@@ -9,6 +9,9 @@ import android.net.Uri
 import android.os.Build
 import android.provider.ContactsContract
 import android.provider.Settings
+import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
@@ -37,6 +40,7 @@ class MainActivity : FlutterActivity() {
             "requestContactsPermission" -> requestContactsPermission(result)
             "pickContact" -> pickContact(result)
             "requestNotificationPermission" -> requestNotificationPermission(result)
+            "openNotificationSettings" -> openNotificationSettings(result)
             "scheduleReminder" -> scheduleReminder(call, result)
             "cancelReminder" -> cancelReminder(call, result)
             "restorePendingReminders" -> restorePendingReminders(result)
@@ -161,8 +165,26 @@ class MainActivity : FlutterActivity() {
         }
 
     private fun requestNotificationPermission(result: MethodChannel.Result) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || hasNotificationPermission()) {
+        if (hasNotificationPermission()) {
             result.success(true)
+            return
+        }
+        if (hasPostNotificationsPermission() &&
+            !NotificationManagerCompat.from(this).areNotificationsEnabled()
+        ) {
+            launchNotificationSettings()
+            result.success(false)
+            return
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            launchNotificationSettings()
+            result.success(hasNotificationPermission())
+            return
+        }
+        val preferences = getSharedPreferences(NOTIFICATION_PREFERENCES, MODE_PRIVATE)
+        if (preferences.getInt(NOTIFICATION_DENIAL_COUNT, 0) >= MAX_NOTIFICATION_DENIALS) {
+            launchNotificationSettings()
+            result.success(hasNotificationPermission())
             return
         }
         if (pendingNotificationResult != null) {
@@ -171,10 +193,43 @@ class MainActivity : FlutterActivity() {
         }
 
         pendingNotificationResult = result
-        requestPermissions(
+        ActivityCompat.requestPermissions(
+            this,
             arrayOf(Manifest.permission.POST_NOTIFICATIONS),
             REQUEST_POST_NOTIFICATIONS,
         )
+    }
+
+    private fun openNotificationSettings(result: MethodChannel.Result) {
+        if (launchNotificationSettings()) {
+            result.success(true)
+        } else {
+            result.error(
+                "NOTIFICATION_SETTINGS_UNAVAILABLE",
+                "Could not open notification settings",
+                null,
+            )
+        }
+    }
+
+    private fun launchNotificationSettings(): Boolean = try {
+        startActivity(
+            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, packageName),
+        )
+        true
+    } catch (settingsError: Exception) {
+        try {
+            startActivity(
+                Intent(
+                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.fromParts("package", packageName, null),
+                ),
+            )
+            true
+        } catch (fallbackError: Exception) {
+            false
+        }
     }
 
     private fun scheduleReminder(call: MethodCall, result: MethodChannel.Result) {
@@ -255,6 +310,7 @@ class MainActivity : FlutterActivity() {
                 roleAvailable && roleManager?.isRoleHeld(RoleManager.ROLE_CALL_SCREENING) == true
             ),
             "readContacts" to hasContactsPermission(),
+            "notificationsGranted" to hasNotificationPermission(),
         )
     }
 
@@ -263,10 +319,18 @@ class MainActivity : FlutterActivity() {
             checkSelfPermission(Manifest.permission.READ_CONTACTS) ==
             PackageManager.PERMISSION_GRANTED
 
-    private fun hasNotificationPermission(): Boolean =
+    private fun hasNotificationPermission(): Boolean {
+        val appNotificationsEnabled = NotificationManagerCompat.from(this)
+            .areNotificationsEnabled()
+        return appNotificationsEnabled && hasPostNotificationsPermission()
+    }
+
+    private fun hasPostNotificationsPermission(): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
-            PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) == PackageManager.PERMISSION_GRANTED
 
     @Deprecated("Deprecated in Android, retained for role activity results")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
@@ -300,7 +364,19 @@ class MainActivity : FlutterActivity() {
             pendingContactsResult?.success(permissionState())
             pendingContactsResult = null
         } else if (requestCode == REQUEST_POST_NOTIFICATIONS) {
-            pendingNotificationResult?.success(hasNotificationPermission())
+            val granted = hasNotificationPermission()
+            val preferences = getSharedPreferences(NOTIFICATION_PREFERENCES, MODE_PRIVATE)
+            if (granted) {
+                preferences.edit().remove(NOTIFICATION_DENIAL_COUNT).apply()
+            } else {
+                preferences.edit()
+                    .putInt(
+                        NOTIFICATION_DENIAL_COUNT,
+                        preferences.getInt(NOTIFICATION_DENIAL_COUNT, 0) + 1,
+                    )
+                    .apply()
+            }
+            pendingNotificationResult?.success(granted)
             pendingNotificationResult = null
         }
     }
@@ -311,6 +387,9 @@ class MainActivity : FlutterActivity() {
         const val REQUEST_READ_CONTACTS = 8402
         const val REQUEST_POST_NOTIFICATIONS = 8403
         const val REQUEST_PICK_CONTACT = 8404
+        const val NOTIFICATION_PREFERENCES = "call_guard_notification_permissions"
+        const val NOTIFICATION_DENIAL_COUNT = "denial_count"
+        const val MAX_NOTIFICATION_DENIALS = 2
         val simulationExecutor = Executors.newSingleThreadExecutor { runnable ->
             Thread(runnable, "CallGuardCallSimulation").apply { isDaemon = true }
         }

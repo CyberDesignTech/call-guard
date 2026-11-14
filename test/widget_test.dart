@@ -63,6 +63,74 @@ void main() {
     expect(await _testDatabase.getPhoneRules('white'), hasLength(2));
   });
 
+  test('legacy reminder tables migrate and persist repeat rules', () async {
+    final databasePath = File('test/call_guard_legacy_reminders_test.db')
+        .absolute
+        .path;
+    final databaseFile = File(databasePath);
+    if (databaseFile.existsSync()) databaseFile.deleteSync();
+    addTearDown(() async {
+      for (final file in [
+        databaseFile,
+        File('$databasePath-shm'),
+        File('$databasePath-wal'),
+      ]) {
+        if (await file.exists()) await file.delete();
+      }
+    });
+
+    final legacyDatabase = await sqflite.openDatabase(
+      databasePath,
+      version: 1,
+      onCreate: (db, version) async {
+        await db.execute('''
+          CREATE TABLE call_reminders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            phone TEXT NOT NULL,
+            contact_name TEXT,
+            remind_at INTEGER NOT NULL,
+            note TEXT,
+            is_done INTEGER DEFAULT 0
+          )
+        ''');
+        await db.insert('call_reminders', {
+          'phone': '+380671234567',
+          'remind_at': 1_900_000_000_000,
+        });
+      },
+    );
+    await legacyDatabase.close();
+
+    final migrated = DatabaseHelper.forTesting(databasePath: databasePath);
+    await migrated.initialize();
+    final legacyRow = (await migrated.getReminders()).firstWhere(
+      (row) => row['phone'] == '+380671234567',
+    );
+    expect(legacyRow['repeat_type'], 'none');
+    expect(legacyRow['repeat_interval'], 1);
+
+    final reminderId = await migrated.insertReminder(
+      phone: '+48123456789',
+      contactName: 'Ada',
+      remindAt: 1_900_000_000_000,
+      note: 'Call back',
+      repeatType: 'custom',
+      repeatInterval: 4,
+    );
+    await migrated.updateReminderSchedule(
+      id: reminderId,
+      remindAt: 1_900_000_100_000,
+      repeatType: 'weekly',
+      repeatInterval: 1,
+    );
+    final updated = (await migrated.getReminders()).singleWhere(
+      (row) => row['id'] == reminderId,
+    );
+    expect(updated['repeat_type'], 'weekly');
+    expect(updated['repeat_interval'], 1);
+    await migrated.close();
+  });
+
   test(
     'can edit a reminder time and delete or clear call log entries',
     () async {
@@ -180,6 +248,11 @@ void main() {
           reason: '${language.label}: $key',
         );
       }
+      expect(
+        strings.call('moreSubtitle').toLowerCase(),
+        isNot(contains('demo')),
+        reason: '${language.label}: reminders page should not say demo',
+      );
     }
   });
 
@@ -201,6 +274,7 @@ void main() {
       await bridge.scheduleReminder(id: 21, remindAt: 1_900_000_000_000);
       await bridge.cancelReminder(21);
       await bridge.restorePendingReminders();
+      await bridge.openNotificationSettings();
       await bridge.openDefaultAppsSettings();
       await bridge.openDialer('+380 67 123 45 67');
 
@@ -209,13 +283,103 @@ void main() {
         'scheduleReminder',
         'cancelReminder',
         'restorePendingReminders',
+        'openNotificationSettings',
         'openDefaultAppsSettings',
         'openDialer',
       ]);
       expect(calls[1].arguments, {'id': 21, 'remindAt': 1_900_000_000_000});
-      expect(calls[5].arguments, {'phoneNumber': '+380 67 123 45 67'});
+      expect(calls[6].arguments, {'phoneNumber': '+380 67 123 45 67'});
     },
   );
+
+  testWidgets(
+    'notification banner refreshes and home shows permission status',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      const channel = MethodChannel('com.wepr.callguard/screening');
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      var notificationsGranted = false;
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        if (call.method == 'checkPermissions') {
+          return {
+            'roleAvailable': true,
+            'callScreeningRole': false,
+            'readContacts': false,
+            'notificationsGranted': notificationsGranted,
+          };
+        }
+        if (call.method == 'restorePendingReminders') return true;
+        return true;
+      });
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+      await pumpApp(tester);
+      await tester.tap(find.byTooltip('Нагадування та Журнал'));
+      await waitForText(
+        tester,
+        'Надайте Call Guard дозвіл на сповіщення, щоб нагадування спрацьовували вчасно при вимкненому екрані',
+      );
+      expect(find.text('Надати дозвіл'), findsOneWidget);
+
+      notificationsGranted = true;
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      await waitForText(tester, 'Створити нагадування');
+      expect(
+        find.text(
+          'Надайте Call Guard дозвіл на сповіщення, щоб нагадування спрацьовували вчасно при вимкненому екрані',
+        ),
+        findsNothing,
+      );
+
+      await tester.tap(find.byTooltip('Захист викликів'));
+      await waitForText(tester, 'Сповіщення дозволено');
+      expect(find.text('Дозвіл на сповіщення'), findsOneWidget);
+    },
+  );
+
+  testWidgets('reminder cards display custom repeat badges', (tester) async {
+    const channel = MethodChannel('com.wepr.callguard/screening');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'checkPermissions') {
+        return {
+          'roleAvailable': true,
+          'callScreeningRole': false,
+          'readContacts': false,
+          'notificationsGranted': false,
+        };
+      }
+      return true;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    await tester.runAsync(() async {
+      final reminder = (await _testDatabase.getReminders()).first;
+      await _testDatabase.updateReminderSchedule(
+        id: reminder['id'] as int,
+        remindAt: DateTime.now()
+            .add(const Duration(days: 3))
+            .millisecondsSinceEpoch,
+        repeatType: 'custom',
+        repeatInterval: 4,
+      );
+    });
+    await pumpApp(tester);
+    await tester.tap(find.byTooltip('Нагадування та Журнал'));
+    await waitForText(tester, 'Олена Коваль');
+    await tester.drag(find.byType(ListView).last, const Offset(0, -500));
+    await tester.pumpAndSettle();
+    expect(find.text('Кожні 4 дн.'), findsOneWidget);
+    expect(find.byTooltip('Змінити дату й час нагадування'), findsWidgets);
+  });
 
   test(
     'contact picker reports permission state and selected contact',
@@ -307,6 +471,11 @@ void main() {
     await tester.ensureVisible(find.text('Створити нагадування'));
     await tester.tap(find.text('Створити нагадування'));
     await tester.pumpAndSettle();
+    expect(find.text('Повторювати'), findsOneWidget);
+    expect(find.text('Одноразово'), findsOneWidget);
+    expect(find.text('Щодня'), findsOneWidget);
+    expect(find.text('Щотижня'), findsOneWidget);
+    expect(find.text('Свій варіант'), findsOneWidget);
     await tester.tap(find.text('Вибрати з контактів'));
     await tester.pumpAndSettle();
     expect(

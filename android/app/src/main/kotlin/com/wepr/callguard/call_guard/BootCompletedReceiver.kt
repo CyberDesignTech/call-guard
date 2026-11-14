@@ -12,7 +12,7 @@ class BootCompletedReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         worker.execute {
             try {
-                CallReminderScheduler.restorePending(context)
+                CallReminderScheduler.restorePending(context, afterBoot = true)
             } catch (error: Exception) {
                 Log.e(TAG, "Could not restore call reminders after reboot", error)
             } finally {

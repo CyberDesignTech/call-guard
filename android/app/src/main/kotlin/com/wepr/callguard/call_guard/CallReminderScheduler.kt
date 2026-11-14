@@ -22,18 +22,20 @@ object CallReminderScheduler {
         val triggerAt = remindAt.coerceAtLeast(System.currentTimeMillis())
 
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
-                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
-            } else {
-                alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
-            }
+            // Alarm clocks are exact, wake the device from Doze and bypass app standby.
+            // They are the strongest alarm API available to a reminder app.
+            alarmManager.setAlarmClock(
+                AlarmManager.AlarmClockInfo(triggerAt, showReminderUi(context, reminderId)),
+                pendingIntent,
+            )
         } catch (securityException: SecurityException) {
-            Log.w(TAG, "Exact alarm permission is unavailable; using an inexact idle-safe alarm")
+            // Android 12+ can withhold exact-alarm access. Keep the reminder usable
+            // with the strongest idle-safe fallback instead of losing it entirely.
+            Log.w(TAG, "Alarm-clock permission is unavailable; using an idle-safe fallback")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
             } else {
+                @Suppress("DEPRECATION")
                 alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
             }
         }
@@ -50,9 +52,28 @@ object CallReminderScheduler {
         pendingIntent.cancel()
     }
 
-    fun restorePending(context: Context) {
-        CallReminderStore.pendingReminders(context).forEach { reminder ->
-            schedule(context, reminder.id, reminder.remindAt)
+    fun restorePending(context: Context, afterBoot: Boolean = false) {
+        val now = System.currentTimeMillis()
+        CallReminderStore.pendingReminders(
+            context,
+            includeFiredOneTime = afterBoot,
+        ).forEach { reminder ->
+            if (afterBoot && reminder.repeatType != "none" && reminder.remindAt <= now) {
+                val next = ReminderRepeatPolicy.nextOccurrence(reminder, now) ?: return@forEach
+                if (CallReminderStore.updateReminderSchedule(
+                        context,
+                        reminder.id,
+                        next,
+                        reminder.repeatType,
+                        reminder.repeatInterval,
+                        lastFiredAt = now,
+                    )
+                ) {
+                    schedule(context, reminder.id, next)
+                }
+            } else {
+                schedule(context, reminder.id, reminder.remindAt)
+            }
         }
     }
 
@@ -72,5 +93,22 @@ object CallReminderScheduler {
         return PendingIntent.getBroadcast(context, reminderId, intent, flags)
     }
 
+    private fun showReminderUi(context: Context, reminderId: Int): PendingIntent {
+        val intent = Intent(context, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PendingIntent.FLAG_IMMUTABLE
+        } else {
+            0
+        }
+        return PendingIntent.getActivity(
+            context,
+            reminderId xor SHOW_UI_REQUEST_CODE_MASK,
+            intent,
+            flags,
+        )
+    }
+
     private const val TAG = "CallReminderScheduler"
+    private const val SHOW_UI_REQUEST_CODE_MASK = 0x40000000
 }

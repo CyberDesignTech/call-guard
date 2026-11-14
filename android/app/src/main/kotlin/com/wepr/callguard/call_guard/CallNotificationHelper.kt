@@ -9,24 +9,29 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.media.AudioAttributes
+import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.util.Log
+import androidx.core.app.NotificationManagerCompat
 import java.util.Locale
 
 object CallNotificationHelper {
-    const val REMINDER_CHANNEL_ID = "call_guard_reminders"
-    const val MISSED_CALL_CHANNEL_ID = "call_guard_missed_calls"
+    const val REMINDER_CHANNEL_ID = "call_guard_reminders_v2"
+    const val MISSED_CALL_CHANNEL_ID = "call_guard_missed_calls_v2"
 
     fun showReminder(context: Context, reminder: CallReminderRecord): Boolean {
         val localizedContext = localizedContext(context)
-        if (!canPostNotifications(context)) return false
         createChannel(
             context,
             localizedContext.getString(R.string.call_reminder_channel_name),
             localizedContext.getString(R.string.call_reminder_channel_description),
             REMINDER_CHANNEL_ID,
         )
+        if (!canPostNotifications(context) || !isChannelEnabled(context, REMINDER_CHANNEL_ID)) {
+            return false
+        }
 
         val dialIntent = dialIntent(context, reminder.phone)
         val dialPendingIntent = PendingIntent.getActivity(
@@ -59,6 +64,8 @@ object CallNotificationHelper {
             REMINDER_CHANNEL_ID,
         )
             .setSmallIcon(android.R.drawable.ic_menu_call)
+            .setVisibility(Notification.VISIBILITY_PUBLIC)
+            .setDefaults(Notification.DEFAULT_ALL)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(Notification.BigTextStyle().bigText(body))
@@ -82,13 +89,15 @@ object CallNotificationHelper {
 
     fun showMissedCall(context: Context, phone: String): Boolean {
         val localizedContext = localizedContext(context)
-        if (!canPostNotifications(context)) return false
         createChannel(
             context,
             localizedContext.getString(R.string.missed_call_channel_name),
             localizedContext.getString(R.string.missed_call_channel_description),
             MISSED_CALL_CHANNEL_ID,
         )
+        if (!canPostNotifications(context) || !isChannelEnabled(context, MISSED_CALL_CHANNEL_ID)) {
+            return false
+        }
 
         val dialPendingIntent = PendingIntent.getActivity(
             context,
@@ -98,6 +107,8 @@ object CallNotificationHelper {
         )
         val notification = notificationBuilder(localizedContext, MISSED_CALL_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_call)
+            .setVisibility(Notification.VISIBILITY_PUBLIC)
+            .setDefaults(Notification.DEFAULT_ALL)
             .setContentTitle(localizedContext.getString(R.string.missed_call_title))
             .setContentText(phone)
             .setCategory(Notification.CATEGORY_CALL)
@@ -151,16 +162,36 @@ object CallNotificationHelper {
             NotificationManager.IMPORTANCE_HIGH,
         ).apply {
             this.description = description
-            lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            enableVibration(true)
+            vibrationPattern = longArrayOf(0L, 250L, 150L, 250L)
+            setSound(
+                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build(),
+            )
         }
         (context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager)
             ?.createNotificationChannel(channel)
     }
 
     private fun canPostNotifications(context: Context): Boolean =
-        Build.VERSION.SDK_INT < 33 ||
-            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
-            PackageManager.PERMISSION_GRANTED
+        NotificationManagerCompat.from(context).areNotificationsEnabled() &&
+            (Build.VERSION.SDK_INT < 33 ||
+                context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
+                PackageManager.PERMISSION_GRANTED)
+
+    private fun isChannelEnabled(context: Context, channelId: String): Boolean =
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            true
+        } else {
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            manager?.getNotificationChannel(channelId)?.let {
+                it.importance != NotificationManager.IMPORTANCE_NONE
+            } ?: false
+        }
 
     private fun notify(context: Context, notificationId: Int, notification: Notification): Boolean =
         runCatching {

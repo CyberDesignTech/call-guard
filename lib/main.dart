@@ -849,6 +849,7 @@ class _SystemCallPermissionsCardState extends State<_SystemCallPermissionsCard>
     roleAvailable: false,
     callScreeningRole: false,
     readContacts: false,
+    notificationsGranted: false,
   );
   bool _loading = true;
   bool _hasError = false;
@@ -880,6 +881,9 @@ class _SystemCallPermissionsCardState extends State<_SystemCallPermissionsCard>
         _loading = false;
         _hasError = false;
       });
+      if (permissions.notificationsGranted) {
+        unawaited(_restoreReminderAlarms());
+      }
     } on PlatformException {
       if (!mounted) return;
       setState(() {
@@ -967,6 +971,27 @@ class _SystemCallPermissionsCardState extends State<_SystemCallPermissionsCard>
     await _refresh();
   }
 
+  Future<void> _requestNotifications() async {
+    try {
+      await _channel.requestNotificationPermission();
+    } on PlatformException {
+      // The status refresh below presents the actual system setting.
+    } on MissingPluginException {
+      // Notifications permission requests are Android-only.
+    }
+    await _refresh();
+  }
+
+  Future<void> _restoreReminderAlarms() async {
+    try {
+      await _channel.restorePendingReminders();
+    } on PlatformException {
+      // Keep the permission card responsive if alarm restoration fails.
+    } on MissingPluginException {
+      // Alarm restoration is Android-only.
+    }
+  }
+
   Widget _permissionRow({
     required IconData icon,
     required String title,
@@ -974,6 +999,7 @@ class _SystemCallPermissionsCardState extends State<_SystemCallPermissionsCard>
     required String grantedLabel,
     required String actionLabel,
     required VoidCallback onRequest,
+    String? missingLabel,
     Widget? grantedAction,
     bool unavailable = false,
   }) {
@@ -1000,7 +1026,7 @@ class _SystemCallPermissionsCardState extends State<_SystemCallPermissionsCard>
                     ? grantedLabel
                     : unavailable
                     ? widget.strings.call('roleUnavailable')
-                    : widget.strings.call('roleMissing'),
+                    : widget.strings.call(missingLabel ?? 'roleMissing'),
                 style: TextStyle(color: _Palette.muted, fontSize: 10),
               ),
             ],
@@ -1061,6 +1087,19 @@ class _SystemCallPermissionsCardState extends State<_SystemCallPermissionsCard>
             grantedLabel: widget.strings.call('contactsGranted'),
             actionLabel: widget.strings.call('grantContacts'),
             onRequest: _requestContacts,
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 10),
+            child: _ThinDivider(),
+          ),
+          _permissionRow(
+            icon: Icons.notifications_active_outlined,
+            title: widget.strings.call('notificationPermissionLabel'),
+            granted: _permissions.notificationsGranted,
+            grantedLabel: widget.strings.call('notificationsGranted'),
+            actionLabel: widget.strings.call('grantNotificationPermission'),
+            onRequest: _requestNotifications,
+            missingLabel: 'notificationsMissing',
           ),
           if (_hasError) ...[
             const SizedBox(height: 8),
@@ -3100,6 +3139,7 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
   List<_Reminder> _reminders = [];
   List<_CallLogEntry> _logs = [];
   bool _loading = true;
+  bool _notificationsGranted = false;
   Timer? _logRefreshTimer;
   final _screeningChannel = CallScreeningChannel();
 
@@ -3108,13 +3148,10 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _reload();
+    _refreshNotificationStatus();
     _logRefreshTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
-        if (_segment == 1) {
-          unawaited(_reloadLogs());
-        } else {
-          unawaited(_reloadReminders());
-        }
+        if (_segment == 1) unawaited(_reloadLogs());
       }
     });
   }
@@ -3129,6 +3166,7 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshNotificationStatus());
       if (_segment == 1) {
         unawaited(_reloadLogs());
       } else {
@@ -3166,6 +3204,39 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
     });
   }
 
+  Future<void> _refreshNotificationStatus() async {
+    try {
+      final permissions = await _screeningChannel.checkPermissions();
+      if (!mounted) return;
+      setState(() => _notificationsGranted = permissions.notificationsGranted);
+      if (permissions.notificationsGranted) {
+        await _screeningChannel.restorePendingReminders();
+      }
+    } on PlatformException {
+      // Non-Android platforms do not expose Android notification permissions.
+    } on MissingPluginException {
+      // The status check is provided by the Android MethodChannel.
+    }
+  }
+
+  Future<void> _requestNotificationAccess() async {
+    try {
+      final granted = await _screeningChannel.requestNotificationPermission();
+      if (granted) {
+        await widget.database.setSetting(
+          'notification_permission_prompted',
+          true,
+        );
+        await _screeningChannel.restorePendingReminders();
+      }
+    } on PlatformException {
+      // Refresh below displays the effective setting after returning from Android settings.
+    } on MissingPluginException {
+      // Notification permission requests are available only on Android.
+    }
+    await _refreshNotificationStatus();
+  }
+
   _Reminder _reminderFromRow(Map<String, Object?> row) => _Reminder(
     id: row['id'] as int,
     phone: row['phone'] as String,
@@ -3173,6 +3244,8 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
     remindAt: row['remind_at'] as int,
     note: row['note'] as String? ?? '',
     isDone: (row['is_done'] as int? ?? 0) != 0,
+    repeatType: row['repeat_type'] as String? ?? 'none',
+    repeatInterval: (row['repeat_interval'] as int? ?? 1).clamp(1, 365).toInt(),
   );
 
   _CallLogEntry _logFromRow(Map<String, Object?> row) => _CallLogEntry(
@@ -3202,6 +3275,16 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
     };
     return '$dayLabel · ${_timeLabel(TimeOfDay.fromDateTime(date))}';
   }
+
+  String? _repeatLabel(_Reminder reminder) => switch (reminder.repeatType) {
+    'daily' => widget.strings.call('repeatDaily'),
+    'weekly' => widget.strings.call('repeatWeekly'),
+    'custom' =>
+      widget.strings
+          .call('repeatEveryDays')
+          .replaceAll('{count}', reminder.repeatInterval.toString()),
+    _ => null,
+  };
 
   Future<void> _toggleReminder(_Reminder reminder) async {
     final id = reminder.id;
@@ -3255,6 +3338,11 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
       initialTime: TimeOfDay.fromDateTime(current),
     );
     if (selectedTime == null || !mounted) return;
+    final repeatRule = await _pickRepeatRule(
+      repeatType: reminder.repeatType,
+      repeatInterval: reminder.repeatInterval,
+    );
+    if (repeatRule == null || !mounted) return;
 
     final updatedReminderAt = DateTime(
       selectedDate.year,
@@ -3263,7 +3351,12 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
       selectedTime.hour,
       selectedTime.minute,
     ).millisecondsSinceEpoch;
-    await widget.database.updateReminderTime(id, updatedReminderAt);
+    await widget.database.updateReminderSchedule(
+      id: id,
+      remindAt: updatedReminderAt,
+      repeatType: repeatRule.type,
+      repeatInterval: repeatRule.interval,
+    );
     try {
       if (reminder.isDone) {
         await _screeningChannel.cancelReminder(id);
@@ -3286,6 +3379,59 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
         SnackBar(content: Text(widget.strings.call('reminderTimeUpdated'))),
       );
   }
+
+  Future<_RepeatRule?> _pickRepeatRule({
+    required String repeatType,
+    required int repeatInterval,
+  }) async {
+    var selectedType = repeatType;
+    final intervalController = TextEditingController(
+      text: repeatInterval.clamp(1, 365).toString(),
+    );
+    final dialogRoute = DialogRoute<_RepeatRule>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(widget.strings.call('repeatTitle')),
+          content: _RepeatFields(
+            strings: widget.strings,
+            repeatType: selectedType,
+            intervalController: intervalController,
+            onRepeatTypeChanged: (value) =>
+                setDialogState(() => selectedType = value),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(widget.strings.call('cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(
+                dialogContext,
+                _RepeatRule(
+                  type: selectedType,
+                  interval: selectedType == 'custom'
+                      ? _repeatIntervalValue(intervalController.text)
+                      : 1,
+                ),
+              ),
+              child: Text(widget.strings.call('save')),
+            ),
+          ],
+        ),
+      ),
+    );
+    final result = await Navigator.of(
+      context,
+      rootNavigator: true,
+    ).push(dialogRoute);
+    await dialogRoute.completed;
+    intervalController.dispose();
+    return result;
+  }
+
+  int _repeatIntervalValue(String raw) =>
+      (int.tryParse(raw) ?? 1).clamp(1, 365).toInt();
 
   Future<void> _dialReminder(String phoneNumber) async {
     try {
@@ -3310,6 +3456,7 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
       // Notification permission requests are available only on Android.
     }
     await widget.database.setSetting('notification_permission_prompted', true);
+    await _refreshNotificationStatus();
     if (!granted && mounted) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
@@ -3376,10 +3523,12 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
     final phoneController = TextEditingController();
     final contactNameController = TextEditingController();
     final noteController = TextEditingController();
+    final repeatIntervalController = TextEditingController(text: '3');
+    var repeatType = 'none';
     var selectedDate = DateTime.now().add(const Duration(days: 1));
     var selectedTime = const TimeOfDay(hour: 9, minute: 0);
 
-    final result = await showDialog<_Reminder>(
+    final dialogRoute = DialogRoute<_Reminder>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
@@ -3465,6 +3614,19 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
                   ],
                 ),
                 const SizedBox(height: 12),
+                _SectionHeading(
+                  title: widget.strings.call('repeatTitle'),
+                  subtitle: widget.strings.call('repeatHint'),
+                ),
+                const SizedBox(height: 6),
+                _RepeatFields(
+                  strings: widget.strings,
+                  repeatType: repeatType,
+                  intervalController: repeatIntervalController,
+                  onRepeatTypeChanged: (value) =>
+                      setDialogState(() => repeatType = value),
+                ),
+                const SizedBox(height: 12),
                 TextField(
                   controller: noteController,
                   textCapitalization: TextCapitalization.sentences,
@@ -3504,6 +3666,10 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
                     note: noteController.text.trim().isEmpty
                         ? '@reminderNewNote'
                         : noteController.text.trim(),
+                    repeatType: repeatType,
+                    repeatInterval: repeatType == 'custom'
+                        ? _repeatIntervalValue(repeatIntervalController.text)
+                        : 1,
                   ),
                 );
               },
@@ -3513,16 +3679,24 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
         ),
       ),
     );
+    final result = await Navigator.of(
+      context,
+      rootNavigator: true,
+    ).push(dialogRoute);
+    await dialogRoute.completed;
 
     phoneController.dispose();
     contactNameController.dispose();
     noteController.dispose();
+    repeatIntervalController.dispose();
     if (result != null && mounted) {
       final reminderId = await widget.database.insertReminder(
         phone: result.phone,
         contactName: result.contactName,
         remindAt: result.remindAt,
         note: result.note,
+        repeatType: result.repeatType,
+        repeatInterval: result.repeatInterval,
       );
       await _requestNotificationPermissionOnce();
       try {
@@ -3598,9 +3772,54 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
   }
 
   List<Widget> _reminderContent() => [
+    if (!_notificationsGranted) ...[
+      Container(
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          color: _Palette.accentSurface(_Palette.amber),
+          borderRadius: BorderRadius.circular(19),
+          border: Border.all(
+            color: _Palette.accent(_Palette.amber).withValues(alpha: 0.35),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.notifications_off_outlined,
+                  color: _Palette.accent(_Palette.amber),
+                  size: 21,
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    widget.strings.call('notificationReminderBanner'),
+                    style: TextStyle(
+                      color: _Palette.ink,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 11),
+            FilledButton.icon(
+              onPressed: _requestNotificationAccess,
+              icon: const Icon(Icons.notifications_active_outlined, size: 17),
+              label: Text(widget.strings.call('grantNotificationPermission')),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 14),
+    ],
     _SectionHeading(
       title: widget.strings.call('scheduledCalls'),
-      subtitle: widget.strings.call('remindersDemoHint'),
+      subtitle: widget.strings.call('remindersLocalHint'),
     ),
     const SizedBox(height: 11),
     if (_loading)
@@ -3615,6 +3834,7 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
             reminder: reminder,
             strings: widget.strings,
             dateLabel: _dateTimeLabel(reminder.remindAt),
+            repeatLabel: _repeatLabel(reminder),
             onCall: () => _dialReminder(reminder.phone),
             onEditTime: () => _editReminderTime(reminder),
             onToggleDone: () => _toggleReminder(reminder),
@@ -3710,6 +3930,8 @@ class _Reminder {
     required this.remindAt,
     required this.note,
     this.isDone = false,
+    this.repeatType = 'none',
+    this.repeatInterval = 1,
   });
 
   final int? id;
@@ -3718,6 +3940,83 @@ class _Reminder {
   final int remindAt;
   final String note;
   final bool isDone;
+  final String repeatType;
+  final int repeatInterval;
+}
+
+class _RepeatRule {
+  const _RepeatRule({required this.type, required this.interval});
+
+  final String type;
+  final int interval;
+}
+
+class _RepeatFields extends StatelessWidget {
+  const _RepeatFields({
+    required this.strings,
+    required this.repeatType,
+    required this.intervalController,
+    required this.onRepeatTypeChanged,
+  });
+
+  final AppStrings strings;
+  final String repeatType;
+  final TextEditingController intervalController;
+  final ValueChanged<String> onRepeatTypeChanged;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      RadioGroup<String>(
+        groupValue: repeatType,
+        onChanged: (value) {
+          if (value != null) onRepeatTypeChanged(value);
+        },
+        child: Column(
+          children: [
+            RadioListTile<String>(
+              value: 'none',
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: Text(strings.call('repeatNone')),
+            ),
+            RadioListTile<String>(
+              value: 'daily',
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: Text(strings.call('repeatDaily')),
+            ),
+            RadioListTile<String>(
+              value: 'weekly',
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: Text(strings.call('repeatWeekly')),
+            ),
+            RadioListTile<String>(
+              value: 'custom',
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: Text(strings.call('repeatCustom')),
+            ),
+          ],
+        ),
+      ),
+      if (repeatType == 'custom')
+        Padding(
+          padding: const EdgeInsets.only(left: 48, right: 8, bottom: 8),
+          child: TextField(
+            controller: intervalController,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: InputDecoration(
+              labelText: strings.call('repeatIntervalLabel'),
+              suffixText: strings.call('repeatDaysUnit'),
+            ),
+          ),
+        ),
+    ],
+  );
 }
 
 class _CallLogEntry {
@@ -3739,6 +4038,7 @@ class _ReminderCard extends StatelessWidget {
     required this.reminder,
     required this.strings,
     required this.dateLabel,
+    required this.repeatLabel,
     required this.onCall,
     required this.onEditTime,
     required this.onToggleDone,
@@ -3748,6 +4048,7 @@ class _ReminderCard extends StatelessWidget {
   final _Reminder reminder;
   final AppStrings strings;
   final String dateLabel;
+  final String? repeatLabel;
   final VoidCallback onCall;
   final VoidCallback onEditTime;
   final VoidCallback onToggleDone;
@@ -3798,51 +4099,65 @@ class _ReminderCard extends StatelessWidget {
                   ),
                 ),
                 Flexible(
-                  child: Tooltip(
-                    message: strings.call('editReminderTime'),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: onEditTime,
-                        borderRadius: BorderRadius.circular(10),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 5,
-                            vertical: 7,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.schedule_rounded,
-                                size: 15,
-                                color: _Palette.accent(_Palette.blue),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      if (repeatLabel != null) ...[
+                        _Tag(
+                          label: repeatLabel!,
+                          color: _Palette.blue,
+                          background: _Palette.bluePale,
+                        ),
+                        const SizedBox(height: 3),
+                      ],
+                      Tooltip(
+                        message: strings.call('editReminderTime'),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: onEditTime,
+                            borderRadius: BorderRadius.circular(10),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 5,
+                                vertical: 7,
                               ),
-                              const SizedBox(width: 5),
-                              Flexible(
-                                child: Text(
-                                  dateLabel,
-                                  textAlign: TextAlign.right,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.schedule_rounded,
+                                    size: 15,
                                     color: _Palette.accent(_Palette.blue),
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 10,
                                   ),
-                                ),
+                                  const SizedBox(width: 5),
+                                  Flexible(
+                                    child: Text(
+                                      dateLabel,
+                                      textAlign: TextAlign.right,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: _Palette.accent(_Palette.blue),
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Icon(
+                                    Icons.edit_calendar_outlined,
+                                    size: 13,
+                                    color: _Palette.muted,
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 3),
-                              Icon(
-                                Icons.edit_calendar_outlined,
-                                size: 13,
-                                color: _Palette.muted,
-                              ),
-                            ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
               ],

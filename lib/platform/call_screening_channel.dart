@@ -5,17 +5,20 @@ class CallScreeningPermissions {
     required this.roleAvailable,
     required this.callScreeningRole,
     required this.readContacts,
+    required this.notificationsGranted,
   });
 
   final bool roleAvailable;
   final bool callScreeningRole;
   final bool readContacts;
+  final bool notificationsGranted;
 
   factory CallScreeningPermissions.fromMap(Map<String, Object?>? values) =>
       CallScreeningPermissions(
         roleAvailable: values?['roleAvailable'] == true,
         callScreeningRole: values?['callScreeningRole'] == true,
         readContacts: values?['readContacts'] == true,
+        notificationsGranted: values?['notificationsGranted'] == true,
       );
 }
 
@@ -96,6 +99,10 @@ class CallScreeningChannel {
   Future<bool> requestNotificationPermission() async =>
       await _channel.invokeMethod<bool>('requestNotificationPermission') ??
       false;
+
+  Future<void> openNotificationSettings() async {
+    await _channel.invokeMethod<bool>('openNotificationSettings');
+  }
 
   Future<void> scheduleReminder({
     required int id,

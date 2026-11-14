@@ -21,9 +21,12 @@ class DatabaseHelper {
         _databasePath ?? path.join(await getDatabasesPath(), 'call_guard.db');
     final database = await openDatabase(
       databasePath,
-      version: 1,
+      version: 2,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
+      onUpgrade: (db, oldVersion, newVersion) =>
+          _ensureReminderRepeatColumns(db),
+      onOpen: _ensureReminderRepeatColumns,
     );
     _openedDatabase = database;
     return database;
@@ -75,7 +78,10 @@ class DatabaseHelper {
         contact_name TEXT,
         remind_at INTEGER NOT NULL,
         note TEXT,
-        is_done INTEGER DEFAULT 0
+        is_done INTEGER DEFAULT 0,
+        repeat_type TEXT NOT NULL DEFAULT 'none',
+        repeat_interval INTEGER NOT NULL DEFAULT 1,
+        last_fired_at INTEGER
       )
     ''');
     await db.execute('''
@@ -233,6 +239,28 @@ class DatabaseHelper {
     await batch.commit(noResult: true);
   }
 
+  Future<void> _ensureReminderRepeatColumns(DatabaseExecutor db) async {
+    final columns = (await db.rawQuery('PRAGMA table_info(call_reminders)'))
+        .map((column) => column['name'] as String?)
+        .whereType<String>()
+        .toSet();
+    if (!columns.contains('repeat_type')) {
+      await db.execute(
+        "ALTER TABLE call_reminders ADD COLUMN repeat_type TEXT NOT NULL DEFAULT 'none'",
+      );
+    }
+    if (!columns.contains('repeat_interval')) {
+      await db.execute(
+        'ALTER TABLE call_reminders ADD COLUMN repeat_interval INTEGER NOT NULL DEFAULT 1',
+      );
+    }
+    if (!columns.contains('last_fired_at')) {
+      await db.execute(
+        'ALTER TABLE call_reminders ADD COLUMN last_fired_at INTEGER',
+      );
+    }
+  }
+
   Map<String, Object?> _operatorSeed(
     String countryIso,
     String nameKey,
@@ -356,21 +384,43 @@ class DatabaseHelper {
     required String? contactName,
     required int remindAt,
     required String? note,
+    String repeatType = 'none',
+    int repeatInterval = 1,
   }) async => (await _database).insert('call_reminders', {
     'phone': phone,
     'contact_name': contactName,
     'remind_at': remindAt,
     'note': note,
     'is_done': 0,
+    'repeat_type': repeatType,
+    'repeat_interval': repeatInterval,
+    'last_fired_at': null,
   });
 
   Future<int> updateReminderDone(int id, bool isDone) async =>
       (await _database).update(
         'call_reminders',
-        {'is_done': isDone ? 1 : 0},
+        {'is_done': isDone ? 1 : 0, if (!isDone) 'last_fired_at': null},
         where: 'id = ?',
         whereArgs: [id],
       );
+
+  Future<int> updateReminderSchedule({
+    required int id,
+    required int remindAt,
+    required String repeatType,
+    required int repeatInterval,
+  }) async => (await _database).update(
+    'call_reminders',
+    {
+      'remind_at': remindAt,
+      'repeat_type': repeatType,
+      'repeat_interval': repeatInterval,
+      'last_fired_at': null,
+    },
+    where: 'id = ?',
+    whereArgs: [id],
+  );
 
   Future<int> updateReminderTime(int id, int remindAt) async =>
       (await _database).update(
