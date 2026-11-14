@@ -13,7 +13,6 @@ object DbContract {
 
     object PhoneRules {
         const val TABLE = "phone_rules"
-        const val ID = "id"
         const val PHONE = "phone"
         const val LABEL = "label"
         const val LIST_TYPE = "list_type"
@@ -53,7 +52,6 @@ object DbContract {
 
     object CallLogs {
         const val TABLE = "call_logs"
-        const val ID = "id"
         const val PHONE = "phone"
         const val REASON = "reason"
         const val TIMESTAMP = "timestamp"

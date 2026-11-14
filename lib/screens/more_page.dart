@@ -24,11 +24,15 @@ class MorePage extends StatefulWidget {
     required this.database,
     required this.onStub,
     required this.strings,
+    required this.isActive,
+    this.journalOpenRequest = 0,
   });
 
   final DatabaseHelper database;
   final VoidCallback onStub;
   final AppStrings strings;
+  final bool isActive;
+  final int journalOpenRequest;
 
   @override
   State<MorePage> createState() => MorePageState();
@@ -40,26 +44,46 @@ class MorePageState extends State<MorePage> with WidgetsBindingObserver {
   List<CallLogEntry> _logs = [];
   bool _loading = true;
   bool _notificationsGranted = false;
-  Timer? _logRefreshTimer;
+  Timer? _refreshTimer;
   final _screeningChannel = CallScreeningChannel();
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    if (widget.journalOpenRequest > 0) _segment = 1;
     _reload();
     _refreshNotificationStatus();
-    _logRefreshTimer = Timer.periodic(const Duration(seconds: 2), (_) {
-      if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
-        if (_segment == 1) unawaited(_reloadLogs());
+    _refreshTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (widget.isActive &&
+          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+        if (_segment == 1) {
+          unawaited(_reloadLogs());
+        } else {
+          unawaited(_reloadReminders());
+        }
       }
     });
   }
 
   @override
+  void didUpdateWidget(covariant MorePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.journalOpenRequest != widget.journalOpenRequest &&
+        widget.journalOpenRequest > 0) {
+      setState(() => _segment = 1);
+      unawaited(_reload());
+    }
+    if (!oldWidget.isActive && widget.isActive) {
+      unawaited(_refreshNotificationStatus());
+      unawaited(_reload());
+    }
+  }
+
+  @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _logRefreshTimer?.cancel();
+    _refreshTimer?.cancel();
     super.dispose();
   }
 
@@ -67,10 +91,12 @@ class MorePageState extends State<MorePage> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(_refreshNotificationStatus());
-      if (_segment == 1) {
-        unawaited(_reloadLogs());
-      } else {
-        unawaited(_reloadReminders());
+      if (widget.isActive) {
+        if (_segment == 1) {
+          unawaited(_reloadLogs());
+        } else {
+          unawaited(_reloadReminders());
+        }
       }
     }
   }
@@ -188,7 +214,7 @@ class MorePageState extends State<MorePage> with WidgetsBindingObserver {
     try {
       if (isDone) {
         await _screeningChannel.cancelReminder(id);
-      } else if (reminder.remindAt > DateTime.now().millisecondsSinceEpoch) {
+      } else {
         await _screeningChannel.scheduleReminder(
           id: id,
           remindAt: reminder.remindAt,
@@ -367,11 +393,18 @@ class MorePageState extends State<MorePage> with WidgetsBindingObserver {
       widget.onStub();
       return;
     }
-    await widget.database.insertPhoneRule(
-      phone: phone,
-      label: null,
-      listType: 'white',
+    final existingRules = await widget.database.getPhoneRules('white');
+    final normalized = phone.trim();
+    final alreadyAllowed = existingRules.any(
+      (row) => (row['phone'] as String? ?? '').trim() == normalized,
     );
+    if (!alreadyAllowed) {
+      await widget.database.insertPhoneRule(
+        phone: phone,
+        label: null,
+        listType: 'white',
+      );
+    }
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -645,7 +678,11 @@ class MorePageState extends State<MorePage> with WidgetsBindingObserver {
             selected: {_segment},
             onSelectionChanged: (selection) {
               setState(() => _segment = selection.first);
-              if (selection.first == 1) unawaited(_reloadLogs());
+              if (selection.first == 1) {
+                unawaited(_reloadLogs());
+              } else {
+                unawaited(_reloadReminders());
+              }
             },
             style: ButtonStyle(
               textStyle: const WidgetStatePropertyAll(
@@ -786,16 +823,34 @@ class MorePageState extends State<MorePage> with WidgetsBindingObserver {
     else
       ..._logs.map((entry) {
         final tint = switch (entry.reason) {
-          'reasonCountry' => AppPalette.red,
-          'reasonHidden' => AppPalette.amber,
-          'reasonSilence' => const Color(0xFF7663D9),
+          'silent_schedule' => const Color(0xFF7663D9),
+          'hidden_number' => AppPalette.amber,
+          'country_block' ||
+          'international_block' ||
+          'blacklist' => AppPalette.red,
+          'operator_block' => const Color(0xFFE07A2E),
+          'non_contacts' || 'not_in_contacts' => const Color(0xFFE07A2E),
+          'allowlist_only' => const Color(0xFFE07A2E),
+          'country_allow' ||
+          'operator_allow' ||
+          'allowlist' ||
+          'emergency_repeat' => AppPalette.green,
           _ => AppPalette.blue,
         };
         final icon = switch (entry.reason) {
-          'reasonCountry' => Icons.public_rounded,
-          'reasonHidden' => Icons.visibility_off_outlined,
-          'reasonSilence' => Icons.notifications_off_outlined,
-          _ => Icons.block_rounded,
+          'silent_schedule' => Icons.notifications_off_outlined,
+          'hidden_number' => Icons.visibility_off_outlined,
+          'country_block' => Icons.public_rounded,
+          'international_block' => Icons.language_rounded,
+          'operator_block' => Icons.cell_tower_rounded,
+          'non_contacts' || 'not_in_contacts' => Icons.person_off_outlined,
+          'allowlist_only' => Icons.playlist_add_check_rounded,
+          'country_allow' => Icons.public_rounded,
+          'operator_allow' => Icons.cell_tower_rounded,
+          'allowlist' => Icons.person_outline_rounded,
+          'emergency_repeat' => Icons.phone_callback_rounded,
+          'blacklist' => Icons.block_rounded,
+          _ => Icons.check_circle_outline_rounded,
         };
         return Padding(
           padding: const EdgeInsets.only(bottom: 10),

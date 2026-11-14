@@ -266,23 +266,6 @@ object CallReminderStore {
             inserted
         }
 
-    fun insertCallLog(context: Context, phone: String, reason: String) {
-        CallGuardDatabase.withDatabase(context) { database ->
-            database.insertOrThrow(
-                DbContract.CallLogs.TABLE,
-                null,
-                ContentValues().apply {
-                    put(
-                        DbContract.CallLogs.PHONE,
-                        phone.ifBlank { PhoneNumbers.HIDDEN_NUMBER },
-                    )
-                    put(DbContract.CallLogs.REASON, reason)
-                    put(DbContract.CallLogs.TIMESTAMP, System.currentTimeMillis())
-                },
-            )
-        }
-    }
-
     private fun updateScheduleRow(
         database: SQLiteDatabase,
         update: ReminderScheduleUpdate,

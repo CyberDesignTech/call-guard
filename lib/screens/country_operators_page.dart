@@ -83,6 +83,8 @@ class CountryOperatorsPageState extends State<CountryOperatorsPage> {
     });
   }
 
+  Future<void> refresh() => _loadCountries();
+
   String _flagForCountry(String isoCode) => switch (isoCode) {
     'UA' => '🇺🇦',
     'PL' => '🇵🇱',
@@ -504,7 +506,9 @@ class CountryOperatorsPageState extends State<CountryOperatorsPage> {
         country.operators.any(
           (operator) =>
               _operatorName(operator).toLowerCase().contains(needle) ||
-              operator.prefixes.any((prefix) => prefix.contains(needle)),
+              operator.prefixes.any(
+                (prefix) => prefix.toLowerCase().contains(needle),
+              ),
         );
   }
 
@@ -518,8 +522,13 @@ class CountryOperatorsPageState extends State<CountryOperatorsPage> {
         : country.operators
               .where(
                 (operator) =>
-                    operator.name.toLowerCase().contains(query.toLowerCase()) ||
-                    operator.prefixes.any((prefix) => prefix.contains(query)),
+                    _operatorName(operator).toLowerCase().contains(
+                      query.toLowerCase(),
+                    ) ||
+                    operator.prefixes.any(
+                      (prefix) =>
+                          prefix.toLowerCase().contains(query.toLowerCase()),
+                    ),
               )
               .toList();
 

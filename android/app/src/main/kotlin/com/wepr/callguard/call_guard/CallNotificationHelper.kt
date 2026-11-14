@@ -137,43 +137,6 @@ object CallNotificationHelper {
                 pendingIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT),
             )
         }
-        val reminderIntent = actionReceiverIntent(
-            context,
-            AnsweringActionReceiver.ACTION_REMIND_30M,
-            cleanNumber,
-            notificationId,
-        )
-        val reminderPendingIntent = PendingIntent.getBroadcast(
-            context,
-            notificationId xor REMIND_ACTION_REQUEST_CODE_MASK,
-            reminderIntent,
-            pendingIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT),
-        )
-        val whitelistIntent = actionReceiverIntent(
-            context,
-            AnsweringActionReceiver.ACTION_ADD_WHITELIST,
-            cleanNumber,
-            notificationId,
-        )
-        val whitelistPendingIntent = PendingIntent.getBroadcast(
-            context,
-            notificationId xor WHITELIST_ACTION_REQUEST_CODE_MASK,
-            whitelistIntent,
-            pendingIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT),
-        )
-        val smsIntent = Intent(
-            Intent.ACTION_SENDTO,
-            Uri.parse("smsto:$cleanNumber"),
-        ).putExtra(
-            "sms_body",
-            localizedContext.getString(R.string.answering_sms_template),
-        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        val smsPendingIntent = PendingIntent.getActivity(
-            context,
-            notificationId xor SMS_ACTION_REQUEST_CODE_MASK,
-            smsIntent,
-            pendingIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT),
-        )
         val publicNotification = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(android.R.drawable.ic_menu_call)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -205,6 +168,43 @@ object CallNotificationHelper {
             .setContentIntent(contentPendingIntent)
             .setPublicVersion(publicNotification)
         if (!hiddenNumber) {
+            val reminderIntent = actionReceiverIntent(
+                context,
+                AnsweringActionReceiver.ACTION_REMIND_30M,
+                cleanNumber,
+                notificationId,
+            )
+            val reminderPendingIntent = PendingIntent.getBroadcast(
+                context,
+                notificationId xor REMIND_ACTION_REQUEST_CODE_MASK,
+                reminderIntent,
+                pendingIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT),
+            )
+            val whitelistIntent = actionReceiverIntent(
+                context,
+                AnsweringActionReceiver.ACTION_ADD_WHITELIST,
+                cleanNumber,
+                notificationId,
+            )
+            val whitelistPendingIntent = PendingIntent.getBroadcast(
+                context,
+                notificationId xor WHITELIST_ACTION_REQUEST_CODE_MASK,
+                whitelistIntent,
+                pendingIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT),
+            )
+            val smsIntent = Intent(
+                Intent.ACTION_SENDTO,
+                Uri.parse("smsto:$cleanNumber"),
+            ).putExtra(
+                "sms_body",
+                localizedContext.getString(R.string.answering_sms_template),
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            val smsPendingIntent = PendingIntent.getActivity(
+                context,
+                notificationId xor SMS_ACTION_REQUEST_CODE_MASK,
+                smsIntent,
+                pendingIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT),
+            )
             builder.addAction(
                 android.R.drawable.ic_menu_recent_history,
                 localizedContext.getString(R.string.answering_action_remind_30),

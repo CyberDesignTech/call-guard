@@ -7,7 +7,6 @@
     <string name="missed_call_channel_name">Callback Assistant</string>
     <string name="missed_call_channel_description">Notifications about rejected incoming calls</string>
     <string name="missed_call_title">Call back</string>
-    <string name="missed_call_action_dial">Call back</string>
     <string name="missed_call_public_title">Call Guard</string>
     <string name="missed_call_public_text">Incoming call declined</string>
     <string name="missed_call_hidden_title">Hidden number declined</string>
@@ -22,6 +21,4 @@
     <string name="reminder_note_meeting">Call back about the meeting</string>
     <string name="reminder_note_check">Check the message</string>
     <string name="reminder_note_new">Call back</string>
-    <string name="allowlist_only">Allowlist only</string>
-    <string name="emergency_repeat">Emergency repeat call allowed</string>
 </resources>

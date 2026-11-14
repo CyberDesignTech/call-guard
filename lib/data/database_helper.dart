@@ -38,6 +38,7 @@ class DatabaseHelper {
       onOpen: (db) async {
         await _ensureReminderRepeatColumns(db);
         await _ensureCallbackSettings(db);
+        await _normalizeLegacyCallLogReasons(db);
       },
     );
     _openedDatabase = database;
@@ -231,21 +232,21 @@ class DatabaseHelper {
 
     batch.insert('call_logs', {
       'phone': '+48 600 123 456',
-      'reason': 'reasonCountry',
+      'reason': 'country_block',
       'timestamp': now
           .subtract(const Duration(hours: 2))
           .millisecondsSinceEpoch,
     });
     batch.insert('call_logs', {
       'phone': '@numberHidden',
-      'reason': 'reasonHidden',
+      'reason': 'hidden_number',
       'timestamp': now
           .subtract(const Duration(hours: 5))
           .millisecondsSinceEpoch,
     });
     batch.insert('call_logs', {
       'phone': '+380 44 555 20 20',
-      'reason': 'reasonSilence',
+      'reason': 'silent_schedule',
       'timestamp': now
           .subtract(const Duration(days: 1, hours: 4))
           .millisecondsSinceEpoch,
@@ -323,6 +324,27 @@ class DatabaseHelper {
         'key': entry.key,
         'value': entry.value,
       }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    }
+  }
+
+  Future<void> _normalizeLegacyCallLogReasons(DatabaseExecutor db) async {
+    final hasCallLogs =
+        (await db.rawQuery(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'call_logs'",
+        )).isNotEmpty;
+    if (!hasCallLogs) return;
+    const legacyReasons = <String, String>{
+      'reasonCountry': 'country_block',
+      'reasonHidden': 'hidden_number',
+      'reasonSilence': 'silent_schedule',
+    };
+    for (final entry in legacyReasons.entries) {
+      await db.update(
+        'call_logs',
+        {'reason': entry.value},
+        where: 'reason = ?',
+        whereArgs: [entry.key],
+      );
     }
   }
 
@@ -506,16 +528,6 @@ class DatabaseHelper {
 
   Future<List<Map<String, Object?>>> getCallLogs() async =>
       (await _database).query('call_logs', orderBy: 'timestamp DESC');
-
-  Future<int> insertCallLog({
-    required String phone,
-    required String reason,
-    required int timestamp,
-  }) async => (await _database).insert('call_logs', {
-    'phone': phone,
-    'reason': reason,
-    'timestamp': timestamp,
-  });
 
   Future<int> deleteCallLog(int id) async =>
       (await _database).delete('call_logs', where: 'id = ?', whereArgs: [id]);

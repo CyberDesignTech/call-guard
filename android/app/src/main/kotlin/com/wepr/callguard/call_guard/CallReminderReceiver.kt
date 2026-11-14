@@ -33,12 +33,11 @@ class CallReminderReceiver : BroadcastReceiver() {
                         if (reminder == null || reminder.isDone) {
                             CallReminderScheduler.cancel(appContext, reminderId)
                         } else {
-                            val notificationShown =
-                                CallNotificationHelper.showReminder(appContext, reminder)
+                            CallNotificationHelper.showReminder(appContext, reminder)
                             if (reminder.repeatType == "none") {
-                                if (notificationShown) {
-                                    CallReminderStore.markFired(appContext, reminder.id)
-                                }
+                                // One-time reminders must never fire again, even when the
+                                // notification could not be shown (disabled channel/permission).
+                                CallReminderStore.markFired(appContext, reminder.id)
                             } else {
                                 // Repeating reminders must advance even if notifications are
                                 // disabled, otherwise they would stay stuck in the past.

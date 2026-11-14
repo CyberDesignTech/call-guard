@@ -7,7 +7,6 @@
     <string name="missed_call_channel_name">Asistente de devolución</string>
     <string name="missed_call_channel_description">Avisos sobre llamadas entrantes rechazadas</string>
     <string name="missed_call_title">Devolver llamada</string>
-    <string name="missed_call_action_dial">Devolver llamada</string>
     <string name="missed_call_public_title">Call Guard</string>
     <string name="missed_call_public_text">Llamada entrante rechazada</string>
     <string name="missed_call_hidden_title">Llamada de número oculto rechazada</string>
@@ -22,6 +21,4 @@
     <string name="reminder_note_meeting">Devolver llamada sobre la reunión</string>
     <string name="reminder_note_check">Revisar el mensaje</string>
     <string name="reminder_note_new">Devolver llamada</string>
-    <string name="allowlist_only">Solo lista permitida</string>
-    <string name="emergency_repeat">Se permitió la llamada repetida de emergencia</string>
 </resources>

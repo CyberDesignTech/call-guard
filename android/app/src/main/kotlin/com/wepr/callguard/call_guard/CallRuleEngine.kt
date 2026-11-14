@@ -47,13 +47,6 @@ class CallRuleEngine(context: Context) {
         }
     }
 
-    /** Evaluates and persists rejected calls to the shared call_logs table. */
-    fun evaluateAndRecord(phoneNumber: String?): CallRuleVerdict {
-        val result = evaluate(phoneNumber)
-        if (!result.allowed) recordCallLog(result.phoneNumber, result.reason)
-        return result
-    }
-
     fun recordCallLog(phoneNumber: String, reason: String) {
         try {
             CallGuardDatabase.withDatabase(appContext) { database ->
@@ -97,17 +90,12 @@ class CallRuleEngine(context: Context) {
             val emergencyRepeatEnabled = settings.bool(
                 DbContract.SettingKeys.ANSWERING_EMERGENCY_REPEAT,
                 false,
-            )
-            if (emergencyRepeatEnabled && !hidden && canonicalPhone.isNotBlank()) {
-                val isBlacklisted = matchesPhoneRule(
-                    database,
-                    DbContract.PhoneRules.BLACK,
-                    rawPhone,
-                    canonicalPhone,
-                )
-                if (!isBlacklisted && wasRecentlyRejectedBySilence(database, canonicalPhone)) {
-                    return verdict(true, "emergency_repeat", canonicalPhone)
-                }
+            ) && settings.bool(DbContract.SettingKeys.ANSWERING_ENABLED, false)
+            if (emergencyRepeatEnabled && !hidden && canonicalPhone.isNotBlank() &&
+                !isExplicitlyBlocked(database, rawPhone, canonicalPhone, settings) &&
+                wasRecentlyRejectedBySilence(database, canonicalPhone)
+            ) {
+                return verdict(true, "emergency_repeat", canonicalPhone)
             }
             return verdict(false, "silent_schedule", PhoneNumbers.logValue(rawPhone, canonicalPhone))
         }
@@ -264,6 +252,38 @@ class CallRuleEngine(context: Context) {
             }
         }
         return false
+    }
+
+    /**
+     * True when the number is blocked by a conscious rule (blacklist, country, operator or
+     * international block). The emergency repeat must never bypass those decisions.
+     */
+    private fun isExplicitlyBlocked(
+        database: SQLiteDatabase,
+        rawPhone: String,
+        canonicalPhone: String,
+        settings: Map<String, String>,
+    ): Boolean {
+        if (matchesPhoneRule(database, DbContract.PhoneRules.BLACK, rawPhone, canonicalPhone)) {
+            return true
+        }
+
+        val countries = readCountries(database)
+        val phoneDigits = PhoneNumbers.digits(canonicalPhone)
+        val matchedCountry = countries
+            .filter { it.dialDigits.isNotEmpty() && phoneDigits.startsWith(it.dialDigits) }
+            .maxByOrNull { it.dialDigits.length }
+
+        if (matchedCountry != null) {
+            val nationalDigits = phoneDigits.drop(matchedCountry.dialDigits.length)
+            if (findOperatorAction(database, matchedCountry.isoCode, nationalDigits) == ACTION_BLOCK) {
+                return true
+            }
+            if (matchedCountry.action == ACTION_BLOCK) return true
+        }
+
+        return settings.bool(DbContract.SettingKeys.BLOCK_INTERNATIONAL, false) &&
+            isInternational(rawPhone, canonicalPhone, matchedCountry, countries)
     }
 
     private fun samePhone(rawPhone: String, canonicalPhone: String, storedPhone: String): Boolean {

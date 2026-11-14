@@ -7,7 +7,6 @@
     <string name="missed_call_channel_name">Assistant de rappel</string>
     <string name="missed_call_channel_description">Notifications des appels entrants rejetés</string>
     <string name="missed_call_title">Rappeler</string>
-    <string name="missed_call_action_dial">Rappeler</string>
     <string name="missed_call_public_title">Call Guard</string>
     <string name="missed_call_public_text">Appel entrant rejeté</string>
     <string name="missed_call_hidden_title">Appel d’un numéro masqué rejeté</string>
@@ -22,6 +21,4 @@
     <string name="reminder_note_meeting">Rappeler au sujet de la réunion</string>
     <string name="reminder_note_check">Vérifier le message</string>
     <string name="reminder_note_new">Rappeler</string>
-    <string name="allowlist_only">Liste autorisée uniquement</string>
-    <string name="emergency_repeat">Rappel d’urgence autorisé</string>
 </resources>

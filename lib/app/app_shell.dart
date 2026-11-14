@@ -267,6 +267,7 @@ class CallGuardShellState extends State<CallGuardShell> {
             database: widget.database,
             onStub: _showStub,
             strings: widget.strings,
+            isActive: _section == AppSection.lists,
             onEdgeSwipe: (direction) => _selectSection(
               AppSection.values[AppSection.lists.index + direction],
             ),
@@ -283,7 +284,6 @@ class CallGuardShellState extends State<CallGuardShell> {
             onEndTimeChanged: widget.onSilenceEndChanged,
             selectedDays: widget.silenceWeekdays,
             onSelectedDaysChanged: widget.onSilenceWeekdaysChanged,
-            onStub: _showStub,
           ),
           AnsweringModePage(
             strings: widget.strings,
@@ -306,6 +306,8 @@ class CallGuardShellState extends State<CallGuardShell> {
             database: widget.database,
             onStub: _showStub,
             strings: widget.strings,
+            isActive: _section == AppSection.more,
+            journalOpenRequest: widget.openCallJournalRequest,
           ),
         ],
       ),

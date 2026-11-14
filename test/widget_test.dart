@@ -9,6 +9,12 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart' as ffi;
 import 'package:call_guard/data/database_helper.dart';
 import 'package:call_guard/main.dart';
 import 'package:call_guard/l10n/app_strings.dart';
+import 'package:call_guard/l10n/strings_de.dart';
+import 'package:call_guard/l10n/strings_en.dart';
+import 'package:call_guard/l10n/strings_es.dart';
+import 'package:call_guard/l10n/strings_fr.dart';
+import 'package:call_guard/l10n/strings_pl.dart';
+import 'package:call_guard/l10n/strings_uk.dart';
 import 'package:call_guard/platform/call_screening_channel.dart';
 
 late DatabaseHelper _testDatabase;
@@ -1007,5 +1013,133 @@ void main() {
     await tester.tap(find.text('Додати оператора'));
     await tester.pumpAndSettle();
     expect(find.text('Мережеві префікси (NDC)'), findsOneWidget);
+  });
+
+  testWidgets('openCallJournal deep link selects the journal segment', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    const channel = MethodChannel('com.wepr.callguard/screening');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'checkPermissions') {
+        return {
+          'roleAvailable': true,
+          'callScreeningRole': false,
+          'readContacts': false,
+          'notificationsGranted': false,
+        };
+      }
+      if (call.method == 'consumePendingCallJournal') return false;
+      return true;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    await pumpApp(tester);
+    await tester.tap(find.byTooltip('Нагадування та Журнал'));
+    await finishSectionTransition(tester);
+    await waitForText(tester, 'Олена Коваль');
+    expect(find.text('Останні блокування'), findsNothing);
+
+    await messenger.handlePlatformMessage(
+      'com.wepr.callguard/screening',
+      const StandardMethodCodec().encodeMethodCall(
+        const MethodCall('openCallJournal'),
+      ),
+      (_) {},
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Останні блокування'), findsOneWidget);
+    expect(find.text('Нагадування про дзвінки'), findsOneWidget);
+    expect(find.text('Олена Коваль'), findsNothing);
+  });
+
+  testWidgets('operator search matches localized name case-insensitively', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await pumpApp(tester);
+    await tester.tap(find.byTooltip('Списки та фільтри'));
+    await finishSectionTransition(tester);
+    await waitForText(tester, 'Країни та оператори');
+    await tester.tap(find.text('Країни та оператори'));
+    await finishSectionTransition(tester);
+    await waitForText(tester, 'Україна');
+
+    expect(find.byType(TextField), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'КИЇВСТАР');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Україна'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Київстар'), findsOneWidget);
+    expect(find.text('Vodafone UA'), findsNothing);
+    expect(find.text('lifecell'), findsNothing);
+  });
+
+  test('dictionaries stay complete with identical placeholders', () {
+    final dictionaries = <String, Map<String, String>>{
+      'uk': stringsUk,
+      'en': stringsEn,
+      'pl': stringsPl,
+      'de': stringsDe,
+      'es': stringsEs,
+      'fr': stringsFr,
+    };
+    final referenceKeys = stringsUk.keys.toSet();
+    final placeholder = RegExp(r'\{[^}]+\}');
+    Set<String> placeholders(String text) =>
+        placeholder.allMatches(text).map((match) => match.group(0)!).toSet();
+
+    for (final entry in dictionaries.entries) {
+      expect(
+        entry.value.keys.toSet(),
+        referenceKeys,
+        reason: '${entry.key} dictionary keys must match Ukrainian',
+      );
+      for (final key in referenceKeys) {
+        expect(
+          placeholders(entry.value[key]!),
+          placeholders(stringsUk[key]!),
+          reason: '${entry.key}.$key placeholders must match Ukrainian',
+        );
+      }
+    }
+
+    const removedKeys = {
+      'answeringActionRemind30',
+      'answeringActionWhitelist',
+      'answeringActionSms',
+      'answeringSmsTemplate',
+      'answering_machine',
+      'reasonCountry',
+      'reasonHidden',
+      'reasonSilence',
+    };
+    for (final entry in dictionaries.entries) {
+      for (final removed in removedKeys) {
+        expect(
+          entry.value.containsKey(removed),
+          isFalse,
+          reason: '${entry.key} still contains dead key $removed',
+        );
+      }
+      for (final key in ['scheduleActive', 'journalDemoHint']) {
+        final text = entry.value[key]!.toLowerCase();
+        expect(text, isNot(contains('demo')), reason: '${entry.key}.$key');
+        expect(text, isNot(contains('демо')), reason: '${entry.key}.$key');
+        expect(text, isNot(contains('démo')), reason: '${entry.key}.$key');
+      }
+    }
   });
 }

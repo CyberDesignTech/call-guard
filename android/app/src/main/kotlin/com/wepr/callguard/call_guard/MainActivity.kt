@@ -2,6 +2,7 @@ package com.wepr.callguard.call_guard
 
 import android.Manifest
 import android.app.Activity
+import android.app.NotificationManager
 import android.app.role.RoleManager
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -336,7 +337,7 @@ class MainActivity : FlutterActivity() {
         }
 
         simulationExecutor.execute {
-            val verdict = CallRuleEngine(applicationContext).evaluateAndRecord(phoneNumber)
+            val verdict = CallRuleEngine(applicationContext).evaluate(phoneNumber)
             runOnUiThread { result.success(verdict.toMap()) }
         }
     }
@@ -366,7 +367,18 @@ class MainActivity : FlutterActivity() {
     private fun hasNotificationPermission(): Boolean {
         val appNotificationsEnabled = NotificationManagerCompat.from(this)
             .areNotificationsEnabled()
-        return appNotificationsEnabled && hasPostNotificationsPermission()
+        return appNotificationsEnabled &&
+            hasPostNotificationsPermission() &&
+            hasMainChannelsEnabled()
+    }
+
+    private fun hasMainChannelsEnabled(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return true
+        val manager = getSystemService(NotificationManager::class.java) ?: return true
+        return MAIN_NOTIFICATION_CHANNELS.all { channelId ->
+            manager.getNotificationChannel(channelId)?.importance !=
+                NotificationManager.IMPORTANCE_NONE
+        }
     }
 
     private fun hasPostNotificationsPermission(): Boolean =
@@ -461,6 +473,10 @@ class MainActivity : FlutterActivity() {
         const val NOTIFICATION_PREFERENCES = "call_guard_notification_permissions"
         const val NOTIFICATION_DENIAL_COUNT = "denial_count"
         const val MAX_NOTIFICATION_DENIALS = 2
+        val MAIN_NOTIFICATION_CHANNELS = listOf(
+            CallNotificationHelper.MISSED_CALL_CHANNEL_ID,
+            CallNotificationHelper.REMINDER_CHANNEL_ID,
+        )
         val simulationExecutor = Executors.newSingleThreadExecutor { runnable ->
             Thread(runnable, "CallGuardCallSimulation").apply { isDaemon = true }
         }

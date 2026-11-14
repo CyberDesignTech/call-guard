@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../data/database_helper.dart';
@@ -16,12 +18,14 @@ class ListsPage extends StatefulWidget {
     required this.database,
     required this.onStub,
     required this.strings,
+    required this.isActive,
     this.onEdgeSwipe,
   });
 
   final DatabaseHelper database;
   final VoidCallback onStub;
   final AppStrings strings;
+  final bool isActive;
   final ValueChanged<int>? onEdgeSwipe;
 
   @override
@@ -29,7 +33,7 @@ class ListsPage extends StatefulWidget {
 }
 
 class ListsPageState extends State<ListsPage>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   int _tab = 0;
   bool _loadingRules = true;
   double _edgeOverscroll = 0;
@@ -37,21 +41,48 @@ class ListsPageState extends State<ListsPage>
   final _countryPageKey = GlobalKey<CountryOperatorsPageState>();
   List<ListEntry> _whitelist = [];
   List<ListEntry> _blacklist = [];
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _tabController = TabController(length: 3, vsync: this)
       ..addListener(_handleTabChanged);
     _reloadRules();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (widget.isActive &&
+          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+        unawaited(_reloadRules());
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant ListsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.isActive && widget.isActive) {
+      unawaited(_reloadRules());
+      unawaited(_countryPageKey.currentState?.refresh() ?? Future<void>.value());
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _refreshTimer?.cancel();
     _tabController
       ..removeListener(_handleTabChanged)
       ..dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && widget.isActive) {
+      unawaited(_reloadRules());
+      unawaited(_countryPageKey.currentState?.refresh() ?? Future<void>.value());
+    }
   }
 
   void _handleTabChanged() {

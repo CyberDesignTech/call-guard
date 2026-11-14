@@ -35,7 +35,8 @@ object OptionalAnsweringModule {
         if (!isEnabled(snapshot)) return false
         val applies = when (scenario) {
             SCENARIO_SILENCE -> ruleReason == "silent_schedule"
-            SCENARIO_UNKNOWN_NUMBERS -> isUnknownNumber(context, phoneNumber)
+            SCENARIO_UNKNOWN_NUMBERS ->
+                ruleReason in UNKNOWN_NUMBER_REASONS && isUnknownNumber(context, phoneNumber)
             else -> false
         }
         if (!applies) return false
@@ -123,6 +124,12 @@ object OptionalAnsweringModule {
     private const val DEFAULT_AUTO_REMINDER_MINUTES = 30L
     private const val MILLIS_PER_MINUTE = 60_000L
     private val AUTO_REMINDER_MINUTES = setOf(15, 30, 60)
+    private val UNKNOWN_NUMBER_REASONS = setOf(
+        "default_allow",
+        "not_in_contacts",
+        "non_contacts",
+        "unknown_number",
+    )
     const val SCENARIO_SILENCE = "quiet_mode"
     const val SCENARIO_UNKNOWN_NUMBERS = "unknown_numbers"
 }

@@ -22,7 +22,6 @@ class SchedulePage extends StatefulWidget {
     required this.onEndTimeChanged,
     required this.selectedDays,
     required this.onSelectedDaysChanged,
-    required this.onStub,
   });
 
   final AppStrings strings;
@@ -36,7 +35,6 @@ class SchedulePage extends StatefulWidget {
   final ValueChanged<TimeOfDay> onEndTimeChanged;
   final Set<int> selectedDays;
   final ValueChanged<Set<int>> onSelectedDaysChanged;
-  final VoidCallback onStub;
 
   @override
   State<SchedulePage> createState() => SchedulePageState();
