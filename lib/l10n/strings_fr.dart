@@ -222,7 +222,22 @@ const Map<String, String> stringsFr = {
   'answeringContactsPermissionWarning': 'L’accès aux contacts est nécessaire pour distinguer les contacts enregistrés des numéros inconnus.',
   'notificationsPermissionNeeded':
       'Autorisez les notifications pour voir les rappels d’appel.',
+  'answeringAutoRemindLabel': 'Me rappeler automatiquement de rappeler',
+  'answeringAutoRemindDescription':
+      'Créer un rappel après le rejet d’un appel selon le scénario choisi.',
+  'answeringAutoRemindIntervalLabel': 'Me rappeler dans',
+  'answeringInterval15': '15 min',
+  'answeringInterval30': '30 min',
+  'answeringInterval60': '1 h',
+  'answeringEmergencyRepeatLabel': 'Passage d’urgence (rappel sous 5 min)',
+  'answeringEmergencyRepeatDescription': 'Un nouvel appel du même numéro visible sonnera en mode silencieux s’il arrive dans les 5 minutes. Les numéros bloqués le resteront.',
+  'answeringActionRemind30': 'Rappel dans 30 min',
+  'answeringActionWhitelist': 'Ajouter aux autorisés',
+  'answeringActionSms': 'SMS',
+  'answeringSmsTemplate':
+      'Je ne peux pas parler maintenant. Je vous rappellerai plus tard.',
   'answering_machine': 'Rappel pour rappeler',
+  'emergency_repeat': 'Rappel d’urgence autorisé',
   'systemRoleLabel': 'Identification et spam',
   'roleGranted': 'Rôle système accordé',
   'roleMissing': 'Rôle système non accordé',

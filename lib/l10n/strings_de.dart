@@ -221,7 +221,23 @@ const Map<String, String> stringsDe = {
   'answeringContactsPermissionWarning': 'Der Kontaktzugriff wird benötigt, um gespeicherte Kontakte von unbekannten Nummern zu unterscheiden.',
   'notificationsPermissionNeeded':
       'Erlauben Sie Benachrichtigungen, um Anruferinnerungen zu sehen.',
+  'answeringAutoRemindLabel': 'Automatisch ans Zurückrufen erinnern',
+  'answeringAutoRemindDescription':
+      'Nach einer Ablehnung im gewählten Szenario eine Erinnerung erstellen.',
+  'answeringAutoRemindIntervalLabel': 'Erinnern in',
+  'answeringInterval15': '15 Min.',
+  'answeringInterval30': '30 Min.',
+  'answeringInterval60': '1 Std.',
+  'answeringEmergencyRepeatLabel':
+      'Notfall-Durchlass (Rückruf innerhalb von 5 Min.)',
+  'answeringEmergencyRepeatDescription': 'Ein erneuter Anruf derselben sichtbaren Nummer klingelt innerhalb von 5 Minuten auch im Ruhemodus. Nummern auf der Sperrliste bleiben blockiert.',
+  'answeringActionRemind30': 'In 30 Min. erinnern',
+  'answeringActionWhitelist': 'Zur Erlaubnisliste',
+  'answeringActionSms': 'SMS',
+  'answeringSmsTemplate':
+      'Ich kann gerade nicht sprechen. Ich rufe später zurück.',
   'answering_machine': 'Rückruferinnerung',
+  'emergency_repeat': 'Erneuter Notfallanruf durchgelassen',
   'systemRoleLabel': 'Anrufer-ID und Spam',
   'roleGranted': 'Systemrolle erteilt',
   'roleMissing': 'Systemrolle nicht erteilt',

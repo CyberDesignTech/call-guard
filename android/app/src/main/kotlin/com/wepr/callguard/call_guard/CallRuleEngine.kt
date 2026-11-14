@@ -86,14 +86,29 @@ class CallRuleEngine(context: Context) {
         }
 
         val calendar = Calendar.getInstance()
-        if (settings.bool(DbContract.SettingKeys.MANUAL_SILENCE_ENABLED, false) ||
+        val silenceActive = settings.bool(DbContract.SettingKeys.MANUAL_SILENCE_ENABLED, false) ||
             settings.bool(DbContract.SettingKeys.MANUAL_SILENCE, false) ||
             settings.bool(DbContract.SettingKeys.SILENCE_MANUAL, false) ||
             (
                 settings.bool(DbContract.SettingKeys.AUTOMATIC_SILENCE, false) &&
                     isWithinQuietSchedule(settings, calendar)
+            )
+        if (silenceActive) {
+            val emergencyRepeatEnabled = settings.bool(
+                DbContract.SettingKeys.ANSWERING_EMERGENCY_REPEAT,
+                false,
+            )
+            if (emergencyRepeatEnabled && !hidden && canonicalPhone.isNotBlank()) {
+                val isBlacklisted = matchesPhoneRule(
+                    database,
+                    DbContract.PhoneRules.BLACK,
+                    rawPhone,
+                    canonicalPhone,
                 )
-        ) {
+                if (!isBlacklisted && wasRecentlyRejectedBySilence(database, canonicalPhone)) {
+                    return verdict(true, "emergency_repeat", canonicalPhone)
+                }
+            }
             return verdict(false, "silent_schedule", PhoneNumbers.logValue(rawPhone, canonicalPhone))
         }
 
@@ -226,6 +241,31 @@ class CallRuleEngine(context: Context) {
         return false
     }
 
+    private fun wasRecentlyRejectedBySilence(
+        database: SQLiteDatabase,
+        canonicalPhone: String,
+    ): Boolean {
+        val cutoff = System.currentTimeMillis() - EMERGENCY_REPEAT_WINDOW_MS
+        val targetDigits = PhoneNumbers.digits(canonicalPhone)
+        if (targetDigits.isEmpty()) return false
+
+        database.rawQuery(
+            "SELECT ${DbContract.CallLogs.PHONE} FROM ${DbContract.CallLogs.TABLE} " +
+                "WHERE ${DbContract.CallLogs.TIMESTAMP} >= ? AND " +
+                "${DbContract.CallLogs.REASON} = ?",
+            arrayOf(cutoff.toString(), "silent_schedule"),
+        ).use { cursor ->
+            val phoneColumn = cursor.getColumnIndexOrThrow(DbContract.CallLogs.PHONE)
+            while (cursor.moveToNext()) {
+                val recentPhone = cursor.getString(phoneColumn).orEmpty()
+                if (PhoneNumbers.isHidden(recentPhone)) continue
+                val recentCanonical = PhoneNumbers.canonicalize(appContext, recentPhone)
+                if (PhoneNumbers.digits(recentCanonical) == targetDigits) return true
+            }
+        }
+        return false
+    }
+
     private fun samePhone(rawPhone: String, canonicalPhone: String, storedPhone: String): Boolean {
         val storedCanonical = PhoneNumbers.canonicalize(appContext, storedPhone)
         val incomingDigits = PhoneNumbers.digits(canonicalPhone)
@@ -313,5 +353,6 @@ class CallRuleEngine(context: Context) {
         const val ACTION_BLOCK = "block"
         const val DEFAULT_START_MINUTE = 22 * 60
         const val DEFAULT_END_MINUTE = 7 * 60
+        const val EMERGENCY_REPEAT_WINDOW_MS = 5 * 60 * 1000L
     }
 }

@@ -78,6 +78,21 @@ void main() {
     );
   });
 
+  test('callback assistant settings default safely and persist', () async {
+    final defaults = await _testDatabase.getSettings();
+    expect(defaults['answering_auto_remind'], 'false');
+    expect(defaults['answering_auto_remind_minutes'], '30');
+    expect(defaults['answering_emergency_repeat'], 'false');
+
+    await _testDatabase.setSetting('answering_auto_remind', true);
+    await _testDatabase.setSetting('answering_auto_remind_minutes', 15);
+    await _testDatabase.setSetting('answering_emergency_repeat', true);
+    final saved = await _testDatabase.getSettings();
+    expect(saved['answering_auto_remind'], 'true');
+    expect(saved['answering_auto_remind_minutes'], '15');
+    expect(saved['answering_emergency_repeat'], 'true');
+  });
+
   test('legacy reminder tables migrate and persist repeat rules', () async {
     final databasePath = File('test/call_guard_legacy_reminders_test.db')
         .absolute
@@ -118,6 +133,10 @@ void main() {
 
     final migrated = DatabaseHelper.forTesting(databasePath: databasePath);
     await migrated.initialize();
+    final migratedSettings = await migrated.getSettings();
+    expect(migratedSettings['answering_auto_remind'], 'false');
+    expect(migratedSettings['answering_auto_remind_minutes'], '30');
+    expect(migratedSettings['answering_emergency_repeat'], 'false');
     expect(
       await migrated.getIndexNamesForTesting(),
       contains('idx_call_reminders_pending'),
@@ -127,6 +146,7 @@ void main() {
     );
     expect(legacyRow['repeat_type'], 'none');
     expect(legacyRow['repeat_interval'], 1);
+    expect(legacyRow['created_at'], 0);
 
     final reminderId = await migrated.insertReminder(
       phone: '+48123456789',
@@ -809,6 +829,71 @@ void main() {
       'Доступ до контактів потрібен, щоб відрізнити збережені номери від невідомих.',
     );
     expect(find.text('Надати доступ'), findsOneWidget);
+  });
+
+  testWidgets('callback assistant auto-remind and emergency settings work', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 1300);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    const channel = MethodChannel('com.wepr.callguard/screening');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'checkPermissions') {
+        return {
+          'roleAvailable': true,
+          'callScreeningRole': true,
+          'readContacts': true,
+          'notificationsGranted': true,
+        };
+      }
+      if (call.method == 'consumePendingCallJournal') return false;
+      if (call.method == 'restorePendingReminders') return true;
+      return null;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    await pumpApp(tester);
+    await tester.tap(find.byTooltip('Помічник передзвону'));
+    await finishSectionTransition(tester);
+
+    final autoRemindLabel = find.text('Автоматично нагадувати передзвонити');
+    await tester.ensureVisible(autoRemindLabel);
+    await tester.tap(autoRemindLabel);
+    await tester.pump();
+    expect(find.text('15 хв'), findsOneWidget);
+    expect(find.text('30 хв'), findsOneWidget);
+    expect(find.text('1 год'), findsOneWidget);
+    await tester.tap(find.text('15 хв'));
+    await tester.pump();
+
+    final emergencyLabel = find.text(
+      'Екстрений прорив (повторний дзвінок за 5 хв)',
+    );
+    await tester.ensureVisible(emergencyLabel);
+    await tester.pump();
+    await tester.tap(emergencyLabel);
+    await tester.pump();
+
+    // The app persists settings asynchronously; poll until the writes land.
+    var settings = await tester.runAsync(_testDatabase.getSettings) ?? {};
+    for (
+      var attempt = 0;
+      attempt < 20 && settings['answering_emergency_repeat'] != 'true';
+      attempt++
+    ) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      settings = await tester.runAsync(_testDatabase.getSettings) ?? {};
+    }
+    expect(settings['answering_auto_remind'], 'true');
+    expect(settings['answering_auto_remind_minutes'], '15');
+    expect(settings['answering_emergency_repeat'], 'true');
   });
 
   testWidgets('profile menu opens About and Support dialogs', (tester) async {

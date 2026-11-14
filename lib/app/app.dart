@@ -38,6 +38,9 @@ class CallGuardAppState extends State<CallGuardApp>
   bool _answeringEnabled = false;
   String _answeringScenario = 'quiet_mode';
   bool _answeringLocalNotification = true;
+  bool _answeringAutoRemind = false;
+  int _answeringAutoRemindMinutes = 30;
+  bool _answeringEmergencyRepeat = false;
   int _openCallJournalRequest = 0;
   late final CallScreeningChannel _screeningChannel;
   Future<void> _pendingSettingsWrites = Future<void>.value();
@@ -129,6 +132,16 @@ class CallGuardAppState extends State<CallGuardApp>
         _answeringLocalNotification = parseBool(
           'answering_local_notification',
           true,
+        );
+        _answeringAutoRemind = parseBool('answering_auto_remind', false);
+        final autoRemindMinutes = parseInt('answering_auto_remind_minutes', 30);
+        _answeringAutoRemindMinutes =
+            const {15, 30, 60}.contains(autoRemindMinutes)
+            ? autoRemindMinutes
+            : 30;
+        _answeringEmergencyRepeat = parseBool(
+          'answering_emergency_repeat',
+          false,
         );
         _ready = true;
       });
@@ -255,6 +268,21 @@ class CallGuardAppState extends State<CallGuardApp>
               onAnsweringLocalNotificationChanged: (value) {
                 setState(() => _answeringLocalNotification = value);
                 _persistSetting('answering_local_notification', value);
+              },
+              answeringAutoRemind: _answeringAutoRemind,
+              onAnsweringAutoRemindChanged: (value) {
+                setState(() => _answeringAutoRemind = value);
+                _persistSetting('answering_auto_remind', value);
+              },
+              answeringAutoRemindMinutes: _answeringAutoRemindMinutes,
+              onAnsweringAutoRemindMinutesChanged: (value) {
+                setState(() => _answeringAutoRemindMinutes = value);
+                _persistSetting('answering_auto_remind_minutes', value);
+              },
+              answeringEmergencyRepeat: _answeringEmergencyRepeat,
+              onAnsweringEmergencyRepeatChanged: (value) {
+                setState(() => _answeringEmergencyRepeat = value);
+                _persistSetting('answering_emergency_repeat', value);
               },
               openCallJournalRequest: _openCallJournalRequest,
               themeMode: _themeMode,

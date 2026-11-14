@@ -56,6 +56,7 @@ object CallGuardDatabase {
         ).apply {
             rawQuery("PRAGMA busy_timeout = ${DbContract.BUSY_TIMEOUT_MS}", null).use { }
             ensureRepeatColumns(this)
+            ensureCallbackSettings(this)
         }
     }
 
@@ -89,10 +90,41 @@ object CallGuardDatabase {
                         "${DbContract.CallReminders.LAST_FIRED_AT} INTEGER",
                 )
             }
+            if (DbContract.CallReminders.CREATED_AT !in columns) {
+                database.execSQL(
+                    "ALTER TABLE ${DbContract.CallReminders.TABLE} ADD COLUMN " +
+                        "${DbContract.CallReminders.CREATED_AT} INTEGER NOT NULL DEFAULT 0",
+                )
+            }
         } catch (error: Exception) {
             // Allow a later call to retry the migration instead of caching a failure.
             repeatColumnsChecked.set(false)
             throw error
         }
     }
+
+    private fun ensureCallbackSettings(database: SQLiteDatabase) {
+        database.execSQL(
+            "CREATE TABLE IF NOT EXISTS ${DbContract.AppSettings.TABLE} (" +
+                "${DbContract.AppSettings.KEY} TEXT PRIMARY KEY, " +
+                "${DbContract.AppSettings.VALUE} TEXT NOT NULL)",
+        )
+        callbackSettingDefaults.forEach { (key, value) ->
+            database.insertWithOnConflict(
+                DbContract.AppSettings.TABLE,
+                null,
+                android.content.ContentValues().apply {
+                    put(DbContract.AppSettings.KEY, key)
+                    put(DbContract.AppSettings.VALUE, value)
+                },
+                SQLiteDatabase.CONFLICT_IGNORE,
+            )
+        }
+    }
+
+    private val callbackSettingDefaults = mapOf(
+        DbContract.SettingKeys.ANSWERING_AUTO_REMIND to "false",
+        DbContract.SettingKeys.ANSWERING_AUTO_REMIND_MINUTES to "30",
+        DbContract.SettingKeys.ANSWERING_EMERGENCY_REPEAT to "false",
+    )
 }

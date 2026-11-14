@@ -20,6 +20,12 @@ class AnsweringModePage extends StatefulWidget {
     required this.onScenarioChanged,
     required this.localNotification,
     required this.onLocalNotificationChanged,
+    required this.autoRemind,
+    required this.onAutoRemindChanged,
+    required this.autoRemindMinutes,
+    required this.onAutoRemindMinutesChanged,
+    required this.emergencyRepeat,
+    required this.onEmergencyRepeatChanged,
   });
 
   final AppStrings strings;
@@ -29,6 +35,12 @@ class AnsweringModePage extends StatefulWidget {
   final ValueChanged<String> onScenarioChanged;
   final bool localNotification;
   final ValueChanged<bool> onLocalNotificationChanged;
+  final bool autoRemind;
+  final ValueChanged<bool> onAutoRemindChanged;
+  final int autoRemindMinutes;
+  final ValueChanged<int> onAutoRemindMinutesChanged;
+  final bool emergencyRepeat;
+  final ValueChanged<bool> onEmergencyRepeatChanged;
 
   @override
   State<AnsweringModePage> createState() => _AnsweringModePageState();
@@ -221,6 +233,73 @@ class _AnsweringModePageState extends State<AnsweringModePage>
           onChanged: widget.onLocalNotificationChanged,
           iconColor: AppPalette.amber,
           iconBackground: AppPalette.amberPale,
+        ),
+      ),
+      const SizedBox(height: 16),
+      AppPanel(
+        child: Column(
+          children: [
+            RuleSwitch(
+              icon: Icons.alarm_outlined,
+              title: widget.strings.call('answeringAutoRemindLabel'),
+              subtitle: widget.strings.call('answeringAutoRemindDescription'),
+              value: widget.autoRemind,
+              onChanged: widget.onAutoRemindChanged,
+            ),
+            if (widget.autoRemind) ...[
+              const SizedBox(height: 12),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(
+                    widget.strings.call('answeringAutoRemindIntervalLabel'),
+                    style: TextStyle(
+                      color: AppPalette.muted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 7),
+              SegmentedButton<int>(
+                showSelectedIcon: false,
+                segments: [
+                  ButtonSegment<int>(
+                    value: 15,
+                    label: Text(widget.strings.call('answeringInterval15')),
+                  ),
+                  ButtonSegment<int>(
+                    value: 30,
+                    label: Text(widget.strings.call('answeringInterval30')),
+                  ),
+                  ButtonSegment<int>(
+                    value: 60,
+                    label: Text(widget.strings.call('answeringInterval60')),
+                  ),
+                ],
+                selected: {widget.autoRemindMinutes},
+                onSelectionChanged: (selection) {
+                  if (selection.isNotEmpty) {
+                    widget.onAutoRemindMinutesChanged(selection.first);
+                  }
+                },
+              ),
+            ],
+          ],
+        ),
+      ),
+      const SizedBox(height: 16),
+      AppPanel(
+        child: RuleSwitch(
+          icon: Icons.phone_callback_rounded,
+          title: widget.strings.call('answeringEmergencyRepeatLabel'),
+          subtitle: widget.strings.call('answeringEmergencyRepeatDescription'),
+          value: widget.emergencyRepeat,
+          onChanged: widget.onEmergencyRepeatChanged,
+          iconColor: AppPalette.red,
+          iconBackground: AppPalette.redPale,
         ),
       ),
       const SizedBox(height: 16),

@@ -12,6 +12,10 @@
     <string name="missed_call_public_text">Вхідний дзвінок відхилено</string>
     <string name="missed_call_hidden_title">Відхилено дзвінок із прихованого номера</string>
     <string name="missed_call_hidden_text">Натисніть, щоб відкрити журнал дзвінків</string>
+    <string name="answering_action_remind_30">Нагадати 30 хв</string>
+    <string name="answering_action_add_whitelist">У білий список</string>
+    <string name="answering_action_sms">SMS</string>
+    <string name="answering_sms_template">Зараз не можу говорити, передзвоню пізніше.</string>
     <string name="reminder_contact_olena">Олена Коваль</string>
     <string name="reminder_contact_unknown">Невідомий номер</string>
     <string name="reminder_contact_new">Новий контакт</string>
@@ -19,4 +23,5 @@
     <string name="reminder_note_check">Перевірити повідомлення</string>
     <string name="reminder_note_new">Передзвонити</string>
     <string name="allowlist_only">Лише білий список</string>
+    <string name="emergency_repeat">Екстрений повторний дзвінок пропущено</string>
 </resources>

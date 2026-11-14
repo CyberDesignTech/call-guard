@@ -221,7 +221,22 @@ const Map<String, String> stringsPl = {
   'answeringContactsPermissionWarning': 'Dostęp do kontaktów jest potrzebny, aby odróżniać zapisane kontakty od nieznanych numerów.',
   'notificationsPermissionNeeded':
       'Zezwól na powiadomienia, aby widzieć przypomnienia o połączeniach.',
+  'answeringAutoRemindLabel': 'Automatycznie przypomnij o oddzwonieniu',
+  'answeringAutoRemindDescription':
+      'Utwórz przypomnienie po odrzuceniu połączenia w wybranym scenariuszu.',
+  'answeringAutoRemindIntervalLabel': 'Przypomnij za',
+  'answeringInterval15': '15 min',
+  'answeringInterval30': '30 min',
+  'answeringInterval60': '1 godz.',
+  'answeringEmergencyRepeatLabel':
+      'Przebicie awaryjne (ponowny telefon w ciągu 5 min)',
+  'answeringEmergencyRepeatDescription': 'Ponowne połączenie z tego samego widocznego numeru w ciągu 5 minut zadzwoni w trybie ciszy. Numery z czarnej listy nadal będą blokowane.',
+  'answeringActionRemind30': 'Przypomnij za 30 min',
+  'answeringActionWhitelist': 'Dodaj do białej listy',
+  'answeringActionSms': 'SMS',
+  'answeringSmsTemplate': 'Nie mogę teraz rozmawiać. Oddzwonię później.',
   'answering_machine': 'Przypomnienie o oddzwonieniu',
+  'emergency_repeat': 'Przepuszczono pilne ponowne połączenie',
   'systemRoleLabel': 'Identyfikacja i spam',
   'roleGranted': 'Rola systemowa przyznana',
   'roleMissing': 'Rola systemowa nieprzyznana',

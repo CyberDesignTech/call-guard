@@ -13,8 +13,13 @@ object DbContract {
 
     object PhoneRules {
         const val TABLE = "phone_rules"
+        const val ID = "id"
         const val PHONE = "phone"
+        const val LABEL = "label"
         const val LIST_TYPE = "list_type"
+        const val CREATED_AT = "created_at"
+        const val WHITE = "white"
+        const val BLACK = "black"
     }
 
     object CountryRules {
@@ -43,6 +48,7 @@ object DbContract {
         const val REPEAT_TYPE = "repeat_type"
         const val REPEAT_INTERVAL = "repeat_interval"
         const val LAST_FIRED_AT = "last_fired_at"
+        const val CREATED_AT = "created_at"
     }
 
     object CallLogs {
@@ -69,6 +75,9 @@ object DbContract {
         const val ANSWERING_SCENARIO = "answering_scenario"
         const val ANSWERING_ENABLED = "answering_enabled"
         const val ANSWERING_LOCAL_NOTIFICATION = "answering_local_notification"
+        const val ANSWERING_AUTO_REMIND = "answering_auto_remind"
+        const val ANSWERING_AUTO_REMIND_MINUTES = "answering_auto_remind_minutes"
+        const val ANSWERING_EMERGENCY_REPEAT = "answering_emergency_repeat"
         const val LOCALE = "locale"
     }
 }

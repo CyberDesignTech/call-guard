@@ -153,6 +153,119 @@ object CallReminderStore {
             }
         }
 
+    /** Inserts a local callback reminder unless an equivalent one was just created. */
+    fun insertReminderIfNotRecentlyCreated(
+        context: Context,
+        phone: String,
+        remindAt: Long,
+        note: String,
+        dedupeWindowMs: Long = DEFAULT_REMINDER_DEDUPE_WINDOW_MS,
+    ): Int? = CallGuardDatabase.withDatabase(context) { database ->
+        val canonicalPhone = PhoneNumbers.canonicalize(context, phone)
+        if (canonicalPhone.isBlank()) return@withDatabase null
+
+        val now = System.currentTimeMillis()
+        var reminderId: Int? = null
+        database.beginTransaction()
+        try {
+            val hasRecentDuplicate = database.query(
+                DbContract.CallReminders.TABLE,
+                arrayOf(DbContract.CallReminders.PHONE),
+                "${DbContract.CallReminders.CREATED_AT} >= ? AND " +
+                    "${DbContract.CallReminders.NOTE} = ?",
+                arrayOf(
+                    (now - dedupeWindowMs.coerceAtLeast(0)).toString(),
+                    note,
+                ),
+                null,
+                null,
+                null,
+            ).use { cursor ->
+                val phoneColumn = cursor.getColumnIndexOrThrow(DbContract.CallReminders.PHONE)
+                var duplicate = false
+                while (cursor.moveToNext() && !duplicate) {
+                    duplicate = sameCanonicalPhone(
+                        context,
+                        canonicalPhone,
+                        cursor.getString(phoneColumn).orEmpty(),
+                    )
+                }
+                duplicate
+            }
+
+            if (!hasRecentDuplicate) {
+                reminderId = database.insertOrThrow(
+                    DbContract.CallReminders.TABLE,
+                    null,
+                    ContentValues().apply {
+                        put(DbContract.CallReminders.PHONE, canonicalPhone)
+                        putNull(DbContract.CallReminders.CONTACT_NAME)
+                        put(DbContract.CallReminders.REMIND_AT, remindAt)
+                        put(DbContract.CallReminders.NOTE, note)
+                        put(DbContract.CallReminders.IS_DONE, 0)
+                        put(DbContract.CallReminders.REPEAT_TYPE, "none")
+                        put(DbContract.CallReminders.REPEAT_INTERVAL, 1)
+                        putNull(DbContract.CallReminders.LAST_FIRED_AT)
+                        put(DbContract.CallReminders.CREATED_AT, now)
+                    },
+                ).toInt()
+                database.setTransactionSuccessful()
+            }
+        } finally {
+            database.endTransaction()
+        }
+        reminderId
+    }
+
+    /** Idempotently adds a canonical, open phone number to the existing white list. */
+    fun addToWhitelistIfAbsent(context: Context, phone: String): Boolean =
+        CallGuardDatabase.withDatabase(context) { database ->
+            val canonicalPhone = PhoneNumbers.canonicalize(context, phone)
+            if (canonicalPhone.isBlank()) return@withDatabase false
+
+            var inserted = false
+            database.beginTransaction()
+            try {
+                val alreadyAllowed = database.query(
+                    DbContract.PhoneRules.TABLE,
+                    arrayOf(DbContract.PhoneRules.PHONE),
+                    "${DbContract.PhoneRules.LIST_TYPE} = ?",
+                    arrayOf(DbContract.PhoneRules.WHITE),
+                    null,
+                    null,
+                    null,
+                ).use { cursor ->
+                    val phoneColumn = cursor.getColumnIndexOrThrow(DbContract.PhoneRules.PHONE)
+                    var found = false
+                    while (cursor.moveToNext() && !found) {
+                        found = sameCanonicalPhone(
+                            context,
+                            canonicalPhone,
+                            cursor.getString(phoneColumn).orEmpty(),
+                        )
+                    }
+                    found
+                }
+                if (!alreadyAllowed) {
+                    database.insertOrThrow(
+                        DbContract.PhoneRules.TABLE,
+                        null,
+                        ContentValues().apply {
+                            put(DbContract.PhoneRules.PHONE, canonicalPhone)
+                            putNull(DbContract.PhoneRules.LABEL)
+                            put(DbContract.PhoneRules.LIST_TYPE, DbContract.PhoneRules.WHITE)
+                            put(DbContract.PhoneRules.CREATED_AT, System.currentTimeMillis())
+                        },
+                    )
+                    inserted = true
+                }
+                database.setTransactionSuccessful()
+            } finally {
+                database.endTransaction()
+            }
+            inserted
+        }
+
     fun insertCallLog(context: Context, phone: String, reason: String) {
         CallGuardDatabase.withDatabase(context) { database ->
             database.insertOrThrow(
@@ -193,6 +306,15 @@ object CallReminderStore {
         arrayOf(update.id.toString()),
     ) > 0
 
+    private fun sameCanonicalPhone(context: Context, first: String, second: String): Boolean {
+        val firstCanonical = PhoneNumbers.canonicalize(context, first)
+        val secondCanonical = PhoneNumbers.canonicalize(context, second)
+        val firstDigits = PhoneNumbers.digits(firstCanonical)
+        val secondDigits = PhoneNumbers.digits(secondCanonical)
+        if (firstDigits.isNotEmpty() && firstDigits == secondDigits) return true
+        return PhoneNumbers.compare(context, firstCanonical, secondCanonical)
+    }
+
     private fun Cursor.toReminder(): CallReminderRecord =
         CallReminderRecord(
             id = getInt(getColumnIndexOrThrow(DbContract.CallReminders.ID)),
@@ -226,5 +348,8 @@ object CallReminderStore {
         DbContract.CallReminders.REPEAT_TYPE,
         DbContract.CallReminders.REPEAT_INTERVAL,
         DbContract.CallReminders.LAST_FIRED_AT,
+        DbContract.CallReminders.CREATED_AT,
     )
+
+    private const val DEFAULT_REMINDER_DEDUPE_WINDOW_MS = 5 * 60 * 1000L
 }

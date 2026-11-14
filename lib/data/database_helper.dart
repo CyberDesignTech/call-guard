@@ -2,6 +2,12 @@ import 'package:path/path.dart' as path;
 import 'package:sqflite/sqflite.dart';
 
 class DatabaseHelper {
+  static const _callbackSettingDefaults = <String, String>{
+    'answering_auto_remind': 'false',
+    'answering_auto_remind_minutes': '30',
+    'answering_emergency_repeat': 'false',
+  };
+
   DatabaseHelper._({String? databasePath}) : _databasePath = databasePath;
 
   static final DatabaseHelper instance = DatabaseHelper._();
@@ -21,14 +27,18 @@ class DatabaseHelper {
         _databasePath ?? path.join(await getDatabasesPath(), 'call_guard.db');
     final database = await openDatabase(
       databasePath,
-      version: 3,
+      version: 4,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: (db, oldVersion, newVersion) async {
         await _ensureReminderRepeatColumns(db);
         if (oldVersion < 3) await _createIndexes(db);
+        await _ensureCallbackSettings(db);
       },
-      onOpen: _ensureReminderRepeatColumns,
+      onOpen: (db) async {
+        await _ensureReminderRepeatColumns(db);
+        await _ensureCallbackSettings(db);
+      },
     );
     _openedDatabase = database;
     return database;
@@ -83,7 +93,8 @@ class DatabaseHelper {
         is_done INTEGER DEFAULT 0,
         repeat_type TEXT NOT NULL DEFAULT 'none',
         repeat_interval INTEGER NOT NULL DEFAULT 1,
-        last_fired_at INTEGER
+        last_fired_at INTEGER,
+        created_at INTEGER NOT NULL DEFAULT 0
       )
     ''');
     await db.execute('''
@@ -112,6 +123,7 @@ class DatabaseHelper {
       'answering_enabled': 'false',
       'answering_scenario': 'quiet_mode',
       'answering_local_notification': 'true',
+      ..._callbackSettingDefaults,
       'notification_permission_prompted': 'false',
     };
     final batch = db.batch();
@@ -292,6 +304,26 @@ class DatabaseHelper {
         'ALTER TABLE call_reminders ADD COLUMN last_fired_at INTEGER',
       );
     }
+    if (!columns.contains('created_at')) {
+      await db.execute(
+        'ALTER TABLE call_reminders ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0',
+      );
+    }
+  }
+
+  Future<void> _ensureCallbackSettings(DatabaseExecutor db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS app_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )
+    ''');
+    for (final entry in _callbackSettingDefaults.entries) {
+      await db.insert('app_settings', {
+        'key': entry.key,
+        'value': entry.value,
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    }
   }
 
   Map<String, Object?> _operatorSeed(
@@ -307,9 +339,11 @@ class DatabaseHelper {
 
   Future<Map<String, String>> getSettings() async {
     final rows = await (await _database).query('app_settings');
-    return {
-      for (final row in rows) row['key']! as String: row['value']! as String,
-    };
+    return Map<String, String>.of(_callbackSettingDefaults)..addEntries(
+      rows.map(
+        (row) => MapEntry(row['key']! as String, row['value']! as String),
+      ),
+    );
   }
 
   Future<void> setSetting(String key, Object value) async {
@@ -428,6 +462,7 @@ class DatabaseHelper {
     'repeat_type': repeatType,
     'repeat_interval': repeatInterval,
     'last_fired_at': null,
+    'created_at': DateTime.now().millisecondsSinceEpoch,
   });
 
   Future<int> updateReminderDone(int id, bool isDone) async =>

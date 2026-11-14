@@ -12,6 +12,10 @@
     <string name="missed_call_public_text">Połączenie przychodzące odrzucone</string>
     <string name="missed_call_hidden_title">Odrzucono połączenie z numeru ukrytego</string>
     <string name="missed_call_hidden_text">Dotknij, aby otworzyć rejestr połączeń</string>
+    <string name="answering_action_remind_30">Przypomnij za 30 min</string>
+    <string name="answering_action_add_whitelist">Dodaj do białej listy</string>
+    <string name="answering_action_sms">SMS</string>
+    <string name="answering_sms_template">Nie mogę teraz rozmawiać. Oddzwonię później.</string>
     <string name="reminder_contact_olena">Olena Koval</string>
     <string name="reminder_contact_unknown">Nieznany numer</string>
     <string name="reminder_contact_new">Nowy kontakt</string>
@@ -19,4 +23,5 @@
     <string name="reminder_note_check">Sprawdź wiadomość</string>
     <string name="reminder_note_new">Oddzwoń</string>
     <string name="allowlist_only">Tylko biała lista</string>
+    <string name="emergency_repeat">Przepuszczono pilne ponowne połączenie</string>
 </resources>

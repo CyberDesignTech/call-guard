@@ -12,6 +12,10 @@
     <string name="missed_call_public_text">Incoming call declined</string>
     <string name="missed_call_hidden_title">Hidden number declined</string>
     <string name="missed_call_hidden_text">Tap to view the call journal</string>
+    <string name="answering_action_remind_30">Remind in 30 min</string>
+    <string name="answering_action_add_whitelist">Add to allowlist</string>
+    <string name="answering_action_sms">SMS</string>
+    <string name="answering_sms_template">I can’t talk right now. I’ll call you back later.</string>
     <string name="reminder_contact_olena">Olena Koval</string>
     <string name="reminder_contact_unknown">Unknown number</string>
     <string name="reminder_contact_new">New contact</string>
@@ -19,4 +23,5 @@
     <string name="reminder_note_check">Check the message</string>
     <string name="reminder_note_new">Call back</string>
     <string name="allowlist_only">Allowlist only</string>
+    <string name="emergency_repeat">Emergency repeat call allowed</string>
 </resources>

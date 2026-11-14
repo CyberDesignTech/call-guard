@@ -223,7 +223,22 @@ const Map<String, String> stringsUk = {
   'answeringContactsPermissionWarning': 'Доступ до контактів потрібен, щоб відрізнити збережені номери від невідомих.',
   'notificationsPermissionNeeded':
       'Дозвольте сповіщення, щоб бачити нагадування про дзвінки.',
+  'answeringAutoRemindLabel': 'Автоматично нагадувати передзвонити',
+  'answeringAutoRemindDescription':
+      'Створювати нагадування після відхилення дзвінка за сценарієм Помічника.',
+  'answeringAutoRemindIntervalLabel': 'Нагадати через',
+  'answeringInterval15': '15 хв',
+  'answeringInterval30': '30 хв',
+  'answeringInterval60': '1 год',
+  'answeringEmergencyRepeatLabel':
+      'Екстрений прорив (повторний дзвінок за 5 хв)',
+  'answeringEmergencyRepeatDescription': 'Повторний дзвінок із того самого відкритого номера протягом 5 хв у режимі тиші пройде зі звуком. Номери з Чорного списку залишаться заблокованими.',
+  'answeringActionRemind30': 'Нагадати 30 хв',
+  'answeringActionWhitelist': 'У білий список',
+  'answeringActionSms': 'SMS',
+  'answeringSmsTemplate': 'Зараз не можу говорити, передзвоню пізніше.',
   'answering_machine': 'Нагадування передзвонити',
+  'emergency_repeat': 'Екстрений повторний дзвінок пропущено',
   'systemRoleLabel': 'АОН і спам',
   'roleGranted': 'Системну роль надано',
   'roleMissing': 'Системну роль не надано',

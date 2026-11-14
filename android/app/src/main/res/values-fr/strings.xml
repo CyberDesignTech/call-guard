@@ -12,6 +12,10 @@
     <string name="missed_call_public_text">Appel entrant rejeté</string>
     <string name="missed_call_hidden_title">Appel d’un numéro masqué rejeté</string>
     <string name="missed_call_hidden_text">Touchez pour ouvrir le journal des appels</string>
+    <string name="answering_action_remind_30">Rappel dans 30 min</string>
+    <string name="answering_action_add_whitelist">Ajouter aux autorisés</string>
+    <string name="answering_action_sms">SMS</string>
+    <string name="answering_sms_template">Je ne peux pas parler maintenant. Je vous rappellerai plus tard.</string>
     <string name="reminder_contact_olena">Olena Koval</string>
     <string name="reminder_contact_unknown">Numéro inconnu</string>
     <string name="reminder_contact_new">Nouveau contact</string>
@@ -19,4 +23,5 @@
     <string name="reminder_note_check">Vérifier le message</string>
     <string name="reminder_note_new">Rappeler</string>
     <string name="allowlist_only">Liste autorisée uniquement</string>
+    <string name="emergency_repeat">Rappel d’urgence autorisé</string>
 </resources>

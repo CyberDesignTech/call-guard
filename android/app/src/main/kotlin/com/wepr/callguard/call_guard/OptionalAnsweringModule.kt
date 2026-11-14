@@ -40,6 +40,23 @@ object OptionalAnsweringModule {
         }
         if (!applies) return false
 
+        if (isAutoReminderEnabled(snapshot) && !isHiddenNumber(phoneNumber)) {
+            val reminderMinutes = autoReminderMinutes(snapshot)
+            val remindAt = System.currentTimeMillis() + reminderMinutes * MILLIS_PER_MINUTE
+            runCatching {
+                CallReminderStore.insertReminderIfNotRecentlyCreated(
+                    context = context,
+                    phone = phoneNumber,
+                    remindAt = remindAt,
+                    note = REMINDER_NOTE_KEY,
+                )?.let { reminderId ->
+                    CallReminderScheduler.schedule(context, reminderId, remindAt)
+                }
+            }.onFailure {
+                Log.e(TAG, "Could not create the automatic callback reminder", it)
+            }
+        }
+
         val showNotification = (
             snapshot[DbContract.SettingKeys.ANSWERING_LOCAL_NOTIFICATION] ?: "true"
             ).equals("true", ignoreCase = true)
@@ -76,7 +93,7 @@ object OptionalAnsweringModule {
             .equals("true", ignoreCase = true)
 
     private fun isUnknownNumber(context: Context, phoneNumber: String): Boolean {
-        if (PhoneNumbers.isHidden(phoneNumber) || isHiddenMarker(phoneNumber)) return true
+        if (isHiddenNumber(phoneNumber)) return true
         if (!ContactLookup.hasPermission(context)) return false
         return ContactLookup.isUnknownNumber(
             context,
@@ -87,7 +104,25 @@ object OptionalAnsweringModule {
     private fun isHiddenMarker(phoneNumber: String): Boolean =
         phoneNumber.equals(PhoneNumbers.HIDDEN_NUMBER, ignoreCase = true)
 
+    private fun isHiddenNumber(phoneNumber: String): Boolean =
+        PhoneNumbers.isHidden(phoneNumber) || isHiddenMarker(phoneNumber)
+
+    private fun isAutoReminderEnabled(settings: Map<String, String>): Boolean =
+        settings[DbContract.SettingKeys.ANSWERING_AUTO_REMIND]
+            ?.toBooleanStrictOrNull() ?: false
+
+    private fun autoReminderMinutes(settings: Map<String, String>): Long =
+        settings[DbContract.SettingKeys.ANSWERING_AUTO_REMIND_MINUTES]
+            ?.toIntOrNull()
+            ?.takeIf { it in AUTO_REMINDER_MINUTES }
+            ?.toLong()
+            ?: DEFAULT_AUTO_REMINDER_MINUTES
+
     private const val TAG = "OptionalAnsweringModule"
+    private const val REMINDER_NOTE_KEY = "@reminderNewNote"
+    private const val DEFAULT_AUTO_REMINDER_MINUTES = 30L
+    private const val MILLIS_PER_MINUTE = 60_000L
+    private val AUTO_REMINDER_MINUTES = setOf(15, 30, 60)
     const val SCENARIO_SILENCE = "quiet_mode"
     const val SCENARIO_UNKNOWN_NUMBERS = "unknown_numbers"
 }

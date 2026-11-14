@@ -115,6 +115,7 @@ object CallNotificationHelper {
         }
 
         val notificationId = ANSWERING_NOTIFICATION_ID_BASE + phone.hashCode()
+        val cleanNumber = PhoneNumbers.canonicalize(context, phone).ifBlank { phone }
         val contentPendingIntent = if (hiddenNumber) {
             PendingIntent.getActivity(
                 context,
@@ -132,10 +133,47 @@ object CallNotificationHelper {
             PendingIntent.getActivity(
                 context,
                 notificationId,
-                dialIntent(context, phone),
+                dialIntent(context, cleanNumber),
                 pendingIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT),
             )
         }
+        val reminderIntent = actionReceiverIntent(
+            context,
+            AnsweringActionReceiver.ACTION_REMIND_30M,
+            cleanNumber,
+            notificationId,
+        )
+        val reminderPendingIntent = PendingIntent.getBroadcast(
+            context,
+            notificationId xor REMIND_ACTION_REQUEST_CODE_MASK,
+            reminderIntent,
+            pendingIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT),
+        )
+        val whitelistIntent = actionReceiverIntent(
+            context,
+            AnsweringActionReceiver.ACTION_ADD_WHITELIST,
+            cleanNumber,
+            notificationId,
+        )
+        val whitelistPendingIntent = PendingIntent.getBroadcast(
+            context,
+            notificationId xor WHITELIST_ACTION_REQUEST_CODE_MASK,
+            whitelistIntent,
+            pendingIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT),
+        )
+        val smsIntent = Intent(
+            Intent.ACTION_SENDTO,
+            Uri.parse("smsto:$cleanNumber"),
+        ).putExtra(
+            "sms_body",
+            localizedContext.getString(R.string.answering_sms_template),
+        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val smsPendingIntent = PendingIntent.getActivity(
+            context,
+            notificationId xor SMS_ACTION_REQUEST_CODE_MASK,
+            smsIntent,
+            pendingIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT),
+        )
         val publicNotification = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(android.R.drawable.ic_menu_call)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -163,14 +201,25 @@ object CallNotificationHelper {
             )
             .setCategory(Notification.CATEGORY_CALL)
             .setAutoCancel(true)
+            // Tapping the notification body is the primary ACTION_DIAL callback action.
             .setContentIntent(contentPendingIntent)
             .setPublicVersion(publicNotification)
         if (!hiddenNumber) {
             builder.addAction(
-                android.R.drawable.ic_menu_call,
-                localizedContext.getString(R.string.missed_call_action_dial),
-                contentPendingIntent,
+                android.R.drawable.ic_menu_recent_history,
+                localizedContext.getString(R.string.answering_action_remind_30),
+                reminderPendingIntent,
+            ).addAction(
+                android.R.drawable.ic_input_add,
+                localizedContext.getString(R.string.answering_action_add_whitelist),
+                whitelistPendingIntent,
+            ).addAction(
+                android.R.drawable.ic_dialog_email,
+                localizedContext.getString(R.string.answering_action_sms),
+                smsPendingIntent,
             )
+            // Android renders at most three actions, so the phone button is the
+            // notification body tap (contentPendingIntent above) instead of a fourth action.
         }
         return notify(context, notificationId, builder.build())
     }
@@ -178,6 +227,16 @@ object CallNotificationHelper {
     private fun dialIntent(context: Context, phone: String): Intent =
         Intent(Intent.ACTION_DIAL, Uri.parse("tel:${Uri.encode(phone)}"))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    private fun actionReceiverIntent(
+        context: Context,
+        action: String,
+        phone: String,
+        notificationId: Int,
+    ): Intent = Intent(context, AnsweringActionReceiver::class.java)
+        .setAction(action)
+        .putExtra(AnsweringActionReceiver.EXTRA_PHONE, phone)
+        .putExtra(AnsweringActionReceiver.EXTRA_NOTIFICATION_ID, notificationId)
 
     private fun isHiddenPhone(phone: String): Boolean =
         PhoneNumbers.isHidden(phone) ||
@@ -291,4 +350,7 @@ object CallNotificationHelper {
 
     private const val TAG = "CallGuardNotifications"
     private const val ANSWERING_NOTIFICATION_ID_BASE = 0x43470000
+    private const val REMIND_ACTION_REQUEST_CODE_MASK = 0x10000000
+    private const val WHITELIST_ACTION_REQUEST_CODE_MASK = 0x20000000
+    private const val SMS_ACTION_REQUEST_CODE_MASK = 0x30000000
 }

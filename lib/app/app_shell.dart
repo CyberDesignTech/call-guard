@@ -43,6 +43,12 @@ class CallGuardShell extends StatefulWidget {
     required this.onAnsweringScenarioChanged,
     required this.answeringLocalNotification,
     required this.onAnsweringLocalNotificationChanged,
+    required this.answeringAutoRemind,
+    required this.onAnsweringAutoRemindChanged,
+    required this.answeringAutoRemindMinutes,
+    required this.onAnsweringAutoRemindMinutesChanged,
+    required this.answeringEmergencyRepeat,
+    required this.onAnsweringEmergencyRepeatChanged,
     required this.openCallJournalRequest,
     required this.themeMode,
     required this.language,
@@ -78,6 +84,12 @@ class CallGuardShell extends StatefulWidget {
   final ValueChanged<String> onAnsweringScenarioChanged;
   final bool answeringLocalNotification;
   final ValueChanged<bool> onAnsweringLocalNotificationChanged;
+  final bool answeringAutoRemind;
+  final ValueChanged<bool> onAnsweringAutoRemindChanged;
+  final int answeringAutoRemindMinutes;
+  final ValueChanged<int> onAnsweringAutoRemindMinutesChanged;
+  final bool answeringEmergencyRepeat;
+  final ValueChanged<bool> onAnsweringEmergencyRepeatChanged;
   final int openCallJournalRequest;
   final ThemeMode themeMode;
   final AppLanguage language;
@@ -282,6 +294,13 @@ class CallGuardShellState extends State<CallGuardShell> {
             localNotification: widget.answeringLocalNotification,
             onLocalNotificationChanged:
                 widget.onAnsweringLocalNotificationChanged,
+            autoRemind: widget.answeringAutoRemind,
+            onAutoRemindChanged: widget.onAnsweringAutoRemindChanged,
+            autoRemindMinutes: widget.answeringAutoRemindMinutes,
+            onAutoRemindMinutesChanged:
+                widget.onAnsweringAutoRemindMinutesChanged,
+            emergencyRepeat: widget.answeringEmergencyRepeat,
+            onEmergencyRepeatChanged: widget.onAnsweringEmergencyRepeatChanged,
           ),
           MorePage(
             database: widget.database,
