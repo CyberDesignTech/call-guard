@@ -211,7 +211,7 @@ object CallNotificationHelper {
 
     private fun localizedContext(context: Context): Context {
         val setting = runCatching {
-            CallReminderStore.getSetting(context, "locale", "english")
+            CallReminderStore.getSetting(context, DbContract.SettingKeys.LOCALE, "english")
         }.getOrDefault("english")
         val language = when (setting) {
             "ukrainian" -> "uk"

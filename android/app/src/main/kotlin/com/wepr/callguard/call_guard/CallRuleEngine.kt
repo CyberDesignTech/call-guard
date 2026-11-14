@@ -1,16 +1,9 @@
 package com.wepr.callguard.call_guard
 
-import android.Manifest
+import android.content.ContentValues
 import android.content.Context
-import android.content.pm.PackageManager
 import android.database.sqlite.SQLiteDatabase
-import android.net.Uri
-import android.os.Build
-import android.provider.ContactsContract
-import android.telephony.PhoneNumberUtils
-import android.telephony.TelephonyManager
 import android.util.Log
-import java.io.File
 import java.util.Calendar
 import java.util.Locale
 
@@ -20,9 +13,10 @@ data class CallRuleVerdict(
     val phoneNumber: String,
 ) {
     fun toMap(): Map<String, Any> = mapOf(
-        "verdict" to if (allowed) "ALLOW" else "REJECT",
-        "reason" to reason,
-        "phoneNumber" to phoneNumber,
+        BridgeContract.ResultKeys.VERDICT to
+            if (allowed) BridgeContract.Verdicts.ALLOW else BridgeContract.Verdicts.REJECT,
+        BridgeContract.ResultKeys.REASON to reason,
+        BridgeContract.ResultKeys.PHONE_NUMBER to phoneNumber,
     )
 }
 
@@ -30,10 +24,23 @@ data class CallRuleVerdict(
 class CallRuleEngine(context: Context) {
     private val appContext = context.applicationContext
 
-    fun evaluate(phoneNumber: String?): CallRuleVerdict {
+    fun evaluate(phoneNumber: String?): CallRuleVerdict =
+        evaluate(phoneNumber, settings = null)
+
+    /**
+     * @param settings optional snapshot from [CallGuardDatabase.readSettings] so a single
+     * call-screening pass can share one read of app_settings.
+     */
+    fun evaluate(
+        phoneNumber: String?,
+        settings: Map<String, String>?,
+    ): CallRuleVerdict {
         val rawPhone = phoneNumber.orEmpty().trim()
         return try {
-            openDatabase().use { database -> evaluate(database, rawPhone) }
+            val snapshot = settings ?: CallGuardDatabase.readSettings(appContext)
+            CallGuardDatabase.withDatabase(appContext) { database ->
+                evaluate(database, rawPhone, snapshot)
+            }
         } catch (error: Exception) {
             Log.e(TAG, "Could not evaluate call rules; allowing the call", error)
             verdict(allowed = true, reason = "database_unavailable", rawPhone)
@@ -49,53 +56,60 @@ class CallRuleEngine(context: Context) {
 
     fun recordCallLog(phoneNumber: String, reason: String) {
         try {
-            openDatabase().use { database ->
-                val values = android.content.ContentValues().apply {
-                    put("phone", phoneNumber.ifBlank { "@numberHidden" })
-                    put("reason", reason)
-                    put("timestamp", System.currentTimeMillis())
+            CallGuardDatabase.withDatabase(appContext) { database ->
+                val values = ContentValues().apply {
+                    put(DbContract.CallLogs.PHONE, phoneNumber.ifBlank { PhoneNumbers.HIDDEN_NUMBER })
+                    put(DbContract.CallLogs.REASON, reason)
+                    put(DbContract.CallLogs.TIMESTAMP, System.currentTimeMillis())
                 }
-                database.insertOrThrow("call_logs", null, values)
+                database.insertOrThrow(DbContract.CallLogs.TABLE, null, values)
             }
         } catch (error: Exception) {
             Log.e(TAG, "Could not persist blocked-call log", error)
         }
     }
 
-    private fun evaluate(database: SQLiteDatabase, rawPhone: String): CallRuleVerdict {
-        val settings = readSettings(database)
-        if (!settings.bool("protection_enabled", true)) {
+    private fun evaluate(
+        database: SQLiteDatabase,
+        rawPhone: String,
+        settings: Map<String, String>,
+    ): CallRuleVerdict {
+        if (!settings.bool(DbContract.SettingKeys.PROTECTION_ENABLED, true)) {
             return verdict(true, "protection_disabled", rawPhone)
         }
 
-        val hidden = isHiddenNumber(rawPhone)
-        val canonicalPhone = if (hidden) "" else canonicalize(rawPhone)
+        val hidden = PhoneNumbers.isHidden(rawPhone)
+        val canonicalPhone = if (hidden) "" else PhoneNumbers.canonicalize(appContext, rawPhone)
 
         if (!hidden && matchesPhoneRule(database, "white", rawPhone, canonicalPhone)) {
             return verdict(true, "allowlist", canonicalPhone)
         }
 
         val calendar = Calendar.getInstance()
-        if (settings.bool("manual_silence_enabled", false) ||
-            settings.bool("manual_silence", false) ||
-            settings.bool("silence_manual", false) ||
-            (settings.bool("automatic_silence", false) && isWithinQuietSchedule(settings, calendar))
+        if (settings.bool(DbContract.SettingKeys.MANUAL_SILENCE_ENABLED, false) ||
+            settings.bool(DbContract.SettingKeys.MANUAL_SILENCE, false) ||
+            settings.bool(DbContract.SettingKeys.SILENCE_MANUAL, false) ||
+            (
+                settings.bool(DbContract.SettingKeys.AUTOMATIC_SILENCE, false) &&
+                    isWithinQuietSchedule(settings, calendar)
+                )
         ) {
-            return verdict(false, "silent_schedule", logPhone(rawPhone, canonicalPhone))
+            return verdict(false, "silent_schedule", PhoneNumbers.logValue(rawPhone, canonicalPhone))
         }
 
-        if (hidden && settings.bool("block_hidden", true)) {
-            return verdict(false, "hidden_number", "@numberHidden")
+        if (hidden && settings.bool(DbContract.SettingKeys.BLOCK_HIDDEN, true)) {
+            return verdict(false, "hidden_number", PhoneNumbers.HIDDEN_NUMBER)
         }
 
-        if (settings.bool("block_non_contacts", false) && hasContactsPermission() &&
-            !isInContacts(rawPhone, canonicalPhone)
+        if (settings.bool(DbContract.SettingKeys.BLOCK_NON_CONTACTS, false) &&
+            ContactLookup.hasPermission(appContext) &&
+            !ContactLookup.isInContacts(appContext, canonicalPhone.ifBlank { rawPhone })
         ) {
-            return verdict(false, "not_in_contacts", logPhone(rawPhone, canonicalPhone))
+            return verdict(false, "not_in_contacts", PhoneNumbers.logValue(rawPhone, canonicalPhone))
         }
 
         val countries = readCountries(database)
-        val phoneDigits = digits(canonicalPhone)
+        val phoneDigits = PhoneNumbers.digits(canonicalPhone)
         val matchedCountry = countries
             .filter { it.dialDigits.isNotEmpty() && phoneDigits.startsWith(it.dialDigits) }
             .maxByOrNull { it.dialDigits.length }
@@ -120,62 +134,42 @@ class CallRuleEngine(context: Context) {
             }
         }
 
-        if (settings.bool("block_international", false) &&
+        if (settings.bool(DbContract.SettingKeys.BLOCK_INTERNATIONAL, false) &&
             isInternational(rawPhone, canonicalPhone, matchedCountry, countries)
         ) {
-            return verdict(false, "international_block", logPhone(rawPhone, canonicalPhone))
+            return verdict(
+                false,
+                "international_block",
+                PhoneNumbers.logValue(rawPhone, canonicalPhone),
+            )
         }
 
         if (!hidden && matchesPhoneRule(database, "black", rawPhone, canonicalPhone)) {
             return verdict(false, "blacklist", canonicalPhone)
         }
 
-        if (settings.bool("allow_only_whitelist", false)) {
+        if (settings.bool(DbContract.SettingKeys.ALLOW_ONLY_WHITELIST, false)) {
             return verdict(false, "allowlist_only", canonicalPhone.ifBlank { rawPhone })
         }
 
         return verdict(true, "default_allow", canonicalPhone.ifBlank { rawPhone })
     }
 
-    private fun openDatabase(): SQLiteDatabase {
-        // sqflite's Android getDatabasesPath() resolves to Context.getDatabasePath().
-        val databaseFile: File = appContext.getDatabasePath(DATABASE_NAME)
-        check(databaseFile.isFile) { "Call Guard database does not exist" }
-        return SQLiteDatabase.openDatabase(
-            databaseFile.absolutePath,
-            null,
-            SQLiteDatabase.OPEN_READWRITE,
-        ).apply {
-            rawQuery("PRAGMA busy_timeout = 3000", null).use { }
-        }
-    }
-
-    private fun readSettings(database: SQLiteDatabase): Map<String, String> {
-        val settings = HashMap<String, String>()
-        database.rawQuery("SELECT `key`, `value` FROM app_settings", null).use { cursor ->
-            val keyColumn = cursor.getColumnIndexOrThrow("key")
-            val valueColumn = cursor.getColumnIndexOrThrow("value")
-            while (cursor.moveToNext()) {
-                settings[cursor.getString(keyColumn)] = cursor.getString(valueColumn).orEmpty()
-            }
-        }
-        return settings
-    }
-
     private fun readCountries(database: SQLiteDatabase): List<CountryRule> {
         val countries = ArrayList<CountryRule>()
         database.rawQuery(
-            "SELECT iso_code, dial_code, action FROM country_rules",
+            "SELECT ${DbContract.CountryRules.ISO_CODE}, ${DbContract.CountryRules.DIAL_CODE}, " +
+                "${DbContract.CountryRules.ACTION} FROM ${DbContract.CountryRules.TABLE}",
             null,
         ).use { cursor ->
-            val isoColumn = cursor.getColumnIndexOrThrow("iso_code")
-            val dialColumn = cursor.getColumnIndexOrThrow("dial_code")
-            val actionColumn = cursor.getColumnIndexOrThrow("action")
+            val isoColumn = cursor.getColumnIndexOrThrow(DbContract.CountryRules.ISO_CODE)
+            val dialColumn = cursor.getColumnIndexOrThrow(DbContract.CountryRules.DIAL_CODE)
+            val actionColumn = cursor.getColumnIndexOrThrow(DbContract.CountryRules.ACTION)
             while (cursor.moveToNext()) {
                 countries.add(
                     CountryRule(
                         isoCode = cursor.getString(isoColumn),
-                        dialDigits = digits(cursor.getString(dialColumn)),
+                        dialDigits = PhoneNumbers.digits(cursor.getString(dialColumn)),
                         action = cursor.getString(actionColumn).lowercase(Locale.ROOT),
                     ),
                 )
@@ -192,16 +186,19 @@ class CallRuleEngine(context: Context) {
         if (nationalDigits.isEmpty()) return null
         val matching = ArrayList<Pair<String, String>>()
         database.rawQuery(
-            "SELECT prefixes, action FROM operator_rules WHERE country_iso = ? ORDER BY id",
+            "SELECT ${DbContract.OperatorRules.PREFIXES}, ${DbContract.OperatorRules.ACTION} " +
+                "FROM ${DbContract.OperatorRules.TABLE} " +
+                "WHERE ${DbContract.OperatorRules.COUNTRY_ISO} = ? " +
+                "ORDER BY ${DbContract.OperatorRules.ID}",
             arrayOf(countryIso),
         ).use { cursor ->
-            val prefixesColumn = cursor.getColumnIndexOrThrow("prefixes")
-            val actionColumn = cursor.getColumnIndexOrThrow("action")
+            val prefixesColumn = cursor.getColumnIndexOrThrow(DbContract.OperatorRules.PREFIXES)
+            val actionColumn = cursor.getColumnIndexOrThrow(DbContract.OperatorRules.ACTION)
             while (cursor.moveToNext()) {
                 val action = cursor.getString(actionColumn).lowercase(Locale.ROOT)
                 cursor.getString(prefixesColumn)
                     .split(',')
-                    .map(::digits)
+                    .map(PhoneNumbers::digits)
                     .filter { it.isNotEmpty() && nationalDigits.startsWith(it) }
                     .forEach { matching.add(it to action) }
             }
@@ -216,10 +213,11 @@ class CallRuleEngine(context: Context) {
         canonicalPhone: String,
     ): Boolean {
         database.rawQuery(
-            "SELECT phone FROM phone_rules WHERE list_type = ?",
+            "SELECT ${DbContract.PhoneRules.PHONE} FROM ${DbContract.PhoneRules.TABLE} " +
+                "WHERE ${DbContract.PhoneRules.LIST_TYPE} = ?",
             arrayOf(listType),
         ).use { cursor ->
-            val phoneColumn = cursor.getColumnIndexOrThrow("phone")
+            val phoneColumn = cursor.getColumnIndexOrThrow(DbContract.PhoneRules.PHONE)
             while (cursor.moveToNext()) {
                 val storedPhone = cursor.getString(phoneColumn).orEmpty()
                 if (samePhone(rawPhone, canonicalPhone, storedPhone)) return true
@@ -229,57 +227,15 @@ class CallRuleEngine(context: Context) {
     }
 
     private fun samePhone(rawPhone: String, canonicalPhone: String, storedPhone: String): Boolean {
-        val storedCanonical = canonicalize(storedPhone)
-        val incomingDigits = digits(canonicalPhone)
-        val storedDigits = digits(storedCanonical)
+        val storedCanonical = PhoneNumbers.canonicalize(appContext, storedPhone)
+        val incomingDigits = PhoneNumbers.digits(canonicalPhone)
+        val storedDigits = PhoneNumbers.digits(storedCanonical)
         if (incomingDigits.isNotEmpty() && incomingDigits == storedDigits) return true
-        return runCatching {
-            PhoneNumberUtils.compare(appContext, canonicalPhone.ifBlank { rawPhone }, storedPhone)
-        }.getOrDefault(false)
-    }
-
-    private fun isInContacts(rawPhone: String, canonicalPhone: String): Boolean {
-        val lookupNumber = canonicalPhone.ifBlank { rawPhone }
-        if (lookupNumber.isBlank()) return false
-        val lookupUri = Uri.withAppendedPath(
-            ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
-            Uri.encode(lookupNumber),
+        return PhoneNumbers.compare(
+            appContext,
+            canonicalPhone.ifBlank { rawPhone },
+            storedPhone,
         )
-        return runCatching {
-            appContext.contentResolver.query(
-                lookupUri,
-                arrayOf(ContactsContract.PhoneLookup._ID),
-                null,
-                null,
-                null,
-            )?.use { it.moveToFirst() } ?: false
-        }.onFailure { Log.w(TAG, "Could not query the local contacts provider", it) }
-            .getOrDefault(true)
-    }
-
-    private fun hasContactsPermission(): Boolean =
-        Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
-            appContext.checkSelfPermission(Manifest.permission.READ_CONTACTS) ==
-            PackageManager.PERMISSION_GRANTED
-
-    private fun isHiddenNumber(phone: String): Boolean {
-        val value = phone.trim().uppercase(Locale.ROOT)
-        return value.isEmpty() || value in HIDDEN_NUMBER_MARKERS
-    }
-
-    private fun canonicalize(phone: String): String {
-        val normalized = PhoneNumberUtils.normalizeNumber(phone)
-        val phoneDigits = digits(normalized)
-        if (phoneDigits.isEmpty()) return ""
-        val trimmed = phone.trim()
-        if (trimmed.startsWith("+") || phoneDigits.startsWith("00")) {
-            return "+${if (phoneDigits.startsWith("00")) phoneDigits.drop(2) else phoneDigits}"
-        }
-
-        val region = homeCountryIso() ?: return phoneDigits
-        return runCatching {
-            PhoneNumberUtils.formatNumberToE164(phone, region)
-        }.getOrNull()?.takeIf(String::isNotBlank) ?: phoneDigits
     }
 
     private fun isInternational(
@@ -288,7 +244,7 @@ class CallRuleEngine(context: Context) {
         matchedCountry: CountryRule?,
         countries: List<CountryRule>,
     ): Boolean {
-        val rawDigits = digits(rawPhone)
+        val rawDigits = PhoneNumbers.digits(rawPhone)
         val explicitInternational = rawPhone.trim().startsWith("+") || rawDigits.startsWith("00")
         val homeDialCode = homeDialCode(countries)
         if (matchedCountry != null && homeDialCode != null) {
@@ -299,31 +255,15 @@ class CallRuleEngine(context: Context) {
     }
 
     private fun homeDialCode(countries: List<CountryRule>): String? {
-        val homeIso = homeCountryIso() ?: return null
+        val homeIso = PhoneNumbers.homeCountryIso(appContext) ?: return null
         return countries.firstOrNull { country ->
             country.isoCode.equals(homeIso, ignoreCase = true) ||
                 (country.isoCode == "US-CA" && homeIso in setOf("US", "CA"))
         }?.dialDigits
     }
 
-    private fun homeCountryIso(): String? {
-        val telephony = appContext.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
-        val networkIso = runCatching { telephony?.networkCountryIso }
-            .getOrNull()
-            ?.takeIf(String::isNotBlank)
-        if (networkIso != null) return networkIso.uppercase(Locale.ROOT)
-        val configuration = appContext.resources.configuration
-        val locale = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            configuration.locales[0]
-        } else {
-            @Suppress("DEPRECATION")
-            configuration.locale
-        }
-        return locale.country.takeIf(String::isNotBlank)?.uppercase(Locale.ROOT)
-    }
-
     private fun isWithinQuietSchedule(settings: Map<String, String>, calendar: Calendar): Boolean {
-        val weekdays = settings["silence_weekdays"]
+        val weekdays = settings[DbContract.SettingKeys.SILENCE_WEEKDAYS]
             ?.split(',')
             ?.mapNotNull(String::toIntOrNull)
             ?.filter { it in 1..7 }
@@ -331,8 +271,14 @@ class CallRuleEngine(context: Context) {
             ?: (1..7).toSet()
         if (weekdays.isEmpty()) return false
 
-        val start = settings.int("silence_start_minute", DEFAULT_START_MINUTE).coerceIn(0, 1439)
-        val end = settings.int("silence_end_minute", DEFAULT_END_MINUTE).coerceIn(0, 1439)
+        val start = settings.int(
+            DbContract.SettingKeys.SILENCE_START_MINUTE,
+            DEFAULT_START_MINUTE,
+        ).coerceIn(0, 1439)
+        val end = settings.int(
+            DbContract.SettingKeys.SILENCE_END_MINUTE,
+            DEFAULT_END_MINUTE,
+        ).coerceIn(0, 1439)
         val minuteOfDay = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
         val isoWeekday = ((calendar.get(Calendar.DAY_OF_WEEK) + 5) % 7) + 1
 
@@ -345,12 +291,6 @@ class CallRuleEngine(context: Context) {
         }
         return false
     }
-
-    private fun logPhone(rawPhone: String, canonicalPhone: String): String =
-        if (isHiddenNumber(rawPhone)) "@numberHidden" else canonicalPhone.ifBlank { rawPhone }
-
-    private fun digits(value: String): String =
-        PhoneNumberUtils.normalizeNumber(value).filter { it in '0'..'9' }
 
     private fun Map<String, String>.bool(key: String, default: Boolean): Boolean =
         this[key]?.toBooleanStrictOrNull() ?: default
@@ -369,17 +309,9 @@ class CallRuleEngine(context: Context) {
 
     private companion object {
         const val TAG = "CallGuardRuleEngine"
-        const val DATABASE_NAME = "call_guard.db"
         const val ACTION_ALLOW = "allow"
         const val ACTION_BLOCK = "block"
         const val DEFAULT_START_MINUTE = 22 * 60
         const val DEFAULT_END_MINUTE = 7 * 60
-        val HIDDEN_NUMBER_MARKERS = setOf(
-            "UNKNOWN",
-            "PRIVATE",
-            "PRESENTATION_RESTRICTED",
-            "RESTRICTED",
-            "UNAVAILABLE",
-        )
     }
 }

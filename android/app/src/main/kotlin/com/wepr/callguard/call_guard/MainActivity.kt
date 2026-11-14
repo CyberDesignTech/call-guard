@@ -28,24 +28,25 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
-            SCREENING_CHANNEL,
+            BridgeContract.CHANNEL_NAME,
         ).setMethodCallHandler { call, result -> handleScreeningMethod(call, result) }
     }
 
     private fun handleScreeningMethod(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
-            "checkPermissions" -> result.success(permissionState())
-            "requestCallScreeningRole" -> requestCallScreeningRole(result)
-            "openDefaultAppsSettings" -> openDefaultAppsSettings(result)
-            "requestContactsPermission" -> requestContactsPermission(result)
-            "pickContact" -> pickContact(result)
-            "requestNotificationPermission" -> requestNotificationPermission(result)
-            "openNotificationSettings" -> openNotificationSettings(result)
-            "scheduleReminder" -> scheduleReminder(call, result)
-            "cancelReminder" -> cancelReminder(call, result)
-            "restorePendingReminders" -> restorePendingReminders(result)
-            "openDialer" -> openDialer(call, result)
-            "simulateCall" -> simulateCall(call, result)
+            BridgeContract.Methods.CHECK_PERMISSIONS -> result.success(permissionState())
+            BridgeContract.Methods.REQUEST_CALL_SCREENING_ROLE -> requestCallScreeningRole(result)
+            BridgeContract.Methods.OPEN_DEFAULT_APPS_SETTINGS -> openDefaultAppsSettings(result)
+            BridgeContract.Methods.REQUEST_CONTACTS_PERMISSION -> requestContactsPermission(result)
+            BridgeContract.Methods.PICK_CONTACT -> pickContact(result)
+            BridgeContract.Methods.REQUEST_NOTIFICATION_PERMISSION ->
+                requestNotificationPermission(result)
+            BridgeContract.Methods.OPEN_NOTIFICATION_SETTINGS -> openNotificationSettings(result)
+            BridgeContract.Methods.SCHEDULE_REMINDER -> scheduleReminder(call, result)
+            BridgeContract.Methods.CANCEL_REMINDER -> cancelReminder(call, result)
+            BridgeContract.Methods.RESTORE_PENDING_REMINDERS -> restorePendingReminders(result)
+            BridgeContract.Methods.OPEN_DIALER -> openDialer(call, result)
+            BridgeContract.Methods.SIMULATE_CALL -> simulateCall(call, result)
             else -> result.notImplemented()
         }
     }
@@ -118,7 +119,7 @@ class MainActivity : FlutterActivity() {
 
     private fun pickContact(result: MethodChannel.Result) {
         if (!hasContactsPermission()) {
-            result.success(mapOf("permissionRequired" to true))
+            result.success(mapOf(BridgeContract.ResultKeys.PERMISSION_REQUIRED to true))
             return
         }
         if (pendingContactPickerResult != null) {
@@ -161,7 +162,10 @@ class MainActivity : FlutterActivity() {
             } else {
                 digits
             }
-            if (cleanedPhone.isBlank()) null else mapOf("name" to name, "phone" to cleanedPhone)
+            if (cleanedPhone.isBlank()) null else mapOf(
+                BridgeContract.ResultKeys.NAME to name,
+                BridgeContract.ResultKeys.PHONE to cleanedPhone,
+            )
         }
 
     private fun requestNotificationPermission(result: MethodChannel.Result) {
@@ -233,8 +237,8 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun scheduleReminder(call: MethodCall, result: MethodChannel.Result) {
-        val reminderId = call.argument<Int>("id")
-        val remindAt = (call.argument<Number>("remindAt"))?.toLong()
+        val reminderId = call.argument<Int>(BridgeContract.Arguments.ID)
+        val remindAt = (call.argument<Number>(BridgeContract.Arguments.REMIND_AT))?.toLong()
         if (reminderId == null || reminderId <= 0 || remindAt == null) {
             result.error("INVALID_ARGUMENT", "A valid id and remindAt timestamp are required", null)
             return
@@ -248,7 +252,7 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun cancelReminder(call: MethodCall, result: MethodChannel.Result) {
-        val reminderId = call.argument<Int>("id")
+        val reminderId = call.argument<Int>(BridgeContract.Arguments.ID)
         if (reminderId == null || reminderId <= 0) {
             result.error("INVALID_ARGUMENT", "A valid reminder id is required", null)
             return
@@ -271,7 +275,7 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun openDialer(call: MethodCall, result: MethodChannel.Result) {
-        val phoneNumber = call.argument<String>("phoneNumber")?.trim()
+        val phoneNumber = call.argument<String>(BridgeContract.Arguments.PHONE_NUMBER)?.trim()
         if (phoneNumber.isNullOrEmpty()) {
             result.error("INVALID_ARGUMENT", "phoneNumber is required", null)
             return
@@ -285,7 +289,7 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun simulateCall(call: MethodCall, result: MethodChannel.Result) {
-        val phoneNumber = call.argument<String>("phoneNumber")
+        val phoneNumber = call.argument<String>(BridgeContract.Arguments.PHONE_NUMBER)
         if (phoneNumber == null) {
             result.error("INVALID_ARGUMENT", "phoneNumber is required", null)
             return
@@ -305,12 +309,12 @@ class MainActivity : FlutterActivity() {
         }
         val roleAvailable = roleManager?.isRoleAvailable(RoleManager.ROLE_CALL_SCREENING) == true
         return mapOf(
-            "roleAvailable" to roleAvailable,
-            "callScreeningRole" to (
+            BridgeContract.ResultKeys.ROLE_AVAILABLE to roleAvailable,
+            BridgeContract.ResultKeys.CALL_SCREENING_ROLE to (
                 roleAvailable && roleManager?.isRoleHeld(RoleManager.ROLE_CALL_SCREENING) == true
-            ),
-            "readContacts" to hasContactsPermission(),
-            "notificationsGranted" to hasNotificationPermission(),
+                ),
+            BridgeContract.ResultKeys.READ_CONTACTS to hasContactsPermission(),
+            BridgeContract.ResultKeys.NOTIFICATIONS_GRANTED to hasNotificationPermission(),
         )
     }
 
@@ -381,8 +385,35 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    override fun onDestroy() {
+        failPendingResults()
+        super.onDestroy()
+    }
+
+    /** Completes any bridge call still waiting for an activity/permission result. */
+    private fun failPendingResults() {
+        val results = listOf(
+            pendingRoleResult,
+            pendingContactsResult,
+            pendingNotificationResult,
+            pendingContactPickerResult,
+        )
+        pendingRoleResult = null
+        pendingContactsResult = null
+        pendingNotificationResult = null
+        pendingContactPickerResult = null
+        results.forEach { result ->
+            runCatching {
+                result?.error(
+                    BridgeContract.Errors.ACTIVITY_DESTROYED,
+                    "The activity was destroyed before the request completed",
+                    null,
+                )
+            }
+        }
+    }
+
     private companion object {
-        const val SCREENING_CHANNEL = "com.wepr.callguard/screening"
         const val REQUEST_SCREENING_ROLE = 8401
         const val REQUEST_READ_CONTACTS = 8402
         const val REQUEST_POST_NOTIFICATIONS = 8403

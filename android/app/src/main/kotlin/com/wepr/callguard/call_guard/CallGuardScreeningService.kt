@@ -11,21 +11,28 @@ class CallGuardScreeningService : CallScreeningService() {
     override fun onScreenCall(callDetails: Call.Details) {
         val phoneNumber = callDetails.handle?.schemeSpecificPart.orEmpty()
         executor.execute {
-            val ruleEngine = CallRuleEngine(applicationContext)
-            var verdict = ruleEngine.evaluate(phoneNumber)
+            val appContext = applicationContext
+            // One settings snapshot covers both the rule engine and the answering module.
+            val settings = runCatching {
+                CallGuardDatabase.readSettings(appContext)
+            }.getOrNull()
+            val ruleEngine = CallRuleEngine(appContext)
+            var verdict = ruleEngine.evaluate(phoneNumber, settings)
             if (OptionalAnsweringModule.shouldRejectUnknownCall(
-                    applicationContext,
+                    appContext,
                     phoneNumber,
                     verdict,
+                    settings,
                 )
             ) {
                 verdict = verdict.copy(allowed = false, reason = "not_in_contacts")
             }
             if (!verdict.allowed) {
                 val handledByOptionalModule = OptionalAnsweringModule.handleRejectedCall(
-                    applicationContext,
+                    appContext,
                     verdict.phoneNumber,
                     verdict.reason,
+                    settings,
                 )
                 if (!handledByOptionalModule) {
                     ruleEngine.recordCallLog(verdict.phoneNumber, verdict.reason)

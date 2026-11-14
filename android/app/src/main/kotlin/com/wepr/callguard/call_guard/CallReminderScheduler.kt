@@ -54,6 +54,9 @@ object CallReminderScheduler {
 
     fun restorePending(context: Context, afterBoot: Boolean = false) {
         val now = System.currentTimeMillis()
+        val pendingSchedules = mutableListOf<PendingSchedule>()
+        val overdueUpdates = mutableListOf<ReminderScheduleUpdate>()
+
         CallReminderStore.pendingReminders(
             context,
             includeFiredOneTime = afterBoot,
@@ -63,22 +66,43 @@ object CallReminderScheduler {
             }
             if (afterBoot && reminder.repeatType != "none" && reminder.remindAt <= now) {
                 val next = ReminderRepeatPolicy.nextOccurrence(reminder, now) ?: return@forEach
-                if (CallReminderStore.updateReminderSchedule(
-                        context,
-                        reminder.id,
-                        next,
-                        reminder.repeatType,
-                        reminder.repeatInterval,
+                overdueUpdates.add(
+                    ReminderScheduleUpdate(
+                        id = reminder.id,
+                        remindAt = next,
+                        repeatType = reminder.repeatType,
+                        repeatInterval = reminder.repeatInterval,
                         lastFiredAt = now,
-                    )
-                ) {
-                    schedule(context, reminder.id, next)
-                }
+                    ),
+                )
+                pendingSchedules.add(
+                    PendingSchedule(reminder.id, next, requiresDatabaseUpdate = true),
+                )
             } else {
-                schedule(context, reminder.id, reminder.remindAt)
+                pendingSchedules.add(
+                    PendingSchedule(
+                        reminder.id,
+                        reminder.remindAt,
+                        requiresDatabaseUpdate = false,
+                    ),
+                )
+            }
+        }
+
+        // Advance every overdue repeating reminder in one transaction, then arm alarms.
+        val updatedIds = CallReminderStore.updateReminderSchedules(context, overdueUpdates)
+        pendingSchedules.forEach { pending ->
+            if (!pending.requiresDatabaseUpdate || pending.id in updatedIds) {
+                schedule(context, pending.id, pending.remindAt)
             }
         }
     }
+
+    private data class PendingSchedule(
+        val id: Int,
+        val remindAt: Long,
+        val requiresDatabaseUpdate: Boolean,
+    )
 
     private fun reminderPendingIntent(
         context: Context,

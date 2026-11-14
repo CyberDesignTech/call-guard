@@ -9,10 +9,11 @@ import java.util.concurrent.Executors
 class BootCompletedReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
+        val appContext = context.applicationContext
         val pendingResult = goAsync()
         worker.execute {
             try {
-                CallReminderScheduler.restorePending(context, afterBoot = true)
+                CallReminderScheduler.restorePending(appContext, afterBoot = true)
             } catch (error: Exception) {
                 Log.e(TAG, "Could not restore call reminders after reboot", error)
             } finally {

@@ -2,6 +2,7 @@ package com.wepr.callguard.call_guard
 
 import android.content.ContentValues
 import android.content.Context
+import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 
 data class CallReminderRecord(
@@ -16,21 +17,29 @@ data class CallReminderRecord(
     val lastFiredAt: Long?,
 )
 
+data class ReminderScheduleUpdate(
+    val id: Int,
+    val remindAt: Long,
+    val repeatType: String,
+    val repeatInterval: Int,
+    val lastFiredAt: Long?,
+)
+
 /** Minimal native access to the SQLite tables created by the Flutter sqflite helper. */
 object CallReminderStore {
     fun findReminder(context: Context, id: Int): CallReminderRecord? =
-        openDatabase(context).use { database ->
+        CallGuardDatabase.withDatabase(context) { database ->
             database.query(
-                "call_reminders",
+                DbContract.CallReminders.TABLE,
                 reminderColumns,
-                "id = ?",
+                "${DbContract.CallReminders.ID} = ?",
                 arrayOf(id.toString()),
                 null,
                 null,
                 null,
                 "1",
             ).use { cursor ->
-                if (!cursor.moveToFirst()) return@use null
+                if (!cursor.moveToFirst()) return@withDatabase null
                 cursor.toReminder()
             }
         }
@@ -39,20 +48,22 @@ object CallReminderStore {
         context: Context,
         includeFiredOneTime: Boolean = false,
     ): List<CallReminderRecord> =
-        openDatabase(context).use { database ->
+        CallGuardDatabase.withDatabase(context) { database ->
             val reminders = mutableListOf<CallReminderRecord>()
             database.query(
-                "call_reminders",
+                DbContract.CallReminders.TABLE,
                 reminderColumns,
                 if (includeFiredOneTime) {
-                    "is_done = 0"
+                    "${DbContract.CallReminders.IS_DONE} = 0"
                 } else {
-                    "is_done = 0 AND (repeat_type != 'none' OR last_fired_at IS NULL)"
+                    "${DbContract.CallReminders.IS_DONE} = 0 AND " +
+                        "(${DbContract.CallReminders.REPEAT_TYPE} != 'none' OR " +
+                        "${DbContract.CallReminders.LAST_FIRED_AT} IS NULL)"
                 },
                 null,
                 null,
                 null,
-                "remind_at ASC",
+                "${DbContract.CallReminders.REMIND_AT} ASC",
             ).use { cursor ->
                 while (cursor.moveToNext()) reminders.add(cursor.toReminder())
             }
@@ -60,21 +71,23 @@ object CallReminderStore {
         }
 
     fun markDone(context: Context, id: Int): Boolean =
-        openDatabase(context).use { database ->
+        CallGuardDatabase.withDatabase(context) { database ->
             database.update(
-                "call_reminders",
-                ContentValues().apply { put("is_done", 1) },
-                "id = ?",
+                DbContract.CallReminders.TABLE,
+                ContentValues().apply { put(DbContract.CallReminders.IS_DONE, 1) },
+                "${DbContract.CallReminders.ID} = ?",
                 arrayOf(id.toString()),
             ) > 0
         }
 
     fun markFired(context: Context, id: Int, firedAt: Long = System.currentTimeMillis()): Boolean =
-        openDatabase(context).use { database ->
+        CallGuardDatabase.withDatabase(context) { database ->
             database.update(
-                "call_reminders",
-                ContentValues().apply { put("last_fired_at", firedAt) },
-                "id = ? AND is_done = 0",
+                DbContract.CallReminders.TABLE,
+                ContentValues().apply {
+                    put(DbContract.CallReminders.LAST_FIRED_AT, firedAt)
+                },
+                "${DbContract.CallReminders.ID} = ? AND ${DbContract.CallReminders.IS_DONE} = 0",
                 arrayOf(id.toString()),
             ) > 0
         }
@@ -86,28 +99,50 @@ object CallReminderStore {
         repeatType: String,
         repeatInterval: Int,
         lastFiredAt: Long? = null,
-    ): Boolean = openDatabase(context).use { database ->
-        database.update(
-            "call_reminders",
-            ContentValues().apply {
-                put("remind_at", remindAt)
-                put("repeat_type", repeatType)
-                put("repeat_interval", repeatInterval.coerceAtLeast(1))
-                put("is_done", 0)
-                if (lastFiredAt == null) putNull("last_fired_at")
-                else put("last_fired_at", lastFiredAt)
-            },
-            "id = ? AND is_done = 0",
-            arrayOf(id.toString()),
-        ) > 0
+    ): Boolean = CallGuardDatabase.withDatabase(context) { database ->
+        updateScheduleRow(
+            database,
+            ReminderScheduleUpdate(
+                id = id,
+                remindAt = remindAt,
+                repeatType = repeatType,
+                repeatInterval = repeatInterval,
+                lastFiredAt = lastFiredAt,
+            ),
+        )
+    }
+
+    /**
+     * Updates several advanced repeating reminders in one transaction.
+     *
+     * @return ids whose row was actually updated.
+     */
+    fun updateReminderSchedules(
+        context: Context,
+        updates: List<ReminderScheduleUpdate>,
+    ): Set<Int> {
+        if (updates.isEmpty()) return emptySet()
+        return CallGuardDatabase.withDatabase(context) { database ->
+            val updatedIds = mutableSetOf<Int>()
+            database.beginTransaction()
+            try {
+                updates.forEach { update ->
+                    if (updateScheduleRow(database, update)) updatedIds.add(update.id)
+                }
+                database.setTransactionSuccessful()
+            } finally {
+                database.endTransaction()
+            }
+            updatedIds
+        }
     }
 
     fun getSetting(context: Context, key: String, fallback: String = ""): String =
-        openDatabase(context).use { database ->
+        CallGuardDatabase.withDatabase(context) { database ->
             database.query(
-                "app_settings",
-                arrayOf("value"),
-                "`key` = ?",
+                DbContract.AppSettings.TABLE,
+                arrayOf(DbContract.AppSettings.VALUE),
+                "`${DbContract.AppSettings.KEY}` = ?",
                 arrayOf(key),
                 null,
                 null,
@@ -119,82 +154,77 @@ object CallReminderStore {
         }
 
     fun insertCallLog(context: Context, phone: String, reason: String) {
-        openDatabase(context).use { database ->
+        CallGuardDatabase.withDatabase(context) { database ->
             database.insertOrThrow(
-                "call_logs",
+                DbContract.CallLogs.TABLE,
                 null,
                 ContentValues().apply {
-                    put("phone", phone.ifBlank { "@numberHidden" })
-                    put("reason", reason)
-                    put("timestamp", System.currentTimeMillis())
+                    put(
+                        DbContract.CallLogs.PHONE,
+                        phone.ifBlank { PhoneNumbers.HIDDEN_NUMBER },
+                    )
+                    put(DbContract.CallLogs.REASON, reason)
+                    put(DbContract.CallLogs.TIMESTAMP, System.currentTimeMillis())
                 },
             )
         }
     }
 
-    private fun openDatabase(context: Context): SQLiteDatabase {
-        // Android's sqflite getDatabasesPath() resolves to this same database directory.
-        val databaseFile = context.applicationContext.getDatabasePath(DATABASE_NAME)
-        check(databaseFile.isFile) { "Call Guard database does not exist" }
-        val database = SQLiteDatabase.openDatabase(
-            databaseFile.absolutePath,
-            null,
-            SQLiteDatabase.OPEN_READWRITE,
-        )
-        database.rawQuery("PRAGMA busy_timeout = 3000", null).use { }
-        ensureRepeatColumns(database)
-        return database
-    }
-
-    private fun ensureRepeatColumns(database: SQLiteDatabase) {
-        val columns = mutableSetOf<String>()
-        database.rawQuery("PRAGMA table_info(call_reminders)", null).use { cursor ->
-            val nameColumn = cursor.getColumnIndexOrThrow("name")
-            while (cursor.moveToNext()) columns.add(cursor.getString(nameColumn))
-        }
-        if ("repeat_type" !in columns) {
-            database.execSQL(
-                "ALTER TABLE call_reminders ADD COLUMN repeat_type TEXT NOT NULL DEFAULT 'none'",
+    private fun updateScheduleRow(
+        database: SQLiteDatabase,
+        update: ReminderScheduleUpdate,
+    ): Boolean = database.update(
+        DbContract.CallReminders.TABLE,
+        ContentValues().apply {
+            put(DbContract.CallReminders.REMIND_AT, update.remindAt)
+            put(DbContract.CallReminders.REPEAT_TYPE, update.repeatType)
+            put(
+                DbContract.CallReminders.REPEAT_INTERVAL,
+                update.repeatInterval.coerceAtLeast(1),
             )
-        }
-        if ("repeat_interval" !in columns) {
-            database.execSQL(
-                "ALTER TABLE call_reminders ADD COLUMN repeat_interval INTEGER NOT NULL DEFAULT 1",
-            )
-        }
-        if ("last_fired_at" !in columns) {
-            database.execSQL("ALTER TABLE call_reminders ADD COLUMN last_fired_at INTEGER")
-        }
-    }
+            put(DbContract.CallReminders.IS_DONE, 0)
+            if (update.lastFiredAt == null) {
+                putNull(DbContract.CallReminders.LAST_FIRED_AT)
+            } else {
+                put(DbContract.CallReminders.LAST_FIRED_AT, update.lastFiredAt)
+            }
+        },
+        "${DbContract.CallReminders.ID} = ? AND ${DbContract.CallReminders.IS_DONE} = 0",
+        arrayOf(update.id.toString()),
+    ) > 0
 
-    private fun android.database.Cursor.toReminder(): CallReminderRecord =
+    private fun Cursor.toReminder(): CallReminderRecord =
         CallReminderRecord(
-            id = getInt(getColumnIndexOrThrow("id")),
-            phone = getString(getColumnIndexOrThrow("phone")).orEmpty(),
-            contactName = getString(getColumnIndexOrThrow("contact_name")),
-            remindAt = getLong(getColumnIndexOrThrow("remind_at")),
-            note = getString(getColumnIndexOrThrow("note")),
-            isDone = getInt(getColumnIndexOrThrow("is_done")) != 0,
-            repeatType = getString(getColumnIndexOrThrow("repeat_type")) ?: "none",
-            repeatInterval = getInt(getColumnIndexOrThrow("repeat_interval")).coerceAtLeast(1),
-            lastFiredAt = if (isNull(getColumnIndexOrThrow("last_fired_at"))) {
+            id = getInt(getColumnIndexOrThrow(DbContract.CallReminders.ID)),
+            phone = getString(getColumnIndexOrThrow(DbContract.CallReminders.PHONE)).orEmpty(),
+            contactName = getString(getColumnIndexOrThrow(DbContract.CallReminders.CONTACT_NAME)),
+            remindAt = getLong(getColumnIndexOrThrow(DbContract.CallReminders.REMIND_AT)),
+            note = getString(getColumnIndexOrThrow(DbContract.CallReminders.NOTE)),
+            isDone = getInt(getColumnIndexOrThrow(DbContract.CallReminders.IS_DONE)) != 0,
+            repeatType = getString(
+                getColumnIndexOrThrow(DbContract.CallReminders.REPEAT_TYPE),
+            ) ?: "none",
+            repeatInterval = getInt(
+                getColumnIndexOrThrow(DbContract.CallReminders.REPEAT_INTERVAL),
+            ).coerceAtLeast(1),
+            lastFiredAt = if (
+                isNull(getColumnIndexOrThrow(DbContract.CallReminders.LAST_FIRED_AT))
+            ) {
                 null
             } else {
-                getLong(getColumnIndexOrThrow("last_fired_at"))
+                getLong(getColumnIndexOrThrow(DbContract.CallReminders.LAST_FIRED_AT))
             },
         )
 
     private val reminderColumns = arrayOf(
-        "id",
-        "phone",
-        "contact_name",
-        "remind_at",
-        "note",
-        "is_done",
-        "repeat_type",
-        "repeat_interval",
-        "last_fired_at",
+        DbContract.CallReminders.ID,
+        DbContract.CallReminders.PHONE,
+        DbContract.CallReminders.CONTACT_NAME,
+        DbContract.CallReminders.REMIND_AT,
+        DbContract.CallReminders.NOTE,
+        DbContract.CallReminders.IS_DONE,
+        DbContract.CallReminders.REPEAT_TYPE,
+        DbContract.CallReminders.REPEAT_INTERVAL,
+        DbContract.CallReminders.LAST_FIRED_AT,
     )
-
-    private const val DATABASE_NAME = "call_guard.db"
 }

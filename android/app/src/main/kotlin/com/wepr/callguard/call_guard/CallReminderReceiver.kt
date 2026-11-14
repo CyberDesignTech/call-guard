@@ -1,5 +1,6 @@
 package com.wepr.callguard.call_guard
 
+import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -9,10 +10,11 @@ import java.util.concurrent.Executors
 
 class CallReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        val appContext = context.applicationContext
         val reminderId = intent.getIntExtra(CallReminderScheduler.EXTRA_REMINDER_ID, -1)
         if (reminderId <= 0) return
 
-        val wakeLock = (context.getSystemService(Context.POWER_SERVICE) as? PowerManager)
+        val wakeLock = (appContext.getSystemService(Context.POWER_SERVICE) as? PowerManager)
             ?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "$TAG:Reminder")
         runCatching { wakeLock?.acquire(WAKE_LOCK_TIMEOUT_MS) }
             .onFailure { Log.w(TAG, "Could not acquire reminder wake lock", it) }
@@ -21,26 +23,29 @@ class CallReminderReceiver : BroadcastReceiver() {
             try {
                 when (intent.action) {
                     CallReminderScheduler.ACTION_MARK_REMINDER_DONE -> {
-                        CallReminderStore.markDone(context, reminderId)
-                        CallReminderScheduler.cancel(context, reminderId)
-                        (context.getSystemService(Context.NOTIFICATION_SERVICE)
-                            as? android.app.NotificationManager)?.cancel(reminderId)
+                        CallReminderStore.markDone(appContext, reminderId)
+                        CallReminderScheduler.cancel(appContext, reminderId)
+                        (appContext.getSystemService(Context.NOTIFICATION_SERVICE)
+                            as? NotificationManager)?.cancel(reminderId)
                     }
                     CallReminderScheduler.ACTION_FIRE_REMINDER -> {
-                        val reminder = CallReminderStore.findReminder(context, reminderId)
+                        val reminder = CallReminderStore.findReminder(appContext, reminderId)
                         if (reminder == null || reminder.isDone) {
-                            CallReminderScheduler.cancel(context, reminderId)
+                            CallReminderScheduler.cancel(appContext, reminderId)
                         } else {
-                            val notificationShown = CallNotificationHelper.showReminder(context, reminder)
+                            val notificationShown =
+                                CallNotificationHelper.showReminder(appContext, reminder)
                             if (reminder.repeatType == "none") {
-                                if (notificationShown) CallReminderStore.markFired(context, reminder.id)
+                                if (notificationShown) {
+                                    CallReminderStore.markFired(appContext, reminder.id)
+                                }
                             } else {
                                 // Repeating reminders must advance even if notifications are
                                 // disabled, otherwise they would stay stuck in the past.
                                 val now = System.currentTimeMillis()
                                 val next = ReminderRepeatPolicy.nextOccurrence(reminder, now)
                                 if (next != null && CallReminderStore.updateReminderSchedule(
-                                        context,
+                                        appContext,
                                         reminder.id,
                                         next,
                                         reminder.repeatType,
@@ -48,7 +53,7 @@ class CallReminderReceiver : BroadcastReceiver() {
                                         lastFiredAt = now,
                                     )
                                 ) {
-                                    CallReminderScheduler.schedule(context, reminder.id, next)
+                                    CallReminderScheduler.schedule(appContext, reminder.id, next)
                                 }
                             }
                         }
