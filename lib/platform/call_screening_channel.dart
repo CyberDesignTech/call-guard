@@ -38,6 +38,25 @@ class CallSimulationVerdict {
       );
 }
 
+class ContactPickerResult {
+  const ContactPickerResult({
+    this.permissionRequired = false,
+    this.name,
+    this.phone,
+  });
+
+  final bool permissionRequired;
+  final String? name;
+  final String? phone;
+
+  factory ContactPickerResult.fromMap(Map<String, Object?> values) =>
+      ContactPickerResult(
+        permissionRequired: values['permissionRequired'] == true,
+        name: values['name'] as String?,
+        phone: values['phone'] as String?,
+      );
+}
+
 class CallScreeningChannel {
   CallScreeningChannel({MethodChannel? channel})
     : _channel = channel ?? const MethodChannel('com.wepr.callguard/screening');
@@ -58,6 +77,13 @@ class CallScreeningChannel {
 
   Future<void> openDefaultAppsSettings() async {
     await _channel.invokeMethod<bool>('openDefaultAppsSettings');
+  }
+
+  Future<ContactPickerResult?> pickContact() async {
+    final values = await _channel.invokeMapMethod<String, Object?>(
+      'pickContact',
+    );
+    return values == null ? null : ContactPickerResult.fromMap(values);
   }
 
   Future<CallScreeningPermissions> requestContactsPermission() async =>

@@ -1,11 +1,13 @@
 package com.wepr.callguard.call_guard
 
 import android.Manifest
+import android.app.Activity
 import android.app.role.RoleManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.provider.ContactsContract
 import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -17,6 +19,7 @@ class MainActivity : FlutterActivity() {
     private var pendingRoleResult: MethodChannel.Result? = null
     private var pendingContactsResult: MethodChannel.Result? = null
     private var pendingNotificationResult: MethodChannel.Result? = null
+    private var pendingContactPickerResult: MethodChannel.Result? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -32,6 +35,7 @@ class MainActivity : FlutterActivity() {
             "requestCallScreeningRole" -> requestCallScreeningRole(result)
             "openDefaultAppsSettings" -> openDefaultAppsSettings(result)
             "requestContactsPermission" -> requestContactsPermission(result)
+            "pickContact" -> pickContact(result)
             "requestNotificationPermission" -> requestNotificationPermission(result)
             "scheduleReminder" -> scheduleReminder(call, result)
             "cancelReminder" -> cancelReminder(call, result)
@@ -107,6 +111,54 @@ class MainActivity : FlutterActivity() {
         pendingContactsResult = result
         requestPermissions(arrayOf(Manifest.permission.READ_CONTACTS), REQUEST_READ_CONTACTS)
     }
+
+    private fun pickContact(result: MethodChannel.Result) {
+        if (!hasContactsPermission()) {
+            result.success(mapOf("permissionRequired" to true))
+            return
+        }
+        if (pendingContactPickerResult != null) {
+            result.error("PICKER_IN_PROGRESS", "A contact picker is already open", null)
+            return
+        }
+
+        pendingContactPickerResult = result
+        try {
+            startActivityForResult(
+                Intent(
+                    Intent.ACTION_PICK,
+                    ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                ),
+                REQUEST_PICK_CONTACT,
+            )
+        } catch (error: Exception) {
+            pendingContactPickerResult = null
+            result.error("CONTACT_PICKER_UNAVAILABLE", error.message, null)
+        }
+    }
+
+    private fun readPickedContact(uri: Uri): Map<String, String>? =
+        contentResolver.query(
+            uri,
+            arrayOf(
+                ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                ContactsContract.CommonDataKinds.Phone.NUMBER,
+            ),
+            null,
+            null,
+            null,
+        )?.use { cursor ->
+            if (!cursor.moveToFirst()) return@use null
+            val name = cursor.getString(0).orEmpty()
+            val rawNumber = cursor.getString(1).orEmpty().trim()
+            val digits = rawNumber.filter(Char::isDigit)
+            val cleanedPhone = if (rawNumber.startsWith("+") && digits.isNotEmpty()) {
+                "+$digits"
+            } else {
+                digits
+            }
+            if (cleanedPhone.isBlank()) null else mapOf("name" to name, "phone" to cleanedPhone)
+        }
 
     private fun requestNotificationPermission(result: MethodChannel.Result) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || hasNotificationPermission()) {
@@ -219,7 +271,19 @@ class MainActivity : FlutterActivity() {
     @Deprecated("Deprecated in Android, retained for role activity results")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQUEST_SCREENING_ROLE) {
+        if (requestCode == REQUEST_PICK_CONTACT) {
+            val result = pendingContactPickerResult
+            pendingContactPickerResult = null
+            if (resultCode != Activity.RESULT_OK || data?.data == null) {
+                result?.success(null)
+            } else {
+                try {
+                    result?.success(readPickedContact(data.data!!))
+                } catch (error: Exception) {
+                    result?.error("CONTACT_READ_FAILED", error.message, null)
+                }
+            }
+        } else if (requestCode == REQUEST_SCREENING_ROLE) {
             pendingRoleResult?.success(permissionState())
             pendingRoleResult = null
         }
@@ -246,6 +310,7 @@ class MainActivity : FlutterActivity() {
         const val REQUEST_SCREENING_ROLE = 8401
         const val REQUEST_READ_CONTACTS = 8402
         const val REQUEST_POST_NOTIFICATIONS = 8403
+        const val REQUEST_PICK_CONTACT = 8404
         val simulationExecutor = Executors.newSingleThreadExecutor { runnable ->
             Thread(runnable, "CallGuardCallSimulation").apply { isDaemon = true }
         }

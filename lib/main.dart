@@ -61,6 +61,51 @@ abstract final class _Palette {
   }
 }
 
+Future<ContactPickerResult?> _pickContactFromPhoneBook({
+  required BuildContext context,
+  required AppStrings strings,
+  required CallScreeningChannel channel,
+}) async {
+  try {
+    var result = await channel.pickContact();
+    if (result?.permissionRequired == true) {
+      final permissions = await channel.requestContactsPermission();
+      if (!permissions.readContacts) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              SnackBar(
+                content: Text(strings.call('contactPickerPermissionNeeded')),
+              ),
+            );
+        }
+        return null;
+      }
+      result = await channel.pickContact();
+    }
+    return result;
+  } on PlatformException {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text(strings.call('contactPickerError'))),
+        );
+    }
+    return null;
+  } on MissingPluginException {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text(strings.call('contactPickerError'))),
+        );
+    }
+    return null;
+  }
+}
+
 class CallGuardApp extends StatefulWidget {
   CallGuardApp({super.key, DatabaseHelper? database})
     : database = database ?? DatabaseHelper.instance;
@@ -1783,6 +1828,21 @@ class _ListsPageState extends State<_ListsPage> {
                 prefixIcon: Icon(Icons.label_outline_rounded),
               ),
             ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: () async {
+                final contact = await _pickContactFromPhoneBook(
+                  context: dialogContext,
+                  strings: widget.strings,
+                  channel: CallScreeningChannel(),
+                );
+                if (contact == null || !dialogContext.mounted) return;
+                phoneController.text = contact.phone ?? '';
+                nameController.text = contact.name ?? '';
+              },
+              icon: const Icon(Icons.contacts_outlined, size: 18),
+              label: Text(widget.strings.call('pickFromContacts')),
+            ),
           ],
         ),
         actions: [
@@ -3314,6 +3374,7 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
 
   Future<void> _createReminder() async {
     final phoneController = TextEditingController();
+    final contactNameController = TextEditingController();
     final noteController = TextEditingController();
     var selectedDate = DateTime.now().add(const Duration(days: 1));
     var selectedTime = const TimeOfDay(hour: 9, minute: 0);
@@ -3341,6 +3402,31 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
                   ),
                 ),
                 const SizedBox(height: 12),
+                TextField(
+                  controller: contactNameController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: InputDecoration(
+                    labelText: widget.strings.call('optionalName'),
+                    hintText: widget.strings.call('nameExample'),
+                    prefixIcon: Icon(Icons.person_outline_rounded),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final contact = await _pickContactFromPhoneBook(
+                      context: dialogContext,
+                      strings: widget.strings,
+                      channel: _screeningChannel,
+                    );
+                    if (contact == null || !dialogContext.mounted) return;
+                    phoneController.text = contact.phone ?? '';
+                    contactNameController.text = contact.name ?? '';
+                  },
+                  icon: const Icon(Icons.contacts_outlined, size: 18),
+                  label: Text(widget.strings.call('pickFromContacts')),
+                ),
+                const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(
@@ -3405,7 +3491,9 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
                   dialogContext,
                   _Reminder(
                     phone: phone,
-                    contactName: '@reminderNew',
+                    contactName: contactNameController.text.trim().isEmpty
+                        ? '@reminderNew'
+                        : contactNameController.text.trim(),
                     remindAt: DateTime(
                       selectedDate.year,
                       selectedDate.month,
@@ -3427,6 +3515,7 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
     );
 
     phoneController.dispose();
+    contactNameController.dispose();
     noteController.dispose();
     if (result != null && mounted) {
       final reminderId = await widget.database.insertReminder(

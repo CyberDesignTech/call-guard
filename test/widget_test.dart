@@ -217,6 +217,108 @@ void main() {
     },
   );
 
+  test(
+    'contact picker reports permission state and selected contact',
+    () async {
+      const channel = MethodChannel('com.wepr.callguard/contact-test');
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      var pickerCalls = 0;
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        if (call.method == 'pickContact') {
+          pickerCalls++;
+          if (pickerCalls == 1) return {'permissionRequired': true};
+          return {'name': 'Ada Lovelace', 'phone': '+441234567890'};
+        }
+        if (call.method == 'requestContactsPermission') {
+          return {
+            'roleAvailable': true,
+            'callScreeningRole': false,
+            'readContacts': true,
+          };
+        }
+        return null;
+      });
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+      final bridge = CallScreeningChannel(channel: channel);
+      expect((await bridge.pickContact())?.permissionRequired, isTrue);
+      expect((await bridge.requestContactsPermission()).readContacts, isTrue);
+      final contact = await bridge.pickContact();
+      expect(contact?.name, 'Ada Lovelace');
+      expect(contact?.phone, '+441234567890');
+    },
+  );
+
+  testWidgets('contact picker fills list and reminder forms', (tester) async {
+    const channel = MethodChannel('com.wepr.callguard/screening');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    var pickerCalls = 0;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'restorePendingReminders') return true;
+      if (call.method == 'checkPermissions') {
+        return {
+          'roleAvailable': true,
+          'callScreeningRole': false,
+          'readContacts': false,
+        };
+      }
+      if (call.method == 'pickContact') {
+        pickerCalls++;
+        return pickerCalls == 1
+            ? {'permissionRequired': true}
+            : {'name': 'Ada Lovelace', 'phone': '+441234567890'};
+      }
+      if (call.method == 'requestContactsPermission') {
+        return {
+          'roleAvailable': true,
+          'callScreeningRole': false,
+          'readContacts': true,
+        };
+      }
+      return true;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    await pumpApp(tester);
+    await tester.tap(find.byTooltip('Списки та фільтри'));
+    await waitForText(tester, 'Мама');
+    await tester.tap(find.byTooltip('Додати номер'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Вибрати з контактів'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<TextField>(find.byType(TextField).first).controller!.text,
+      '+441234567890',
+    );
+    expect(
+      tester.widget<TextField>(find.byType(TextField).last).controller!.text,
+      'Ada Lovelace',
+    );
+    await tester.tap(find.text('Скасувати'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Нагадування та Журнал'));
+    await waitForText(tester, 'Олена Коваль');
+    await tester.drag(find.byType(ListView).last, const Offset(0, -700));
+    await tester.pumpAndSettle();
+    await waitForText(tester, 'Створити нагадування');
+    await tester.ensureVisible(find.text('Створити нагадування'));
+    await tester.tap(find.text('Створити нагадування'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Вибрати з контактів'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<TextField>(find.byType(TextField).first).controller!.text,
+      '+441234567890',
+    );
+    expect(
+      tester.widget<TextField>(find.byType(TextField).at(1)).controller!.text,
+      'Ada Lovelace',
+    );
+  });
+
   testWidgets('lets the user switch to the dark UI theme', (tester) async {
     tester.view.physicalSize = const Size(360, 800);
     tester.view.devicePixelRatio = 1;
