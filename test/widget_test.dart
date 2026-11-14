@@ -139,8 +139,10 @@ void main() {
 
     expect(find.text('Захист викликів'), findsOneWidget);
     expect(find.text('Захист активний'), findsOneWidget);
-    expect(find.text('Швидкі правила'), findsOneWidget);
     expect(find.byType(ShieldPhoneLogo), findsNWidgets(2));
+    await tester.drag(find.byType(ListView).first, const Offset(0, -700));
+    await tester.pumpAndSettle();
+    expect(find.text('Швидкі правила'), findsOneWidget);
   });
 
   test('every supported language has a complete UI dictionary', () {
@@ -181,6 +183,50 @@ void main() {
       Theme.of(tester.element(find.text('Тема оформлення'))).brightness,
       Brightness.dark,
     );
+  });
+
+  testWidgets('test call button invokes the native rule engine channel', (
+    tester,
+  ) async {
+    const channel = MethodChannel('com.wepr.callguard/screening');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    String? testedNumber;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'checkPermissions') {
+        return {
+          'roleAvailable': true,
+          'callScreeningRole': false,
+          'readContacts': false,
+        };
+      }
+      if (call.method == 'simulateCall') {
+        testedNumber =
+            (call.arguments as Map<Object?, Object?>)['phoneNumber'] as String;
+        return {
+          'verdict': 'REJECT',
+          'reason': 'blacklist',
+          'phoneNumber': testedNumber,
+        };
+      }
+      return null;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    await pumpApp(tester);
+    await tester.drag(find.byType(ListView).first, const Offset(0, -1200));
+    await tester.pumpAndSettle();
+    final testButton = find.text('Тестовий виклик (перевірка правила)');
+    await tester.ensureVisible(testButton);
+    await tester.tap(testButton);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '+380 67 555 01 01');
+    await tester.tap(find.text('Перевірити номер'));
+    await tester.pumpAndSettle();
+
+    expect(testedNumber, '+380 67 555 01 01');
+    expect(find.text('Відхилити виклик'), findsOneWidget);
+    expect(find.text('Причина: Чорний список'), findsOneWidget);
   });
 
   testWidgets('profile menu opens About and Support dialogs', (tester) async {

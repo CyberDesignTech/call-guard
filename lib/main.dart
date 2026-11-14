@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import 'data/database_helper.dart';
 import 'l10n/app_strings.dart';
+import 'platform/call_screening_channel.dart';
 
 void main() => runApp(CallGuardApp());
 
@@ -80,6 +81,7 @@ class _CallGuardAppState extends State<CallGuardApp>
   bool _blockNonContacts = false;
   bool _blockInternational = true;
   bool _automaticSilence = false;
+  bool _manualSilenceEnabled = false;
   bool _allowOnlyWhitelist = true;
   TimeOfDay _silenceStart = const TimeOfDay(hour: 22, minute: 0);
   TimeOfDay _silenceEnd = const TimeOfDay(hour: 7, minute: 0);
@@ -151,6 +153,7 @@ class _CallGuardAppState extends State<CallGuardApp>
         _blockNonContacts = parseBool('block_non_contacts', false);
         _blockInternational = parseBool('block_international', true);
         _automaticSilence = parseBool('automatic_silence', false);
+        _manualSilenceEnabled = parseBool('manual_silence_enabled', false);
         _allowOnlyWhitelist = parseBool('allow_only_whitelist', true);
         _silenceStart = _timeOfDay(parseInt('silence_start_minute', 1320));
         _silenceEnd = _timeOfDay(parseInt('silence_end_minute', 420));
@@ -326,6 +329,11 @@ class _CallGuardAppState extends State<CallGuardApp>
                 _persistSetting('block_international', value);
               },
               automaticSilence: _automaticSilence,
+              manualSilenceEnabled: _manualSilenceEnabled,
+              onManualSilenceChanged: (value) {
+                setState(() => _manualSilenceEnabled = value);
+                _persistSetting('manual_silence_enabled', value);
+              },
               onAutomaticSilenceChanged: (value) {
                 setState(() => _automaticSilence = value);
                 _persistSetting('automatic_silence', value);
@@ -382,6 +390,8 @@ class _CallGuardShell extends StatefulWidget {
     required this.blockInternational,
     required this.onBlockInternationalChanged,
     required this.automaticSilence,
+    required this.manualSilenceEnabled,
+    required this.onManualSilenceChanged,
     required this.onAutomaticSilenceChanged,
     required this.allowOnlyWhitelist,
     required this.onAllowOnlyWhitelistChanged,
@@ -421,6 +431,8 @@ class _CallGuardShell extends StatefulWidget {
   final bool blockInternational;
   final ValueChanged<bool> onBlockInternationalChanged;
   final bool automaticSilence;
+  final bool manualSilenceEnabled;
+  final ValueChanged<bool> onManualSilenceChanged;
   final ValueChanged<bool> onAutomaticSilenceChanged;
   final bool allowOnlyWhitelist;
   final ValueChanged<bool> onAllowOnlyWhitelistChanged;
@@ -467,27 +479,7 @@ class _CallGuardShellState extends State<_CallGuardShell> {
   void _openTestDialog() {
     showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        icon: Icon(
-          Icons.science_outlined,
-          color: _Palette.accent(_Palette.blue),
-        ),
-        title: Text(widget.strings.call('testTitle')),
-        content: Text(widget.strings.call('testBody')),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text(widget.strings.call('closeLabel')),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              _showStub();
-            },
-            child: Text(widget.strings.call('testRuleButton')),
-          ),
-        ],
-      ),
+      builder: (_) => _SimulateCallDialog(strings: widget.strings),
     );
   }
 
@@ -581,6 +573,8 @@ class _CallGuardShellState extends State<_CallGuardShell> {
           blockInternational: widget.blockInternational,
           onBlockInternationalChanged: widget.onBlockInternationalChanged,
           automaticSilence: widget.automaticSilence,
+          manualSilenceEnabled: widget.manualSilenceEnabled,
+          onManualSilenceChanged: widget.onManualSilenceChanged,
           onOpenSchedule: () => setState(() => _selectedIndex = 2),
           onTest: _openTestDialog,
         ),
@@ -661,6 +655,332 @@ class _CallGuardShellState extends State<_CallGuardShell> {
       ),
     );
   }
+}
+
+class _SimulateCallDialog extends StatefulWidget {
+  const _SimulateCallDialog({required this.strings});
+
+  final AppStrings strings;
+
+  @override
+  State<_SimulateCallDialog> createState() => _SimulateCallDialogState();
+}
+
+class _SimulateCallDialogState extends State<_SimulateCallDialog> {
+  final _phoneController = TextEditingController();
+  final _channel = CallScreeningChannel();
+  CallSimulationVerdict? _verdict;
+  bool _loading = false;
+  bool _hasError = false;
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _simulate() async {
+    final phoneNumber = _phoneController.text.trim();
+    if (phoneNumber.isEmpty) return;
+    setState(() {
+      _loading = true;
+      _hasError = false;
+      _verdict = null;
+    });
+    try {
+      final verdict = await _channel.simulateCall(phoneNumber);
+      if (!mounted) return;
+      setState(() => _verdict = verdict);
+    } on PlatformException {
+      if (mounted) setState(() => _hasError = true);
+    } on MissingPluginException {
+      if (mounted) setState(() => _hasError = true);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  String _reasonLabel(String reason) =>
+      AppStrings.keys.contains(reason) ? widget.strings.call(reason) : reason;
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    icon: Icon(Icons.science_outlined, color: _Palette.accent(_Palette.blue)),
+    title: Text(widget.strings.call('testTitle')),
+    content: SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(widget.strings.call('testBody')),
+          const SizedBox(height: 13),
+          TextField(
+            controller: _phoneController,
+            keyboardType: TextInputType.phone,
+            decoration: InputDecoration(
+              labelText: widget.strings.call('phoneNumber'),
+              hintText: widget.strings.call('phoneNumberHint'),
+              prefixIcon: const Icon(Icons.phone_outlined),
+            ),
+            onSubmitted: (_) => _simulate(),
+          ),
+          if (_loading) ...[
+            const SizedBox(height: 16),
+            const Center(child: CircularProgressIndicator()),
+          ],
+          if (_hasError) ...[
+            const SizedBox(height: 13),
+            Text(
+              widget.strings.call('simulationUnavailable'),
+              style: TextStyle(
+                color: _Palette.accent(_Palette.red),
+                fontSize: 12,
+              ),
+            ),
+          ],
+          if (_verdict case final verdict?) ...[
+            const SizedBox(height: 13),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _Palette.accentSurface(
+                  verdict.allowed ? _Palette.green : _Palette.red,
+                ),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.strings.call(
+                      verdict.allowed ? 'verdictAllowed' : 'verdictRejected',
+                    ),
+                    style: TextStyle(
+                      color: _Palette.accent(
+                        verdict.allowed ? _Palette.green : _Palette.red,
+                      ),
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    '${widget.strings.call('ruleReason')}: ${_reasonLabel(verdict.reason)}',
+                    style: TextStyle(color: _Palette.ink, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: Text(widget.strings.call('closeLabel')),
+      ),
+      FilledButton(
+        onPressed: _loading ? null : _simulate,
+        child: Text(
+          _loading
+              ? widget.strings.call('checkingCallRules')
+              : widget.strings.call('runSimulation'),
+        ),
+      ),
+    ],
+  );
+}
+
+class _SystemCallPermissionsCard extends StatefulWidget {
+  const _SystemCallPermissionsCard({required this.strings});
+
+  final AppStrings strings;
+
+  @override
+  State<_SystemCallPermissionsCard> createState() =>
+      _SystemCallPermissionsCardState();
+}
+
+class _SystemCallPermissionsCardState extends State<_SystemCallPermissionsCard>
+    with WidgetsBindingObserver {
+  final _channel = CallScreeningChannel();
+  CallScreeningPermissions _permissions = const CallScreeningPermissions(
+    roleAvailable: false,
+    callScreeningRole: false,
+    readContacts: false,
+  );
+  bool _loading = true;
+  bool _hasError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refresh();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refresh();
+  }
+
+  Future<void> _refresh() async {
+    try {
+      final permissions = await _channel.checkPermissions();
+      if (!mounted) return;
+      setState(() {
+        _permissions = permissions;
+        _loading = false;
+        _hasError = false;
+      });
+    } on PlatformException {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _hasError = true;
+      });
+    } on MissingPluginException {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _hasError = true;
+      });
+    }
+  }
+
+  Future<void> _requestRole() async {
+    try {
+      await _channel.requestCallScreeningRole();
+    } on PlatformException {
+      // Refresh below to show the actual role state after a denial or failure.
+    } on MissingPluginException {
+      // The native implementation is Android-only.
+    }
+    await _refresh();
+  }
+
+  Future<void> _requestContacts() async {
+    try {
+      await _channel.requestContactsPermission();
+    } on PlatformException {
+      // Refresh below to show the actual permission state.
+    } on MissingPluginException {
+      // The native implementation is Android-only.
+    }
+    await _refresh();
+  }
+
+  Widget _permissionRow({
+    required IconData icon,
+    required String title,
+    required bool granted,
+    required String grantedLabel,
+    required String actionLabel,
+    required VoidCallback onRequest,
+    bool unavailable = false,
+  }) {
+    final color = granted ? _Palette.green : _Palette.amber;
+    return Row(
+      children: [
+        _IconBox(
+          icon: icon,
+          color: color,
+          background: _Palette.accentSurface(color),
+          size: 38,
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 2),
+              Text(
+                _loading
+                    ? widget.strings.call('checkingPermissions')
+                    : granted
+                    ? grantedLabel
+                    : unavailable
+                    ? widget.strings.call('roleUnavailable')
+                    : widget.strings.call('roleMissing'),
+                style: TextStyle(color: _Palette.muted, fontSize: 10),
+              ),
+            ],
+          ),
+        ),
+        if (_loading)
+          Icon(Icons.sync_rounded, color: _Palette.muted, size: 20)
+        else if (!granted && !unavailable)
+          TextButton(
+            onPressed: onRequest,
+            child: Text(
+              actionLabel,
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800),
+            ),
+          )
+        else
+          Icon(
+            granted ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+            color: granted ? _Palette.green : _Palette.muted,
+            size: 20,
+          ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => _Panel(
+    child: Padding(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            widget.strings.call('screeningStatusTitle'),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 12),
+          _permissionRow(
+            icon: Icons.shield_outlined,
+            title: widget.strings.call('systemRoleLabel'),
+            granted: _permissions.callScreeningRole,
+            grantedLabel: widget.strings.call('roleGranted'),
+            actionLabel: widget.strings.call('grantRole'),
+            onRequest: _requestRole,
+            unavailable: !_permissions.roleAvailable && !_loading,
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 10),
+            child: _ThinDivider(),
+          ),
+          _permissionRow(
+            icon: Icons.contacts_outlined,
+            title: widget.strings.call('contactsLabel'),
+            granted: _permissions.readContacts,
+            grantedLabel: widget.strings.call('contactsGranted'),
+            actionLabel: widget.strings.call('grantContacts'),
+            onRequest: _requestContacts,
+          ),
+          if (_hasError) ...[
+            const SizedBox(height: 8),
+            Text(
+              widget.strings.call('permissionCheckError'),
+              style: TextStyle(
+                color: _Palette.accent(_Palette.red),
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ],
+      ),
+    ),
+  );
 }
 
 class _ProfileSettingsSheet extends StatefulWidget {
@@ -1039,6 +1359,8 @@ class _HomePage extends StatelessWidget {
     required this.blockInternational,
     required this.onBlockInternationalChanged,
     required this.automaticSilence,
+    required this.manualSilenceEnabled,
+    required this.onManualSilenceChanged,
     required this.onOpenSchedule,
     required this.onTest,
   });
@@ -1053,6 +1375,8 @@ class _HomePage extends StatelessWidget {
   final bool blockInternational;
   final ValueChanged<bool> onBlockInternationalChanged;
   final bool automaticSilence;
+  final bool manualSilenceEnabled;
+  final ValueChanged<bool> onManualSilenceChanged;
   final VoidCallback onOpenSchedule;
   final VoidCallback onTest;
 
@@ -1185,6 +1509,8 @@ class _HomePage extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 14),
+        _SystemCallPermissionsCard(strings: strings),
+        const SizedBox(height: 14),
         _Panel(
           child: InkWell(
             borderRadius: BorderRadius.circular(21),
@@ -1233,6 +1559,18 @@ class _HomePage extends StatelessWidget {
                 ],
               ),
             ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        _Panel(
+          child: _RuleSwitch(
+            icon: Icons.notifications_off_outlined,
+            title: strings.call('manualSilenceTitle'),
+            subtitle: strings.call('manualSilenceSubtitle'),
+            value: manualSilenceEnabled,
+            onChanged: onManualSilenceChanged,
+            iconColor: const Color(0xFF7663D9),
+            iconBackground: _Palette.accentSurface(const Color(0xFF7663D9)),
           ),
         ),
         const SizedBox(height: 24),
@@ -2712,16 +3050,38 @@ class _MorePage extends StatefulWidget {
   State<_MorePage> createState() => _MorePageState();
 }
 
-class _MorePageState extends State<_MorePage> {
+class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
   int _segment = 0;
   List<_Reminder> _reminders = [];
   List<_CallLogEntry> _logs = [];
   bool _loading = true;
+  Timer? _logRefreshTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _reload();
+    _logRefreshTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (_segment == 1 &&
+          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+        unawaited(_reloadLogs());
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _logRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _segment == 1) {
+      unawaited(_reloadLogs());
+    }
   }
 
   Future<void> _reload() async {
@@ -2730,6 +3090,15 @@ class _MorePageState extends State<_MorePage> {
     if (!mounted) return;
     setState(() {
       _reminders = reminderRows.map(_reminderFromRow).toList();
+      _logs = logRows.map(_logFromRow).toList();
+      _loading = false;
+    });
+  }
+
+  Future<void> _reloadLogs() async {
+    final logRows = await widget.database.getCallLogs();
+    if (!mounted) return;
+    setState(() {
       _logs = logRows.map(_logFromRow).toList();
       _loading = false;
     });
@@ -2939,47 +3308,53 @@ class _MorePageState extends State<_MorePage> {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
-      children: [
-        _PageIntro(
-          eyebrow: widget.strings.call('moreEyebrow'),
-          title: widget.strings.moreTitle,
-          subtitle: widget.strings.call('moreSubtitle'),
-        ),
-        const SizedBox(height: 17),
-        const SizedBox(height: 8),
-        SegmentedButton<int>(
-          showSelectedIcon: false,
-          segments: [
-            ButtonSegment<int>(
-              value: 0,
-              icon: Icon(Icons.notifications_none_rounded, size: 17),
-              label: Text(widget.strings.call('remindersSegment')),
-            ),
-            ButtonSegment<int>(
-              value: 1,
-              icon: Icon(Icons.receipt_long_outlined, size: 17),
-              label: Text(widget.strings.call('journalSegment')),
-            ),
-          ],
-          selected: {_segment},
-          onSelectionChanged: (selection) =>
-              setState(() => _segment = selection.first),
-          style: ButtonStyle(
-            textStyle: const WidgetStatePropertyAll(
-              TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
-            ),
-            padding: const WidgetStatePropertyAll(
-              EdgeInsets.symmetric(horizontal: 5, vertical: 13),
+    return RefreshIndicator(
+      onRefresh: _reload,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
+        children: [
+          _PageIntro(
+            eyebrow: widget.strings.call('moreEyebrow'),
+            title: widget.strings.moreTitle,
+            subtitle: widget.strings.call('moreSubtitle'),
+          ),
+          const SizedBox(height: 17),
+          const SizedBox(height: 8),
+          SegmentedButton<int>(
+            showSelectedIcon: false,
+            segments: [
+              ButtonSegment<int>(
+                value: 0,
+                icon: Icon(Icons.notifications_none_rounded, size: 17),
+                label: Text(widget.strings.call('remindersSegment')),
+              ),
+              ButtonSegment<int>(
+                value: 1,
+                icon: Icon(Icons.receipt_long_outlined, size: 17),
+                label: Text(widget.strings.call('journalSegment')),
+              ),
+            ],
+            selected: {_segment},
+            onSelectionChanged: (selection) {
+              setState(() => _segment = selection.first);
+              if (selection.first == 1) unawaited(_reloadLogs());
+            },
+            style: ButtonStyle(
+              textStyle: const WidgetStatePropertyAll(
+                TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+              ),
+              padding: const WidgetStatePropertyAll(
+                EdgeInsets.symmetric(horizontal: 5, vertical: 13),
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 18),
-        if (_segment == 0) ..._reminderContent() else ..._journalContent(),
-        const SizedBox(height: 14),
-        _PrototypeFootnote(label: widget.strings.call('prototypeFootnote')),
-      ],
+          const SizedBox(height: 18),
+          if (_segment == 0) ..._reminderContent() else ..._journalContent(),
+          const SizedBox(height: 14),
+          _PrototypeFootnote(label: widget.strings.call('prototypeFootnote')),
+        ],
+      ),
     );
   }
 
@@ -3021,9 +3396,20 @@ class _MorePageState extends State<_MorePage> {
   ];
 
   List<Widget> _journalContent() => [
-    _SectionHeading(
-      title: widget.strings.call('recentBlocks'),
-      subtitle: widget.strings.call('journalDemoHint'),
+    Row(
+      children: [
+        Expanded(
+          child: _SectionHeading(
+            title: widget.strings.call('recentBlocks'),
+            subtitle: widget.strings.call('journalDemoHint'),
+          ),
+        ),
+        IconButton(
+          tooltip: widget.strings.call('refresh'),
+          onPressed: _reloadLogs,
+          icon: const Icon(Icons.refresh_rounded),
+        ),
+      ],
     ),
     const SizedBox(height: 11),
     if (_loading)

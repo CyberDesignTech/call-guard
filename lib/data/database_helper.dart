@@ -95,6 +95,7 @@ class DatabaseHelper {
       'block_non_contacts': 'false',
       'block_international': 'true',
       'automatic_silence': 'false',
+      'manual_silence_enabled': 'false',
       'allow_only_whitelist': 'true',
       'silence_start_minute': '1320',
       'silence_end_minute': '420',
