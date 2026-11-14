@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter/services.dart';
 
+import 'data/database_helper.dart';
 import 'l10n/app_strings.dart';
 
-void main() => runApp(const CallGuardApp());
+void main() => runApp(CallGuardApp());
 
 abstract final class _Palette {
   static bool isDark = false;
@@ -57,7 +61,10 @@ abstract final class _Palette {
 }
 
 class CallGuardApp extends StatefulWidget {
-  const CallGuardApp({super.key});
+  CallGuardApp({super.key, DatabaseHelper? database})
+    : database = database ?? DatabaseHelper.instance;
+
+  final DatabaseHelper database;
 
   @override
   State<CallGuardApp> createState() => _CallGuardAppState();
@@ -65,13 +72,34 @@ class CallGuardApp extends StatefulWidget {
 
 class _CallGuardAppState extends State<CallGuardApp>
     with WidgetsBindingObserver {
+  bool _ready = false;
   ThemeMode _themeMode = ThemeMode.system;
   AppLanguage _language = AppLanguage.ukrainian;
+  bool _protectionEnabled = true;
+  bool _blockUnknown = true;
+  bool _blockNonContacts = false;
+  bool _blockInternational = true;
+  bool _automaticSilence = false;
+  bool _allowOnlyWhitelist = true;
+  TimeOfDay _silenceStart = const TimeOfDay(hour: 22, minute: 0);
+  TimeOfDay _silenceEnd = const TimeOfDay(hour: 7, minute: 0);
+  Set<int> _silenceWeekdays = {1, 2, 3, 4, 5, 6, 7};
+  bool _autoReplyEnabled = false;
+  int _autoReplyCondition = 0;
+  int _greetingChoice = 0;
+  bool _recordMessages = false;
+  Future<void> _pendingSettingsWrites = Future<void>.value();
+  List<Map<String, Object?>> _phoneRules = [];
+  List<Map<String, Object?>> _countries = [];
+  List<Map<String, Object?>> _operators = [];
+  List<Map<String, Object?>> _reminders = [];
+  List<Map<String, Object?>> _callLogs = [];
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _restoreSettings();
   }
 
   @override
@@ -82,13 +110,118 @@ class _CallGuardAppState extends State<CallGuardApp>
 
   @override
   void didChangePlatformBrightness() {
-    if (_themeMode == ThemeMode.system) setState(() {});
+    if (_themeMode == ThemeMode.system && _ready) setState(() {});
   }
 
-  void _setThemeMode(ThemeMode mode) => setState(() => _themeMode = mode);
+  Future<void> _restoreSettings() async {
+    try {
+      await widget.database.initialize();
+      final settings = await widget.database.getSettings();
+      final whiteRules = await widget.database.getPhoneRules('white');
+      final blackRules = await widget.database.getPhoneRules('black');
+      final countries = await widget.database.getCountries();
+      final operators = await widget.database.getAllOperators();
+      final reminders = await widget.database.getReminders();
+      final callLogs = await widget.database.getCallLogs();
+      AppLanguage parseLanguage(String? value) =>
+          AppLanguage.values
+              .where((language) => language.name == value)
+              .firstOrNull ??
+          AppLanguage.ukrainian;
+      ThemeMode parseTheme(String? value) =>
+          ThemeMode.values.where((mode) => mode.name == value).firstOrNull ??
+          ThemeMode.system;
+      bool parseBool(String key, bool fallback) =>
+          settings[key] == null ? fallback : settings[key] == 'true';
+      int parseInt(String key, int fallback) =>
+          int.tryParse(settings[key] ?? '') ?? fallback;
+      final weekdays = (settings['silence_weekdays'] ?? '1,2,3,4,5,6,7')
+          .split(',')
+          .map(int.tryParse)
+          .whereType<int>()
+          .where((day) => day >= 1 && day <= 7)
+          .toSet();
 
-  void _setLanguage(AppLanguage language) =>
-      setState(() => _language = language);
+      if (!mounted) return;
+      setState(() {
+        _language = parseLanguage(settings['locale']);
+        _themeMode = parseTheme(settings['theme_mode']);
+        _protectionEnabled = parseBool('protection_enabled', true);
+        _blockUnknown = parseBool('block_hidden', true);
+        _blockNonContacts = parseBool('block_non_contacts', false);
+        _blockInternational = parseBool('block_international', true);
+        _automaticSilence = parseBool('automatic_silence', false);
+        _allowOnlyWhitelist = parseBool('allow_only_whitelist', true);
+        _silenceStart = _timeOfDay(parseInt('silence_start_minute', 1320));
+        _silenceEnd = _timeOfDay(parseInt('silence_end_minute', 420));
+        _silenceWeekdays = settings.containsKey('silence_weekdays')
+            ? weekdays
+            : {1, 2, 3, 4, 5, 6, 7};
+        _autoReplyEnabled = parseBool('auto_reply_enabled', false);
+        _autoReplyCondition = parseInt('auto_reply_condition', 0);
+        _greetingChoice = parseInt('greeting_choice', 0);
+        _recordMessages = parseBool('record_messages', false);
+        _phoneRules = [...whiteRules, ...blackRules];
+        _countries = countries;
+        _operators = operators;
+        _reminders = reminders;
+        _callLogs = callLogs;
+        _ready = true;
+      });
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Call Guard settings could not be restored: $error\n$stackTrace',
+      );
+      if (mounted) setState(() => _ready = true);
+    }
+  }
+
+  TimeOfDay _timeOfDay(int minutes) => TimeOfDay(
+    hour: (minutes ~/ 60).clamp(0, 23),
+    minute: minutes.remainder(60).clamp(0, 59),
+  );
+
+  void _persistSetting(String key, Object value) {
+    _pendingSettingsWrites = _pendingSettingsWrites
+        .catchError((Object _) {})
+        .then((_) => widget.database.setSetting(key, value));
+  }
+
+  void _setThemeMode(ThemeMode mode) {
+    setState(() => _themeMode = mode);
+    _persistSetting('theme_mode', mode.name);
+  }
+
+  void _setLanguage(AppLanguage language) {
+    setState(() => _language = language);
+    _persistSetting('locale', language.name);
+  }
+
+  void _setSilenceStart(TimeOfDay value) {
+    setState(() => _silenceStart = value);
+    _persistSetting('silence_start_minute', value.hour * 60 + value.minute);
+  }
+
+  void _setSilenceEnd(TimeOfDay value) {
+    setState(() => _silenceEnd = value);
+    _persistSetting('silence_end_minute', value.hour * 60 + value.minute);
+  }
+
+  void _setSilenceWeekdays(Set<int> value) {
+    setState(() => _silenceWeekdays = value);
+    final days = value.toList()..sort();
+    _persistSetting('silence_weekdays', days.join(','));
+  }
+
+  void _setAutoReplyCondition(int value) {
+    setState(() => _autoReplyCondition = value);
+    _persistSetting('auto_reply_condition', value);
+  }
+
+  void _setGreetingChoice(int value) {
+    setState(() => _greetingChoice = value);
+    _persistSetting('greeting_choice', value);
+  }
 
   ThemeData _themeFor(Brightness brightness) {
     final isDark = brightness == Brightness.dark;
@@ -168,19 +301,109 @@ class _CallGuardAppState extends State<CallGuardApp>
       themeMode: _themeMode,
       theme: _themeFor(Brightness.light),
       darkTheme: _themeFor(Brightness.dark),
-      home: _CallGuardShell(
-        themeMode: _themeMode,
-        language: _language,
-        strings: strings,
-        onThemeModeChanged: _setThemeMode,
-        onLanguageChanged: _setLanguage,
-      ),
+      home: !_ready
+          ? Scaffold(body: const Center(child: ShieldPhoneLogo(size: 72)))
+          : _CallGuardShell(
+              database: widget.database,
+              protectionEnabled: _protectionEnabled,
+              onProtectionChanged: (value) {
+                setState(() => _protectionEnabled = value);
+                _persistSetting('protection_enabled', value);
+              },
+              blockUnknown: _blockUnknown,
+              onBlockUnknownChanged: (value) {
+                setState(() => _blockUnknown = value);
+                _persistSetting('block_hidden', value);
+              },
+              blockNonContacts: _blockNonContacts,
+              onBlockNonContactsChanged: (value) {
+                setState(() => _blockNonContacts = value);
+                _persistSetting('block_non_contacts', value);
+              },
+              blockInternational: _blockInternational,
+              onBlockInternationalChanged: (value) {
+                setState(() => _blockInternational = value);
+                _persistSetting('block_international', value);
+              },
+              automaticSilence: _automaticSilence,
+              onAutomaticSilenceChanged: (value) {
+                setState(() => _automaticSilence = value);
+                _persistSetting('automatic_silence', value);
+              },
+              allowOnlyWhitelist: _allowOnlyWhitelist,
+              onAllowOnlyWhitelistChanged: (value) {
+                setState(() => _allowOnlyWhitelist = value);
+                _persistSetting('allow_only_whitelist', value);
+              },
+              silenceStart: _silenceStart,
+              onSilenceStartChanged: _setSilenceStart,
+              silenceEnd: _silenceEnd,
+              onSilenceEndChanged: _setSilenceEnd,
+              silenceWeekdays: _silenceWeekdays,
+              onSilenceWeekdaysChanged: _setSilenceWeekdays,
+              autoReplyEnabled: _autoReplyEnabled,
+              onAutoReplyEnabledChanged: (value) {
+                setState(() => _autoReplyEnabled = value);
+                _persistSetting('auto_reply_enabled', value);
+              },
+              autoReplyCondition: _autoReplyCondition,
+              onAutoReplyConditionChanged: _setAutoReplyCondition,
+              greetingChoice: _greetingChoice,
+              onGreetingChoiceChanged: _setGreetingChoice,
+              recordMessages: _recordMessages,
+              onRecordMessagesChanged: (value) {
+                setState(() => _recordMessages = value);
+                _persistSetting('record_messages', value);
+              },
+              phoneRules: _phoneRules,
+              countries: _countries,
+              operators: _operators,
+              reminders: _reminders,
+              callLogs: _callLogs,
+              themeMode: _themeMode,
+              language: _language,
+              strings: strings,
+              onThemeModeChanged: _setThemeMode,
+              onLanguageChanged: _setLanguage,
+            ),
     );
   }
 }
 
 class _CallGuardShell extends StatefulWidget {
   const _CallGuardShell({
+    required this.database,
+    required this.protectionEnabled,
+    required this.onProtectionChanged,
+    required this.blockUnknown,
+    required this.onBlockUnknownChanged,
+    required this.blockNonContacts,
+    required this.onBlockNonContactsChanged,
+    required this.blockInternational,
+    required this.onBlockInternationalChanged,
+    required this.automaticSilence,
+    required this.onAutomaticSilenceChanged,
+    required this.allowOnlyWhitelist,
+    required this.onAllowOnlyWhitelistChanged,
+    required this.silenceStart,
+    required this.onSilenceStartChanged,
+    required this.silenceEnd,
+    required this.onSilenceEndChanged,
+    required this.silenceWeekdays,
+    required this.onSilenceWeekdaysChanged,
+    required this.autoReplyEnabled,
+    required this.onAutoReplyEnabledChanged,
+    required this.autoReplyCondition,
+    required this.onAutoReplyConditionChanged,
+    required this.greetingChoice,
+    required this.onGreetingChoiceChanged,
+    required this.recordMessages,
+    required this.onRecordMessagesChanged,
+    required this.phoneRules,
+    required this.countries,
+    required this.operators,
+    required this.reminders,
+    required this.callLogs,
     required this.themeMode,
     required this.language,
     required this.strings,
@@ -188,6 +411,38 @@ class _CallGuardShell extends StatefulWidget {
     required this.onLanguageChanged,
   });
 
+  final DatabaseHelper database;
+  final bool protectionEnabled;
+  final ValueChanged<bool> onProtectionChanged;
+  final bool blockUnknown;
+  final ValueChanged<bool> onBlockUnknownChanged;
+  final bool blockNonContacts;
+  final ValueChanged<bool> onBlockNonContactsChanged;
+  final bool blockInternational;
+  final ValueChanged<bool> onBlockInternationalChanged;
+  final bool automaticSilence;
+  final ValueChanged<bool> onAutomaticSilenceChanged;
+  final bool allowOnlyWhitelist;
+  final ValueChanged<bool> onAllowOnlyWhitelistChanged;
+  final TimeOfDay silenceStart;
+  final ValueChanged<TimeOfDay> onSilenceStartChanged;
+  final TimeOfDay silenceEnd;
+  final ValueChanged<TimeOfDay> onSilenceEndChanged;
+  final Set<int> silenceWeekdays;
+  final ValueChanged<Set<int>> onSilenceWeekdaysChanged;
+  final bool autoReplyEnabled;
+  final ValueChanged<bool> onAutoReplyEnabledChanged;
+  final int autoReplyCondition;
+  final ValueChanged<int> onAutoReplyConditionChanged;
+  final int greetingChoice;
+  final ValueChanged<int> onGreetingChoiceChanged;
+  final bool recordMessages;
+  final ValueChanged<bool> onRecordMessagesChanged;
+  final List<Map<String, Object?>> phoneRules;
+  final List<Map<String, Object?>> countries;
+  final List<Map<String, Object?>> operators;
+  final List<Map<String, Object?>> reminders;
+  final List<Map<String, Object?>> callLogs;
   final ThemeMode themeMode;
   final AppLanguage language;
   final AppStrings strings;
@@ -200,12 +455,6 @@ class _CallGuardShell extends StatefulWidget {
 
 class _CallGuardShellState extends State<_CallGuardShell> {
   int _selectedIndex = 0;
-  bool _protectionEnabled = true;
-  bool _blockUnknown = true;
-  bool _blockNonContacts = false;
-  bool _blockInternational = true;
-  bool _automaticSilence = false;
-  bool _allowOnlyWhitelist = true;
 
   void _showStub() {
     ScaffoldMessenger.of(context)
@@ -320,42 +569,58 @@ class _CallGuardShellState extends State<_CallGuardShell> {
           const SizedBox(width: 5),
         ],
       ),
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: [
-          _HomePage(
-            strings: widget.strings,
-            protectionEnabled: _protectionEnabled,
-            onProtectionChanged: (value) =>
-                setState(() => _protectionEnabled = value),
-            blockUnknown: _blockUnknown,
-            onBlockUnknownChanged: (value) =>
-                setState(() => _blockUnknown = value),
-            blockNonContacts: _blockNonContacts,
-            onBlockNonContactsChanged: (value) =>
-                setState(() => _blockNonContacts = value),
-            blockInternational: _blockInternational,
-            onBlockInternationalChanged: (value) =>
-                setState(() => _blockInternational = value),
-            automaticSilence: _automaticSilence,
-            onOpenSchedule: () => setState(() => _selectedIndex = 2),
-            onTest: _openTestDialog,
-          ),
-          _ListsPage(onStub: _showStub, strings: widget.strings),
-          _SchedulePage(
-            strings: widget.strings,
-            automaticSilence: _automaticSilence,
-            onAutomaticSilenceChanged: (value) =>
-                setState(() => _automaticSilence = value),
-            allowOnlyWhitelist: _allowOnlyWhitelist,
-            onAllowOnlyWhitelistChanged: (value) =>
-                setState(() => _allowOnlyWhitelist = value),
-            onStub: _showStub,
-          ),
-          _AutoReplyPage(onStub: _showStub, strings: widget.strings),
-          _MorePage(onStub: _showStub, strings: widget.strings),
-        ],
-      ),
+      body: switch (_selectedIndex) {
+        0 => _HomePage(
+          strings: widget.strings,
+          protectionEnabled: widget.protectionEnabled,
+          onProtectionChanged: widget.onProtectionChanged,
+          blockUnknown: widget.blockUnknown,
+          onBlockUnknownChanged: widget.onBlockUnknownChanged,
+          blockNonContacts: widget.blockNonContacts,
+          onBlockNonContactsChanged: widget.onBlockNonContactsChanged,
+          blockInternational: widget.blockInternational,
+          onBlockInternationalChanged: widget.onBlockInternationalChanged,
+          automaticSilence: widget.automaticSilence,
+          onOpenSchedule: () => setState(() => _selectedIndex = 2),
+          onTest: _openTestDialog,
+        ),
+        1 => _ListsPage(
+          database: widget.database,
+          onStub: _showStub,
+          strings: widget.strings,
+        ),
+        2 => _SchedulePage(
+          strings: widget.strings,
+          automaticSilence: widget.automaticSilence,
+          onAutomaticSilenceChanged: widget.onAutomaticSilenceChanged,
+          allowOnlyWhitelist: widget.allowOnlyWhitelist,
+          onAllowOnlyWhitelistChanged: widget.onAllowOnlyWhitelistChanged,
+          startTime: widget.silenceStart,
+          onStartTimeChanged: widget.onSilenceStartChanged,
+          endTime: widget.silenceEnd,
+          onEndTimeChanged: widget.onSilenceEndChanged,
+          selectedDays: widget.silenceWeekdays,
+          onSelectedDaysChanged: widget.onSilenceWeekdaysChanged,
+          onStub: _showStub,
+        ),
+        3 => _AutoReplyPage(
+          onStub: _showStub,
+          strings: widget.strings,
+          enabled: widget.autoReplyEnabled,
+          onEnabledChanged: widget.onAutoReplyEnabledChanged,
+          condition: widget.autoReplyCondition,
+          onConditionChanged: widget.onAutoReplyConditionChanged,
+          greeting: widget.greetingChoice,
+          onGreetingChanged: widget.onGreetingChoiceChanged,
+          recordMessages: widget.recordMessages,
+          onRecordMessagesChanged: widget.onRecordMessagesChanged,
+        ),
+        _ => _MorePage(
+          database: widget.database,
+          onStub: _showStub,
+          strings: widget.strings,
+        ),
+      },
       bottomNavigationBar: NavigationBar(
         height: 70,
         selectedIndex: _selectedIndex,
@@ -420,6 +685,129 @@ class _ProfileSettingsSheet extends StatefulWidget {
 class _ProfileSettingsSheetState extends State<_ProfileSettingsSheet> {
   late AppLanguage _language = widget.language;
   late ThemeMode _themeMode = widget.themeMode;
+
+  void _showAbout() {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const ShieldPhoneLogo(size: 76),
+        title: const Text('Call Guard'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${widget.strings.call('versionLabel')}  v0.2.0-db',
+              style: TextStyle(
+                color: _Palette.accent(_Palette.blue),
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              widget.strings.call('aboutDescription'),
+              textAlign: TextAlign.center,
+              style: TextStyle(color: _Palette.muted, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _Palette.bluePale,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.lock_outline_rounded,
+                    size: 19,
+                    color: _Palette.accent(_Palette.blue),
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Text(
+                      widget.strings.call('aboutPrivacy'),
+                      style: TextStyle(color: _Palette.ink, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(widget.strings.call('closeLabel')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _copyProjectLink(BuildContext dialogContext) async {
+    await Clipboard.setData(
+      const ClipboardData(
+        text: 'https://github.com/CyberDesignTech/call-guard',
+      ),
+    );
+    if (!mounted) return;
+    Navigator.pop(dialogContext);
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text(widget.strings.call('linkCopied'))),
+      );
+  }
+
+  void _showSupport() {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: Icon(
+          Icons.favorite_rounded,
+          color: _Palette.accent(_Palette.red),
+        ),
+        title: Text(widget.strings.call('supportProject')),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                widget.strings.call('supportThanks'),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              _SupportOption(
+                icon: Icons.coffee_outlined,
+                title: widget.strings.call('supportCoffeeTitle'),
+                description: widget.strings.call('supportCoffeeDescription'),
+                color: _Palette.amber,
+              ),
+              const SizedBox(height: 10),
+              _SupportOption(
+                icon: Icons.share_outlined,
+                title: widget.strings.call('supportShareTitle'),
+                description: widget.strings.call('supportShareDescription'),
+                color: _Palette.blue,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(widget.strings.call('closeLabel')),
+          ),
+          FilledButton.icon(
+            onPressed: () => _copyProjectLink(dialogContext),
+            icon: const Icon(Icons.copy_rounded, size: 17),
+            label: Text(widget.strings.call('copyLink')),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -545,12 +933,98 @@ class _ProfileSettingsSheetState extends State<_ProfileSettingsSheet> {
                   ],
                 ),
               ),
+              const Divider(height: 24),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: _IconBox(
+                  icon: Icons.info_outline_rounded,
+                  color: _Palette.blue,
+                  background: _Palette.bluePale,
+                  size: 39,
+                ),
+                title: Text(
+                  strings.call('aboutApp'),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: _showAbout,
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: _IconBox(
+                  icon: Icons.favorite_outline_rounded,
+                  color: _Palette.red,
+                  background: _Palette.redPale,
+                  size: 39,
+                ),
+                title: Text(
+                  strings.call('supportProject'),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: _showSupport,
+              ),
             ],
           ),
         ),
       ),
     );
   }
+}
+
+class _SupportOption extends StatelessWidget {
+  const _SupportOption({
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String title;
+  final String description;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(13),
+    decoration: BoxDecoration(
+      color: _Palette.surface,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: _Palette.line),
+    ),
+    child: Row(
+      children: [
+        _IconBox(
+          icon: icon,
+          color: color,
+          background: _Palette.accentSurface(color),
+          size: 39,
+        ),
+        const SizedBox(width: 11),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 3),
+              Text(
+                description,
+                style: TextStyle(color: _Palette.muted, fontSize: 11),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _HomePage extends StatelessWidget {
@@ -822,8 +1296,13 @@ class _HomePage extends StatelessWidget {
 }
 
 class _ListsPage extends StatefulWidget {
-  const _ListsPage({required this.onStub, required this.strings});
+  const _ListsPage({
+    required this.database,
+    required this.onStub,
+    required this.strings,
+  });
 
+  final DatabaseHelper database;
   final VoidCallback onStub;
   final AppStrings strings;
 
@@ -833,53 +1312,46 @@ class _ListsPage extends StatefulWidget {
 
 class _ListsPageState extends State<_ListsPage> {
   int _tab = 0;
+  bool _loadingRules = true;
   final _countryPageKey = GlobalKey<_CountryOperatorsPageState>();
+  List<_ListEntry> _whitelist = [];
+  List<_ListEntry> _blacklist = [];
 
-  final List<_ListEntry> _whitelist = [
-    _ListEntry(
-      title: '',
-      titleKey: 'demoMother',
-      subtitle: '+380 67 123 45 67',
-      badge: '',
-      badgeKey: 'allowed',
-      icon: Icons.favorite_rounded,
-      tint: _Palette.green,
-      pale: _Palette.greenPale,
-    ),
-    _ListEntry(
-      title: '',
-      titleKey: 'demoWork',
-      subtitle: '+380 44 220 18 40',
-      badge: '',
-      badgeKey: 'allowed',
-      icon: Icons.work_outline_rounded,
-      tint: _Palette.green,
-      pale: _Palette.greenPale,
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _reloadRules();
+  }
 
-  final List<_ListEntry> _blacklist = [
-    _ListEntry(
-      title: '',
-      titleKey: 'demoUnwanted',
-      subtitle: '+48 600 123 456',
+  Future<void> _reloadRules() async {
+    final whiteRows = await widget.database.getPhoneRules('white');
+    final blackRows = await widget.database.getPhoneRules('black');
+    if (!mounted) return;
+    setState(() {
+      _whitelist = whiteRows.map(_entryFromRow).toList();
+      _blacklist = blackRows.map(_entryFromRow).toList();
+      _loadingRules = false;
+    });
+  }
+
+  _ListEntry _entryFromRow(Map<String, Object?> row) {
+    final rawLabel = row['label'] as String? ?? '';
+    final isLocalizedKey = rawLabel.startsWith('@');
+    final listType = row['list_type'] as String;
+    final isWhite = listType == 'white';
+    return _ListEntry(
+      id: row['id'] as int,
+      title: isLocalizedKey ? '' : rawLabel,
+      titleKey: isLocalizedKey ? rawLabel.substring(1) : null,
+      subtitle: row['phone'] as String,
       badge: '',
-      badgeKey: 'blocked',
-      icon: Icons.block_rounded,
-      tint: _Palette.red,
-      pale: _Palette.redPale,
-    ),
-    _ListEntry(
-      title: '',
-      titleKey: 'demoAdvertising',
-      subtitle: '+380 67 555 01 01',
-      badge: '',
-      badgeKey: 'blocked',
-      icon: Icons.campaign_outlined,
-      tint: _Palette.red,
-      pale: _Palette.redPale,
-    ),
-  ];
+      badgeKey: isWhite ? 'allowed' : 'blocked',
+      listType: listType,
+      icon: isWhite ? Icons.person_outline : Icons.block_rounded,
+      tint: isWhite ? _Palette.green : _Palette.red,
+      pale: isWhite ? _Palette.greenPale : _Palette.redPale,
+    );
+  }
 
   Future<void> _addEntry() async {
     if (_tab == 2) {
@@ -938,12 +1410,14 @@ class _ListsPageState extends State<_ListsPage> {
               Navigator.pop(
                 dialogContext,
                 _ListEntry(
-                  title: nameController.text.trim().isEmpty
-                      ? widget.strings.call('newNumber')
-                      : nameController.text.trim(),
+                  title: nameController.text.trim(),
+                  titleKey: nameController.text.trim().isEmpty
+                      ? 'newNumber'
+                      : null,
                   subtitle: phone,
                   badge: '',
                   badgeKey: isWhite ? 'allowed' : 'blocked',
+                  listType: isWhite ? 'white' : 'black',
                   icon: isWhite ? Icons.person_outline : Icons.block_rounded,
                   tint: isWhite ? _Palette.green : _Palette.red,
                   pale: isWhite ? _Palette.greenPale : _Palette.redPale,
@@ -958,14 +1432,20 @@ class _ListsPageState extends State<_ListsPage> {
     phoneController.dispose();
     nameController.dispose();
     if (result != null && mounted) {
-      setState(() {
-        if (_tab == 0) {
-          _whitelist.add(result);
-        } else {
-          _blacklist.add(result);
-        }
-      });
+      await widget.database.insertPhoneRule(
+        phone: result.subtitle,
+        label: result.titleKey == null ? result.title : '@${result.titleKey}',
+        listType: result.listType,
+      );
+      await _reloadRules();
     }
+  }
+
+  Future<void> _deleteEntry(_ListEntry entry) async {
+    final id = entry.id;
+    if (id == null) return;
+    await widget.database.deletePhoneRule(id);
+    await _reloadRules();
   }
 
   @override
@@ -1063,6 +1543,7 @@ class _ListsPageState extends State<_ListsPage> {
                   _entryList(_blacklist, widget.strings.call('blackListHint')),
                   _CountryOperatorsPage(
                     key: _countryPageKey,
+                    database: widget.database,
                     onStub: widget.onStub,
                     strings: widget.strings,
                   ),
@@ -1082,6 +1563,9 @@ class _ListsPageState extends State<_ListsPage> {
   }
 
   Widget _entryList(List<_ListEntry> entries, String note) {
+    if (_loadingRules) {
+      return const Center(child: CircularProgressIndicator());
+    }
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(18, 10, 18, 88),
       itemCount: entries.length + 1,
@@ -1096,7 +1580,12 @@ class _ListsPageState extends State<_ListsPage> {
             ),
           );
         }
-        return _EntryCard(entry: entries[index - 1], strings: widget.strings);
+        final entry = entries[index - 1];
+        return _EntryCard(
+          entry: entry,
+          strings: widget.strings,
+          onDelete: () => _deleteEntry(entry),
+        );
       },
     );
   }
@@ -1108,6 +1597,7 @@ enum _CountryAddChoice { country, operator }
 
 class _CountryEntry {
   _CountryEntry({
+    required this.isoCode,
     required this.flag,
     required this.name,
     this.nameKey,
@@ -1116,6 +1606,7 @@ class _CountryEntry {
     this.action = _RuleState.neutral,
   });
 
+  final String isoCode;
   final String flag;
   final String name;
   final String? nameKey;
@@ -1126,12 +1617,14 @@ class _CountryEntry {
 
 class _OperatorEntry {
   _OperatorEntry({
+    this.id,
     required this.name,
     this.nameKey,
     required this.prefixes,
     this.action = _RuleState.neutral,
   });
 
+  final int? id;
   final String name;
   final String? nameKey;
   final List<String> prefixes;
@@ -1139,19 +1632,21 @@ class _OperatorEntry {
 }
 
 class _OperatorDraft {
-  const _OperatorDraft({required this.countryCode, required this.operator});
+  const _OperatorDraft({required this.countryIso, required this.operator});
 
-  final String countryCode;
+  final String countryIso;
   final _OperatorEntry operator;
 }
 
 class _CountryOperatorsPage extends StatefulWidget {
   const _CountryOperatorsPage({
     super.key,
+    required this.database,
     required this.onStub,
     required this.strings,
   });
 
+  final DatabaseHelper database;
   final VoidCallback onStub;
   final AppStrings strings;
 
@@ -1162,92 +1657,76 @@ class _CountryOperatorsPage extends StatefulWidget {
 class _CountryOperatorsPageState extends State<_CountryOperatorsPage> {
   String _query = '';
   final _searchController = TextEditingController();
-  final List<_CountryEntry> _countries = [
-    _CountryEntry(
-      flag: '🇺🇦',
-      name: '',
-      nameKey: 'countryUkraine',
-      code: '+380',
-      operators: [
-        _OperatorEntry(
-          name: '',
-          nameKey: 'operatorKyivstar',
-          prefixes: ['67', '68', '96', '97', '98'],
+  List<_CountryEntry> _countries = [];
+  bool _loadingCountries = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCountries();
+  }
+
+  Future<void> _loadCountries() async {
+    final rows = await widget.database.getCountries();
+    final countries = <_CountryEntry>[];
+    for (final row in rows) {
+      final isoCode = row['iso_code'] as String;
+      final customName = row['custom_name'] as String?;
+      final operatorRows = await widget.database.getOperators(isoCode);
+      countries.add(
+        _CountryEntry(
+          isoCode: isoCode,
+          flag: _flagForCountry(isoCode),
+          name: customName ?? '',
+          nameKey: customName == null ? row['name_key'] as String : null,
+          code: row['dial_code'] as String,
+          action: _ruleState(row['action'] as String),
+          operators: operatorRows.map(_operatorFromRow).toList(),
         ),
-        _OperatorEntry(
-          name: '',
-          nameKey: 'operatorVodafoneUA',
-          prefixes: ['50', '66', '95', '99'],
-        ),
-        _OperatorEntry(
-          name: '',
-          nameKey: 'operatorLifecell',
-          prefixes: ['63', '73', '93'],
-        ),
-      ],
-    ),
-    _CountryEntry(
-      flag: '🇵🇱',
-      name: '',
-      nameKey: 'countryPoland',
-      code: '+48',
-      operators: [
-        _OperatorEntry(
-          name: '',
-          nameKey: 'operatorOrange',
-          prefixes: ['50', '51', '53', '57', '78', '79'],
-        ),
-        _OperatorEntry(
-          name: '',
-          nameKey: 'operatorPlay',
-          prefixes: ['45', '53', '72', '73', '79', '88'],
-        ),
-      ],
-    ),
-    _CountryEntry(
-      flag: '🇩🇪',
-      name: '',
-      nameKey: 'countryGermany',
-      code: '+49',
-      operators: [
-        _OperatorEntry(
-          name: '',
-          nameKey: 'operatorTelekom',
-          prefixes: ['151', '160', '170', '171', '175'],
-        ),
-        _OperatorEntry(
-          name: '',
-          nameKey: 'operatorVodafoneDE',
-          prefixes: ['152', '162', '172', '173', '174'],
-        ),
-      ],
-    ),
-    _CountryEntry(
-      flag: '🇬🇧',
-      name: '',
-      nameKey: 'countryUK',
-      code: '+44',
-      operators: [
-        _OperatorEntry(
-          name: '',
-          nameKey: 'operatorVodafoneUK',
-          prefixes: ['74', '75', '77', '78', '79'],
-        ),
-        _OperatorEntry(
-          name: '',
-          nameKey: 'operatorEE',
-          prefixes: ['79', '75', '77'],
-        ),
-      ],
-    ),
-    _CountryEntry(
-      flag: '🇺🇸🇨🇦',
-      name: '',
-      nameKey: 'countryNorthAmerica',
-      code: '+1',
-      operators: [],
-    ),
-  ];
+      );
+    }
+    if (!mounted) return;
+    setState(() {
+      _countries = countries;
+      _loadingCountries = false;
+    });
+  }
+
+  String _flagForCountry(String isoCode) => switch (isoCode) {
+    'UA' => '🇺🇦',
+    'PL' => '🇵🇱',
+    'DE' => '🇩🇪',
+    'GB' => '🇬🇧',
+    'US-CA' => '🇺🇸🇨🇦',
+    _ => '🌐',
+  };
+
+  _RuleState _ruleState(String value) => switch (value) {
+    'allow' => _RuleState.allowed,
+    'block' => _RuleState.blocked,
+    _ => _RuleState.neutral,
+  };
+
+  String _storedRule(_RuleState value) => switch (value) {
+    _RuleState.allowed => 'allow',
+    _RuleState.blocked => 'block',
+    _RuleState.neutral => 'neutral',
+  };
+
+  _OperatorEntry _operatorFromRow(Map<String, Object?> row) {
+    final storedName = row['operator_name'] as String;
+    final isLocalized = storedName.startsWith('@');
+    return _OperatorEntry(
+      id: row['id'] as int,
+      name: isLocalized ? '' : storedName,
+      nameKey: isLocalized ? storedName.substring(1) : null,
+      prefixes: (row['prefixes'] as String)
+          .split(',')
+          .where((prefix) => prefix.isNotEmpty)
+          .toList(),
+      action: _ruleState(row['action'] as String),
+    );
+  }
 
   String _countryName(_CountryEntry country) => country.nameKey == null
       ? country.name
@@ -1256,6 +1735,21 @@ class _CountryOperatorsPageState extends State<_CountryOperatorsPage> {
   String _operatorName(_OperatorEntry operator) => operator.nameKey == null
       ? operator.name
       : widget.strings.call(operator.nameKey!);
+
+  void _setCountryAction(_CountryEntry country, _RuleState value) {
+    setState(() => country.action = value);
+    unawaited(
+      widget.database.updateCountryAction(country.isoCode, _storedRule(value)),
+    );
+  }
+
+  void _setOperatorAction(_OperatorEntry operator, _RuleState value) {
+    setState(() => operator.action = value);
+    final id = operator.id;
+    if (id != null) {
+      unawaited(widget.database.updateOperatorAction(id, _storedRule(value)));
+    }
+  }
 
   String _countryAction(_RuleState state) =>
       widget.strings.call(switch (state) {
@@ -1447,6 +1941,8 @@ class _CountryOperatorsPageState extends State<_CountryOperatorsPage> {
                 Navigator.pop(
                   dialogContext,
                   _CountryEntry(
+                    isoCode:
+                        'X${code.replaceAll(RegExp(r'[^0-9]'), '')}-${DateTime.now().microsecondsSinceEpoch}',
                     flag: flagController.text.trim().isEmpty
                         ? '🌐'
                         : flagController.text.trim(),
@@ -1468,7 +1964,14 @@ class _CountryOperatorsPageState extends State<_CountryOperatorsPage> {
     nameController.dispose();
     codeController.dispose();
     if (country != null && mounted) {
-      setState(() => _countries.add(country));
+      await widget.database.insertCountry(
+        isoCode: country.isoCode,
+        dialCode: country.code,
+        nameKey: 'customCountry',
+        customName: country.name,
+        action: _storedRule(country.action),
+      );
+      await _loadCountries();
     }
   }
 
@@ -1479,7 +1982,7 @@ class _CountryOperatorsPageState extends State<_CountryOperatorsPage> {
     }
     final nameController = TextEditingController();
     final prefixesController = TextEditingController();
-    var countryCode = _countries.first.code;
+    var countryIso = _countries.first.isoCode;
     var action = _RuleState.neutral;
 
     final draft = await showDialog<_OperatorDraft>(
@@ -1497,14 +2000,14 @@ class _CountryOperatorsPageState extends State<_CountryOperatorsPage> {
               children: [
                 DropdownButtonFormField<String>(
                   isExpanded: true,
-                  initialValue: countryCode,
+                  initialValue: countryIso,
                   decoration: InputDecoration(
                     labelText: widget.strings.call('operatorCountryField'),
                   ),
                   items: _countries
                       .map(
                         (country) => DropdownMenuItem(
-                          value: country.code,
+                          value: country.isoCode,
                           child: Text(
                             '${country.flag} ${_countryName(country)} ${country.code}',
                             maxLines: 1,
@@ -1514,8 +2017,7 @@ class _CountryOperatorsPageState extends State<_CountryOperatorsPage> {
                       )
                       .toList(),
                   onChanged: (value) {
-                    if (value != null)
-                      setDialogState(() => countryCode = value);
+                    if (value != null) setDialogState(() => countryIso = value);
                   },
                 ),
                 const SizedBox(height: 12),
@@ -1574,7 +2076,7 @@ class _CountryOperatorsPageState extends State<_CountryOperatorsPage> {
                 Navigator.pop(
                   dialogContext,
                   _OperatorDraft(
-                    countryCode: countryCode,
+                    countryIso: countryIso,
                     operator: _OperatorEntry(
                       name: name,
                       prefixes: prefixes,
@@ -1593,10 +2095,15 @@ class _CountryOperatorsPageState extends State<_CountryOperatorsPage> {
     nameController.dispose();
     prefixesController.dispose();
     if (draft != null && mounted) {
-      final country = _countries.firstWhere(
-        (entry) => entry.code == draft.countryCode,
+      await widget.database.insertOperator(
+        countryIso: draft.countryIso,
+        name: draft.operator.nameKey == null
+            ? draft.operator.name
+            : '@${draft.operator.nameKey}',
+        prefixes: draft.operator.prefixes,
+        action: _storedRule(draft.operator.action),
       );
-      setState(() => country.operators.add(draft.operator));
+      await _loadCountries();
     }
   }
 
@@ -1649,7 +2156,7 @@ class _CountryOperatorsPageState extends State<_CountryOperatorsPage> {
               _ruleMenu(
                 state: country.action,
                 country: true,
-                onSelected: (value) => setState(() => country.action = value),
+                onSelected: (value) => _setCountryAction(country, value),
               ),
             ],
           ),
@@ -1753,7 +2260,7 @@ class _CountryOperatorsPageState extends State<_CountryOperatorsPage> {
             _ruleMenu(
               state: operator.action,
               country: false,
-              onSelected: (value) => setState(() => operator.action = value),
+              onSelected: (value) => _setOperatorAction(operator, value),
             ),
           ],
         ),
@@ -1789,7 +2296,12 @@ class _CountryOperatorsPageState extends State<_CountryOperatorsPage> {
           ),
         ),
         const SizedBox(height: 12),
-        if (filtered.isEmpty)
+        if (_loadingCountries)
+          const Padding(
+            padding: EdgeInsets.only(top: 28),
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (filtered.isEmpty)
           _Panel(
             child: Padding(
               padding: const EdgeInsets.all(18),
@@ -1814,6 +2326,8 @@ class _ListEntry {
     required this.badge,
     this.titleKey,
     this.badgeKey,
+    this.id,
+    this.listType = 'white',
     required this.icon,
     required this.tint,
     required this.pale,
@@ -1824,6 +2338,8 @@ class _ListEntry {
   final String badge;
   final String? titleKey;
   final String? badgeKey;
+  final int? id;
+  final String listType;
   final IconData icon;
   final Color tint;
   final Color pale;
@@ -1836,6 +2352,12 @@ class _SchedulePage extends StatefulWidget {
     required this.onAutomaticSilenceChanged,
     required this.allowOnlyWhitelist,
     required this.onAllowOnlyWhitelistChanged,
+    required this.startTime,
+    required this.onStartTimeChanged,
+    required this.endTime,
+    required this.onEndTimeChanged,
+    required this.selectedDays,
+    required this.onSelectedDaysChanged,
     required this.onStub,
   });
 
@@ -1844,6 +2366,12 @@ class _SchedulePage extends StatefulWidget {
   final ValueChanged<bool> onAutomaticSilenceChanged;
   final bool allowOnlyWhitelist;
   final ValueChanged<bool> onAllowOnlyWhitelistChanged;
+  final TimeOfDay startTime;
+  final ValueChanged<TimeOfDay> onStartTimeChanged;
+  final TimeOfDay endTime;
+  final ValueChanged<TimeOfDay> onEndTimeChanged;
+  final Set<int> selectedDays;
+  final ValueChanged<Set<int>> onSelectedDaysChanged;
   final VoidCallback onStub;
 
   @override
@@ -1851,10 +2379,6 @@ class _SchedulePage extends StatefulWidget {
 }
 
 class _SchedulePageState extends State<_SchedulePage> {
-  TimeOfDay _startTime = const TimeOfDay(hour: 22, minute: 0);
-  TimeOfDay _endTime = const TimeOfDay(hour: 7, minute: 0);
-  final Set<int> _selectedDays = {1, 2, 3, 4, 5, 6, 7};
-
   List<String> get _days => [
     widget.strings.call('dayMon'),
     widget.strings.call('dayTue'),
@@ -1868,19 +2392,17 @@ class _SchedulePageState extends State<_SchedulePage> {
   Future<void> _pickTime({required bool start}) async {
     final selected = await showTimePicker(
       context: context,
-      initialTime: start ? _startTime : _endTime,
+      initialTime: start ? widget.startTime : widget.endTime,
       helpText: widget.strings.call(
         start ? 'timePickerStart' : 'timePickerEnd',
       ),
     );
     if (selected != null && mounted) {
-      setState(() {
-        if (start) {
-          _startTime = selected;
-        } else {
-          _endTime = selected;
-        }
-      });
+      if (start) {
+        widget.onStartTimeChanged(selected);
+      } else {
+        widget.onEndTimeChanged(selected);
+      }
     }
   }
 
@@ -1925,7 +2447,7 @@ class _SchedulePageState extends State<_SchedulePage> {
                 Expanded(
                   child: _TimeButton(
                     caption: widget.strings.call('timeStart'),
-                    time: _timeLabel(_startTime),
+                    time: _timeLabel(widget.startTime),
                     icon: Icons.volume_off_outlined,
                     onTap: () => _pickTime(start: true),
                   ),
@@ -1941,7 +2463,7 @@ class _SchedulePageState extends State<_SchedulePage> {
                 Expanded(
                   child: _TimeButton(
                     caption: widget.strings.call('timeEnd'),
-                    time: _timeLabel(_endTime),
+                    time: _timeLabel(widget.endTime),
                     icon: Icons.volume_up_outlined,
                     onTap: () => _pickTime(start: false),
                   ),
@@ -1961,17 +2483,19 @@ class _SchedulePageState extends State<_SchedulePage> {
           runSpacing: 8,
           children: List.generate(_days.length, (index) {
             final day = index + 1;
-            final selected = _selectedDays.contains(day);
+            final selected = widget.selectedDays.contains(day);
             return ChoiceChip(
               label: Text(_days[index]),
               selected: selected,
-              onSelected: (value) => setState(() {
+              onSelected: (value) {
+                final days = Set<int>.from(widget.selectedDays);
                 if (value) {
-                  _selectedDays.add(day);
+                  days.add(day);
                 } else {
-                  _selectedDays.remove(day);
+                  days.remove(day);
                 }
-              }),
+                widget.onSelectedDaysChanged(days);
+              },
               showCheckmark: false,
               labelStyle: TextStyle(
                 color: selected
@@ -2019,21 +2543,30 @@ class _SchedulePageState extends State<_SchedulePage> {
   }
 }
 
-class _AutoReplyPage extends StatefulWidget {
-  const _AutoReplyPage({required this.onStub, required this.strings});
+class _AutoReplyPage extends StatelessWidget {
+  const _AutoReplyPage({
+    required this.onStub,
+    required this.strings,
+    required this.enabled,
+    required this.onEnabledChanged,
+    required this.condition,
+    required this.onConditionChanged,
+    required this.greeting,
+    required this.onGreetingChanged,
+    required this.recordMessages,
+    required this.onRecordMessagesChanged,
+  });
 
   final VoidCallback onStub;
   final AppStrings strings;
-
-  @override
-  State<_AutoReplyPage> createState() => _AutoReplyPageState();
-}
-
-class _AutoReplyPageState extends State<_AutoReplyPage> {
-  bool _enabled = false;
-  int _condition = 0;
-  int _greeting = 0;
-  bool _recordMessages = false;
+  final bool enabled;
+  final ValueChanged<bool> onEnabledChanged;
+  final int condition;
+  final ValueChanged<int> onConditionChanged;
+  final int greeting;
+  final ValueChanged<int> onGreetingChanged;
+  final bool recordMessages;
+  final ValueChanged<bool> onRecordMessagesChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -2041,51 +2574,49 @@ class _AutoReplyPageState extends State<_AutoReplyPage> {
       padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
       children: [
         _PageIntro(
-          eyebrow: widget.strings.call('answerEyebrow'),
-          title: widget.strings.answerTitle,
-          subtitle: widget.strings.call('answerSubtitle'),
+          eyebrow: strings.call('answerEyebrow'),
+          title: strings.answerTitle,
+          subtitle: strings.call('answerSubtitle'),
         ),
         const SizedBox(height: 18),
         _Panel(
           child: _RuleSwitch(
             icon: Icons.record_voice_over_outlined,
-            title: widget.strings.call('autoReplyLabel'),
-            subtitle: widget.strings.call(
-              _enabled ? 'autoReplyOn' : 'autoReplyOff',
-            ),
-            value: _enabled,
-            onChanged: (value) => setState(() => _enabled = value),
+            title: strings.call('autoReplyLabel'),
+            subtitle: strings.call(enabled ? 'autoReplyOn' : 'autoReplyOff'),
+            value: enabled,
+            onChanged: onEnabledChanged,
           ),
         ),
         const SizedBox(height: 21),
         _SectionHeading(
-          title: widget.strings.call('answerWhen'),
-          subtitle: widget.strings.call('answerWhenHint'),
+          title: strings.call('answerWhen'),
+          subtitle: strings.call('answerWhenHint'),
         ),
         const SizedBox(height: 10),
         _Panel(
           child: RadioGroup<int>(
-            groupValue: _condition,
+            groupValue: condition,
             onChanged: (next) {
-              if (next != null) setState(() => _condition = next);
+              if (next != null) onConditionChanged(next);
             },
             child: Column(
               children: [
                 _radioOption(
                   0,
-                  widget.strings.call('whenBlocked'),
+                  strings.call('whenBlocked'),
                   Icons.block_outlined,
                 ),
                 const _ThinDivider(),
                 _radioOption(
                   1,
-                  widget.strings.call('whenSilence'),
+                  strings.call('whenSilence'),
                   Icons.notifications_off_outlined,
                 ),
                 const _ThinDivider(),
                 _radioOption(
                   2,
-                  widget.strings.call('whenBusy'),
+                  strings.call('whenBusy'),
                   Icons.phone_in_talk_outlined,
                 ),
               ],
@@ -2094,8 +2625,8 @@ class _AutoReplyPageState extends State<_AutoReplyPage> {
         ),
         const SizedBox(height: 21),
         _SectionHeading(
-          title: widget.strings.call('greetings'),
-          subtitle: widget.strings.call('greetingsHint'),
+          title: strings.call('greetings'),
+          subtitle: strings.call('greetingsHint'),
         ),
         const SizedBox(height: 10),
         Row(
@@ -2103,29 +2634,29 @@ class _AutoReplyPageState extends State<_AutoReplyPage> {
             Expanded(
               child: _GreetingCard(
                 icon: Icons.graphic_eq_rounded,
-                title: widget.strings.call('greetingStandard'),
-                subtitle: widget.strings.call('greetingSystem'),
-                selected: _greeting == 0,
-                onTap: () => setState(() => _greeting = 0),
+                title: strings.call('greetingStandard'),
+                subtitle: strings.call('greetingSystem'),
+                selected: greeting == 0,
+                onTap: () => onGreetingChanged(0),
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: _GreetingCard(
                 icon: Icons.audio_file_outlined,
-                title: widget.strings.call('greetingCustom'),
-                subtitle: widget.strings.call('greetingAudio'),
-                selected: _greeting == 1,
-                onTap: () => setState(() => _greeting = 1),
+                title: strings.call('greetingCustom'),
+                subtitle: strings.call('greetingAudio'),
+                selected: greeting == 1,
+                onTap: () => onGreetingChanged(1),
               ),
             ),
           ],
         ),
         const SizedBox(height: 12),
         OutlinedButton.icon(
-          onPressed: widget.onStub,
+          onPressed: onStub,
           icon: const Icon(Icons.mic_none_rounded),
-          label: Text(widget.strings.call('recordVoice')),
+          label: Text(strings.call('recordVoice')),
           style: OutlinedButton.styleFrom(
             minimumSize: const Size.fromHeight(48),
             shape: RoundedRectangleBorder(
@@ -2137,16 +2668,16 @@ class _AutoReplyPageState extends State<_AutoReplyPage> {
         _Panel(
           child: _RuleSwitch(
             icon: Icons.voicemail_rounded,
-            title: widget.strings.call('recordMessages'),
-            subtitle: widget.strings.call('recordMessagesHint'),
-            value: _recordMessages,
-            onChanged: (value) => setState(() => _recordMessages = value),
+            title: strings.call('recordMessages'),
+            subtitle: strings.call('recordMessagesHint'),
+            value: recordMessages,
+            onChanged: onRecordMessagesChanged,
             iconColor: _Palette.amber,
             iconBackground: _Palette.amberPale,
           ),
         ),
         const SizedBox(height: 16),
-        _PrototypeFootnote(label: widget.strings.call('prototypeFootnote')),
+        _PrototypeFootnote(label: strings.call('prototypeFootnote')),
       ],
     );
   }
@@ -2167,8 +2698,13 @@ class _AutoReplyPageState extends State<_AutoReplyPage> {
 }
 
 class _MorePage extends StatefulWidget {
-  const _MorePage({required this.onStub, required this.strings});
+  const _MorePage({
+    required this.database,
+    required this.onStub,
+    required this.strings,
+  });
 
+  final DatabaseHelper database;
   final VoidCallback onStub;
   final AppStrings strings;
 
@@ -2178,26 +2714,95 @@ class _MorePage extends StatefulWidget {
 
 class _MorePageState extends State<_MorePage> {
   int _segment = 0;
-  final List<_Reminder> _reminders = [
-    _Reminder(
-      name: '',
-      nameKey: 'reminderOlena',
-      phone: '+380 67 123 45 67',
-      dateLabel: '14:30',
-      datePrefixKey: 'today',
-      note: '',
-      noteKey: 'reminderNoteMeeting',
-    ),
-    _Reminder(
-      name: '',
-      nameKey: 'reminderUnknown',
-      phone: '+48 600 123 456',
-      dateLabel: '09:15',
-      datePrefixKey: 'tomorrow',
-      note: '',
-      noteKey: 'reminderNoteCheck',
-    ),
-  ];
+  List<_Reminder> _reminders = [];
+  List<_CallLogEntry> _logs = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+  }
+
+  Future<void> _reload() async {
+    final reminderRows = await widget.database.getReminders();
+    final logRows = await widget.database.getCallLogs();
+    if (!mounted) return;
+    setState(() {
+      _reminders = reminderRows.map(_reminderFromRow).toList();
+      _logs = logRows.map(_logFromRow).toList();
+      _loading = false;
+    });
+  }
+
+  _Reminder _reminderFromRow(Map<String, Object?> row) => _Reminder(
+    id: row['id'] as int,
+    phone: row['phone'] as String,
+    contactName: row['contact_name'] as String? ?? '',
+    remindAt: row['remind_at'] as int,
+    note: row['note'] as String? ?? '',
+    isDone: (row['is_done'] as int? ?? 0) != 0,
+  );
+
+  _CallLogEntry _logFromRow(Map<String, Object?> row) => _CallLogEntry(
+    id: row['id'] as int,
+    phone: row['phone'] as String,
+    reason: row['reason'] as String,
+    timestamp: row['timestamp'] as int,
+  );
+
+  String _localizedOrRaw(String value) {
+    if (value.startsWith('@')) return widget.strings.call(value.substring(1));
+    if (AppStrings.keys.contains(value)) return widget.strings.call(value);
+    return value;
+  }
+
+  String _dateTimeLabel(int timestamp) {
+    final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final reminderDay = DateTime(date.year, date.month, date.day);
+    final difference = reminderDay.difference(today).inDays;
+    final dayLabel = switch (difference) {
+      0 => widget.strings.call('today'),
+      1 => widget.strings.call('tomorrow'),
+      -1 => widget.strings.call('yesterday'),
+      _ => _dateLabel(date),
+    };
+    return '$dayLabel · ${_timeLabel(TimeOfDay.fromDateTime(date))}';
+  }
+
+  Future<void> _toggleReminder(_Reminder reminder) async {
+    final id = reminder.id;
+    if (id == null) return;
+    await widget.database.updateReminderDone(id, !reminder.isDone);
+    await _reload();
+  }
+
+  Future<void> _deleteReminder(_Reminder reminder) async {
+    final id = reminder.id;
+    if (id == null) return;
+    await widget.database.deleteReminder(id);
+    await _reload();
+  }
+
+  Future<void> _addLogPhone(String phone) async {
+    if (phone.startsWith('@')) {
+      widget.onStub();
+      return;
+    }
+    await widget.database.insertPhoneRule(
+      phone: phone,
+      label: null,
+      listType: 'white',
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text(widget.strings.call('allowlistAdded'))),
+      );
+  }
 
   Future<void> _createReminder() async {
     final phoneController = TextEditingController();
@@ -2291,12 +2896,17 @@ class _MorePageState extends State<_MorePage> {
                 Navigator.pop(
                   dialogContext,
                   _Reminder(
-                    name: widget.strings.call('reminderNew'),
                     phone: phone,
-                    dateLabel:
-                        '${_dateLabel(selectedDate)} · ${_timeLabel(selectedTime)}',
+                    contactName: '@reminderNew',
+                    remindAt: DateTime(
+                      selectedDate.year,
+                      selectedDate.month,
+                      selectedDate.day,
+                      selectedTime.hour,
+                      selectedTime.minute,
+                    ).millisecondsSinceEpoch,
                     note: noteController.text.trim().isEmpty
-                        ? widget.strings.call('reminderNewNote')
+                        ? '@reminderNewNote'
                         : noteController.text.trim(),
                   ),
                 );
@@ -2310,7 +2920,15 @@ class _MorePageState extends State<_MorePage> {
 
     phoneController.dispose();
     noteController.dispose();
-    if (result != null && mounted) setState(() => _reminders.insert(0, result));
+    if (result != null && mounted) {
+      await widget.database.insertReminder(
+        phone: result.phone,
+        contactName: result.contactName,
+        remindAt: result.remindAt,
+        note: result.note,
+      );
+      await _reload();
+    }
   }
 
   String _dateLabel(DateTime date) =>
@@ -2371,16 +2989,24 @@ class _MorePageState extends State<_MorePage> {
       subtitle: widget.strings.call('remindersDemoHint'),
     ),
     const SizedBox(height: 11),
-    ..._reminders.map(
-      (reminder) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: _ReminderCard(
-          reminder: reminder,
-          strings: widget.strings,
-          onCall: widget.onStub,
+    if (_loading)
+      const Center(child: CircularProgressIndicator())
+    else if (_reminders.isEmpty)
+      _EmptyState(label: widget.strings.call('noReminders'))
+    else
+      ..._reminders.map(
+        (reminder) => Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: _ReminderCard(
+            reminder: reminder,
+            strings: widget.strings,
+            dateLabel: _dateTimeLabel(reminder.remindAt),
+            onCall: widget.onStub,
+            onToggleDone: () => _toggleReminder(reminder),
+            onDelete: () => _deleteReminder(reminder),
+          ),
         ),
       ),
-    ),
     const SizedBox(height: 2),
     FilledButton.icon(
       onPressed: _createReminder,
@@ -2400,75 +3026,95 @@ class _MorePageState extends State<_MorePage> {
       subtitle: widget.strings.call('journalDemoHint'),
     ),
     const SizedBox(height: 11),
-    _JournalCard(
-      phone: '+48 600 123 456',
-      caption: '${widget.strings.call('today')} · 11:42',
-      reason: widget.strings.call('reasonCountry'),
-      tint: _Palette.red,
-      pale: _Palette.redPale,
-      icon: Icons.public_rounded,
-      onAdd: widget.onStub,
-      addLabel: widget.strings.call('addToAllowlist'),
-    ),
-    const SizedBox(height: 10),
-    _JournalCard(
-      phone: widget.strings.call('numberHidden'),
-      caption: '${widget.strings.call('today')} · 09:18',
-      reason: widget.strings.call('reasonHidden'),
-      tint: _Palette.amber,
-      pale: _Palette.amberPale,
-      icon: Icons.visibility_off_outlined,
-      onAdd: widget.onStub,
-      addLabel: widget.strings.call('addToAllowlist'),
-    ),
-    const SizedBox(height: 10),
-    _JournalCard(
-      phone: '+380 44 555 20 20',
-      caption: '${widget.strings.call('yesterday')} · 20:06',
-      reason: widget.strings.call('reasonSilence'),
-      tint: const Color(0xFF7663D9),
-      pale: const Color(0xFFF0EDFF),
-      icon: Icons.notifications_off_outlined,
-      onAdd: widget.onStub,
-      addLabel: widget.strings.call('addToAllowlist'),
-    ),
+    if (_loading)
+      const Center(child: CircularProgressIndicator())
+    else if (_logs.isEmpty)
+      _EmptyState(label: widget.strings.call('noLogs'))
+    else
+      ..._logs.map((entry) {
+        final tint = switch (entry.reason) {
+          'reasonCountry' => _Palette.red,
+          'reasonHidden' => _Palette.amber,
+          'reasonSilence' => const Color(0xFF7663D9),
+          _ => _Palette.blue,
+        };
+        final icon = switch (entry.reason) {
+          'reasonCountry' => Icons.public_rounded,
+          'reasonHidden' => Icons.visibility_off_outlined,
+          'reasonSilence' => Icons.notifications_off_outlined,
+          _ => Icons.block_rounded,
+        };
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: _JournalCard(
+            phone: _localizedOrRaw(entry.phone),
+            caption: _dateTimeLabel(entry.timestamp),
+            reason: _localizedOrRaw(entry.reason),
+            tint: tint,
+            pale: _Palette.accentSurface(tint),
+            icon: icon,
+            onAdd: () => _addLogPhone(entry.phone),
+            addLabel: widget.strings.call('addToAllowlist'),
+          ),
+        );
+      }),
   ];
 }
 
 class _Reminder {
   const _Reminder({
-    required this.name,
+    this.id,
     required this.phone,
-    required this.dateLabel,
+    required this.contactName,
+    required this.remindAt,
     required this.note,
-    this.nameKey,
-    this.datePrefixKey,
-    this.noteKey,
+    this.isDone = false,
   });
 
-  final String name;
+  final int? id;
   final String phone;
-  final String dateLabel;
+  final String contactName;
+  final int remindAt;
   final String note;
-  final String? nameKey;
-  final String? datePrefixKey;
-  final String? noteKey;
+  final bool isDone;
+}
+
+class _CallLogEntry {
+  const _CallLogEntry({
+    required this.id,
+    required this.phone,
+    required this.reason,
+    required this.timestamp,
+  });
+
+  final int id;
+  final String phone;
+  final String reason;
+  final int timestamp;
 }
 
 class _ReminderCard extends StatelessWidget {
   const _ReminderCard({
     required this.reminder,
     required this.strings,
+    required this.dateLabel,
     required this.onCall,
+    required this.onToggleDone,
+    required this.onDelete,
   });
 
   final _Reminder reminder;
   final AppStrings strings;
+  final String dateLabel;
   final VoidCallback onCall;
+  final VoidCallback onToggleDone;
+  final VoidCallback onDelete;
 
-  String _dateLabel() => reminder.datePrefixKey == null
-      ? reminder.dateLabel
-      : '${strings.call(reminder.datePrefixKey!)} · ${reminder.dateLabel}';
+  String _localizedOrRaw(String value) {
+    if (value.startsWith('@')) return strings.call(value.substring(1));
+    if (AppStrings.keys.contains(value)) return strings.call(value);
+    return value;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2491,9 +3137,9 @@ class _ReminderCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        reminder.nameKey == null
-                            ? reminder.name
-                            : strings.call(reminder.nameKey!),
+                        reminder.contactName.isEmpty
+                            ? strings.call('reminderNew')
+                            : _localizedOrRaw(reminder.contactName),
                         style: TextStyle(
                           color: _Palette.ink,
                           fontWeight: FontWeight.w800,
@@ -2516,7 +3162,7 @@ class _ReminderCard extends StatelessWidget {
                 const SizedBox(width: 5),
                 Flexible(
                   child: Text(
-                    _dateLabel(),
+                    dateLabel,
                     textAlign: TextAlign.right,
                     style: TextStyle(
                       color: _Palette.accent(_Palette.blue),
@@ -2535,15 +3181,50 @@ class _ReminderCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    reminder.noteKey == null
-                        ? reminder.note
-                        : strings.call(reminder.noteKey!),
+                    reminder.note.isEmpty
+                        ? strings.call('reminderNewNote')
+                        : _localizedOrRaw(reminder.note),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(color: _Palette.muted, fontSize: 11),
                   ),
                 ),
                 const SizedBox(width: 8),
+                IconButton(
+                  tooltip: strings.call(
+                    reminder.isDone ? 'restoreReminder' : 'markReminderDone',
+                  ),
+                  onPressed: onToggleDone,
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 30,
+                    height: 36,
+                  ),
+                  padding: EdgeInsets.zero,
+                  icon: Icon(
+                    reminder.isDone
+                        ? Icons.check_circle_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    color: reminder.isDone ? _Palette.green : _Palette.muted,
+                    size: 18,
+                  ),
+                ),
+                IconButton(
+                  tooltip: strings.call('delete'),
+                  onPressed: onDelete,
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 30,
+                    height: 36,
+                  ),
+                  padding: EdgeInsets.zero,
+                  icon: Icon(
+                    Icons.delete_outline_rounded,
+                    color: _Palette.muted,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 3),
                 FilledButton.tonalIcon(
                   onPressed: onCall,
                   icon: const Icon(Icons.call_outlined, size: 16),
@@ -2567,6 +3248,24 @@ class _ReminderCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 22),
+    child: Center(
+      child: Text(
+        label,
+        textAlign: TextAlign.center,
+        style: TextStyle(color: _Palette.muted, fontSize: 12),
+      ),
+    ),
+  );
 }
 
 class _JournalCard extends StatelessWidget {
@@ -2650,10 +3349,15 @@ class _JournalCard extends StatelessWidget {
 }
 
 class _EntryCard extends StatelessWidget {
-  const _EntryCard({required this.entry, required this.strings});
+  const _EntryCard({
+    required this.entry,
+    required this.strings,
+    required this.onDelete,
+  });
 
   final _ListEntry entry;
   final AppStrings strings;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -2697,6 +3401,19 @@ class _EntryCard extends StatelessWidget {
                   : strings.call(entry.badgeKey!),
               color: entry.tint,
               background: entry.pale,
+            ),
+            const SizedBox(width: 3),
+            IconButton(
+              tooltip: strings.call('delete'),
+              onPressed: onDelete,
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints.tightFor(width: 30, height: 36),
+              icon: Icon(
+                Icons.delete_outline_rounded,
+                color: _Palette.muted,
+                size: 18,
+              ),
             ),
           ],
         ),

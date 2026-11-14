@@ -1,0 +1,401 @@
+import 'package:path/path.dart' as path;
+import 'package:sqflite/sqflite.dart';
+
+class DatabaseHelper {
+  DatabaseHelper._({String? databasePath}) : _databasePath = databasePath;
+
+  static final DatabaseHelper instance = DatabaseHelper._();
+
+  /// Uses a real in-memory SQLite database, intended for widget tests.
+  factory DatabaseHelper.forTesting({String? databasePath}) =>
+      DatabaseHelper._(databasePath: databasePath ?? inMemoryDatabasePath);
+
+  final String? _databasePath;
+  Database? _openedDatabase;
+
+  Future<Database> get _database async {
+    final current = _openedDatabase;
+    if (current != null) return current;
+
+    final databasePath =
+        _databasePath ?? path.join(await getDatabasesPath(), 'call_guard.db');
+    final database = await openDatabase(
+      databasePath,
+      version: 1,
+      onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
+      onCreate: _createSchema,
+    );
+    _openedDatabase = database;
+    return database;
+  }
+
+  Future<void> initialize() async {
+    await _database;
+  }
+
+  Future<void> _createSchema(Database db, int version) async {
+    await db.execute('''
+      CREATE TABLE app_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE phone_rules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        phone TEXT NOT NULL,
+        label TEXT,
+        list_type TEXT NOT NULL,
+        created_at INTEGER
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE country_rules (
+        iso_code TEXT PRIMARY KEY,
+        dial_code TEXT NOT NULL,
+        name_key TEXT NOT NULL,
+        custom_name TEXT,
+        action TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE operator_rules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        country_iso TEXT NOT NULL,
+        operator_name TEXT NOT NULL,
+        prefixes TEXT NOT NULL,
+        action TEXT NOT NULL,
+        FOREIGN KEY(country_iso) REFERENCES country_rules(iso_code) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE call_reminders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        phone TEXT NOT NULL,
+        contact_name TEXT,
+        remind_at INTEGER NOT NULL,
+        note TEXT,
+        is_done INTEGER DEFAULT 0
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE call_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        phone TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        timestamp INTEGER NOT NULL
+      )
+    ''');
+
+    final settings = <String, String>{
+      'locale': 'ukrainian',
+      'theme_mode': 'system',
+      'protection_enabled': 'true',
+      'block_hidden': 'true',
+      'block_non_contacts': 'false',
+      'block_international': 'true',
+      'automatic_silence': 'false',
+      'allow_only_whitelist': 'true',
+      'silence_start_minute': '1320',
+      'silence_end_minute': '420',
+      'silence_weekdays': '1,2,3,4,5,6,7',
+      'auto_reply_enabled': 'false',
+      'auto_reply_condition': '0',
+      'greeting_choice': '0',
+      'record_messages': 'false',
+    };
+    final batch = db.batch();
+    for (final setting in settings.entries) {
+      batch.insert('app_settings', {
+        'key': setting.key,
+        'value': setting.value,
+      });
+    }
+
+    final now = DateTime.now();
+    final countries = <Map<String, Object?>>[
+      {
+        'iso_code': 'UA',
+        'dial_code': '+380',
+        'name_key': 'countryUkraine',
+        'action': 'neutral',
+      },
+      {
+        'iso_code': 'PL',
+        'dial_code': '+48',
+        'name_key': 'countryPoland',
+        'action': 'neutral',
+      },
+      {
+        'iso_code': 'DE',
+        'dial_code': '+49',
+        'name_key': 'countryGermany',
+        'action': 'neutral',
+      },
+      {
+        'iso_code': 'GB',
+        'dial_code': '+44',
+        'name_key': 'countryUK',
+        'action': 'neutral',
+      },
+      {
+        'iso_code': 'US-CA',
+        'dial_code': '+1',
+        'name_key': 'countryNorthAmerica',
+        'action': 'neutral',
+      },
+    ];
+    for (final country in countries) {
+      batch.insert('country_rules', country);
+    }
+
+    final operators = <Map<String, Object?>>[
+      _operatorSeed('UA', 'operatorKyivstar', '67,68,96,97,98'),
+      _operatorSeed('UA', 'operatorVodafoneUA', '50,66,95,99'),
+      _operatorSeed('UA', 'operatorLifecell', '63,73,93'),
+      _operatorSeed('PL', 'operatorOrange', '50,51,53,57,78,79'),
+      _operatorSeed('PL', 'operatorPlay', '45,53,72,73,79,88'),
+      _operatorSeed('DE', 'operatorTelekom', '151,160,170,171,175'),
+      _operatorSeed('DE', 'operatorVodafoneDE', '152,162,172,173,174'),
+      _operatorSeed('GB', 'operatorVodafoneUK', '74,75,77,78,79'),
+      _operatorSeed('GB', 'operatorEE', '79,75,77'),
+    ];
+    for (final operator in operators) {
+      batch.insert('operator_rules', operator);
+    }
+
+    final createdAt = now.millisecondsSinceEpoch;
+    batch.insert('phone_rules', {
+      'phone': '+380 67 123 45 67',
+      'label': '@demoMother',
+      'list_type': 'white',
+      'created_at': createdAt,
+    });
+    batch.insert('phone_rules', {
+      'phone': '+380 44 220 18 40',
+      'label': '@demoWork',
+      'list_type': 'white',
+      'created_at': createdAt,
+    });
+    batch.insert('phone_rules', {
+      'phone': '+48 600 123 456',
+      'label': '@demoUnwanted',
+      'list_type': 'black',
+      'created_at': createdAt,
+    });
+    batch.insert('phone_rules', {
+      'phone': '+380 67 555 01 01',
+      'label': '@demoAdvertising',
+      'list_type': 'black',
+      'created_at': createdAt,
+    });
+
+    batch.insert('call_reminders', {
+      'phone': '+380 67 123 45 67',
+      'contact_name': '@reminderOlena',
+      'remind_at': now.add(const Duration(hours: 3)).millisecondsSinceEpoch,
+      'note': '@reminderNoteMeeting',
+      'is_done': 0,
+    });
+    batch.insert('call_reminders', {
+      'phone': '+48 600 123 456',
+      'contact_name': '@reminderUnknown',
+      'remind_at': now
+          .add(const Duration(days: 1, hours: 9))
+          .millisecondsSinceEpoch,
+      'note': '@reminderNoteCheck',
+      'is_done': 0,
+    });
+
+    batch.insert('call_logs', {
+      'phone': '+48 600 123 456',
+      'reason': 'reasonCountry',
+      'timestamp': now
+          .subtract(const Duration(hours: 2))
+          .millisecondsSinceEpoch,
+    });
+    batch.insert('call_logs', {
+      'phone': '@numberHidden',
+      'reason': 'reasonHidden',
+      'timestamp': now
+          .subtract(const Duration(hours: 5))
+          .millisecondsSinceEpoch,
+    });
+    batch.insert('call_logs', {
+      'phone': '+380 44 555 20 20',
+      'reason': 'reasonSilence',
+      'timestamp': now
+          .subtract(const Duration(days: 1, hours: 4))
+          .millisecondsSinceEpoch,
+    });
+
+    await batch.commit(noResult: true);
+  }
+
+  Map<String, Object?> _operatorSeed(
+    String countryIso,
+    String nameKey,
+    String prefixes,
+  ) => {
+    'country_iso': countryIso,
+    'operator_name': '@$nameKey',
+    'prefixes': prefixes,
+    'action': 'neutral',
+  };
+
+  Future<Map<String, String>> getSettings() async {
+    final rows = await (await _database).query('app_settings');
+    return {
+      for (final row in rows) row['key']! as String: row['value']! as String,
+    };
+  }
+
+  Future<void> setSetting(String key, Object value) async {
+    await (await _database).insert('app_settings', {
+      'key': key,
+      'value': value.toString(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<List<Map<String, Object?>>> getPhoneRules(String listType) async =>
+      (await _database).query(
+        'phone_rules',
+        where: 'list_type = ?',
+        whereArgs: [listType],
+        orderBy: 'id DESC',
+      );
+
+  Future<int> insertPhoneRule({
+    required String phone,
+    required String? label,
+    required String listType,
+  }) async => (await _database).insert('phone_rules', {
+    'phone': phone,
+    'label': label,
+    'list_type': listType,
+    'created_at': DateTime.now().millisecondsSinceEpoch,
+  });
+
+  Future<int> deletePhoneRule(int id) async =>
+      (await _database).delete('phone_rules', where: 'id = ?', whereArgs: [id]);
+
+  Future<List<Map<String, Object?>>> getCountries() async =>
+      (await _database).query('country_rules', orderBy: 'dial_code');
+
+  Future<List<Map<String, Object?>>> getOperators(String countryIso) async =>
+      (await _database).query(
+        'operator_rules',
+        where: 'country_iso = ?',
+        whereArgs: [countryIso],
+        orderBy: 'id',
+      );
+
+  Future<List<Map<String, Object?>>> getAllOperators() async =>
+      (await _database).query('operator_rules', orderBy: 'id');
+
+  Future<int> insertCountry({
+    required String isoCode,
+    required String dialCode,
+    required String nameKey,
+    required String? customName,
+    required String action,
+  }) async => (await _database).insert('country_rules', {
+    'iso_code': isoCode,
+    'dial_code': dialCode,
+    'name_key': nameKey,
+    'custom_name': customName,
+    'action': action,
+  });
+
+  Future<int> updateCountryAction(String isoCode, String action) async =>
+      (await _database).update(
+        'country_rules',
+        {'action': action},
+        where: 'iso_code = ?',
+        whereArgs: [isoCode],
+      );
+
+  Future<int> deleteCountry(String isoCode) async => (await _database).delete(
+    'country_rules',
+    where: 'iso_code = ?',
+    whereArgs: [isoCode],
+  );
+
+  Future<int> insertOperator({
+    required String countryIso,
+    required String name,
+    required List<String> prefixes,
+    required String action,
+  }) async => (await _database).insert('operator_rules', {
+    'country_iso': countryIso,
+    'operator_name': name,
+    'prefixes': prefixes.join(','),
+    'action': action,
+  });
+
+  Future<int> updateOperatorAction(int id, String action) async =>
+      (await _database).update(
+        'operator_rules',
+        {'action': action},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+
+  Future<int> deleteOperator(int id) async => (await _database).delete(
+    'operator_rules',
+    where: 'id = ?',
+    whereArgs: [id],
+  );
+
+  Future<List<Map<String, Object?>>> getReminders() async =>
+      (await _database).query('call_reminders', orderBy: 'remind_at');
+
+  Future<int> insertReminder({
+    required String phone,
+    required String? contactName,
+    required int remindAt,
+    required String? note,
+  }) async => (await _database).insert('call_reminders', {
+    'phone': phone,
+    'contact_name': contactName,
+    'remind_at': remindAt,
+    'note': note,
+    'is_done': 0,
+  });
+
+  Future<int> updateReminderDone(int id, bool isDone) async =>
+      (await _database).update(
+        'call_reminders',
+        {'is_done': isDone ? 1 : 0},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+
+  Future<int> deleteReminder(int id) async => (await _database).delete(
+    'call_reminders',
+    where: 'id = ?',
+    whereArgs: [id],
+  );
+
+  Future<List<Map<String, Object?>>> getCallLogs() async =>
+      (await _database).query('call_logs', orderBy: 'timestamp DESC');
+
+  Future<int> insertCallLog({
+    required String phone,
+    required String reason,
+    required int timestamp,
+  }) async => (await _database).insert('call_logs', {
+    'phone': phone,
+    'reason': reason,
+    'timestamp': timestamp,
+  });
+
+  Future<int> deleteCallLog(int id) async =>
+      (await _database).delete('call_logs', where: 'id = ?', whereArgs: [id]);
+
+  Future<void> close() async {
+    final database = _openedDatabase;
+    _openedDatabase = null;
+    await database?.close();
+  }
+}
