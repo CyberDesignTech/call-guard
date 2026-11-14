@@ -1,0 +1,17 @@
+<resources>
+    <string name="call_reminder_channel_name">Rappels d’appel</string>
+    <string name="call_reminder_channel_description">Rappels programmés pour rappeler</string>
+    <string name="call_reminder_title">Rappel d’appel</string>
+    <string name="call_reminder_action_call">Appeler</string>
+    <string name="call_reminder_action_done">Terminé</string>
+    <string name="missed_call_channel_name">Appels manqués</string>
+    <string name="missed_call_channel_description">Rappels locaux pour rappeler</string>
+    <string name="missed_call_title">Rappeler</string>
+    <string name="missed_call_action_dial">Rappeler</string>
+    <string name="reminder_contact_olena">Olena Koval</string>
+    <string name="reminder_contact_unknown">Numéro inconnu</string>
+    <string name="reminder_contact_new">Nouveau contact</string>
+    <string name="reminder_note_meeting">Rappeler au sujet de la réunion</string>
+    <string name="reminder_note_check">Vérifier le message</string>
+    <string name="reminder_note_new">Rappeler</string>
+</resources>

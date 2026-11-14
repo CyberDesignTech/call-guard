@@ -63,6 +63,34 @@ class CallScreeningChannel {
         ),
       );
 
+  Future<bool> requestNotificationPermission() async =>
+      await _channel.invokeMethod<bool>('requestNotificationPermission') ??
+      false;
+
+  Future<void> scheduleReminder({
+    required int id,
+    required int remindAt,
+  }) async {
+    await _channel.invokeMethod<bool>('scheduleReminder', {
+      'id': id,
+      'remindAt': remindAt,
+    });
+  }
+
+  Future<void> cancelReminder(int id) async {
+    await _channel.invokeMethod<bool>('cancelReminder', {'id': id});
+  }
+
+  Future<void> restorePendingReminders() async {
+    await _channel.invokeMethod<bool>('restorePendingReminders');
+  }
+
+  Future<void> openDialer(String phoneNumber) async {
+    await _channel.invokeMethod<bool>('openDialer', {
+      'phoneNumber': phoneNumber,
+    });
+  }
+
   Future<CallSimulationVerdict> simulateCall(String phoneNumber) async {
     final values = await _channel.invokeMapMethod<String, Object?>(
       'simulateCall',

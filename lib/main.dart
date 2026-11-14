@@ -86,10 +86,9 @@ class _CallGuardAppState extends State<CallGuardApp>
   TimeOfDay _silenceStart = const TimeOfDay(hour: 22, minute: 0);
   TimeOfDay _silenceEnd = const TimeOfDay(hour: 7, minute: 0);
   Set<int> _silenceWeekdays = {1, 2, 3, 4, 5, 6, 7};
-  bool _autoReplyEnabled = false;
-  int _autoReplyCondition = 0;
-  int _greetingChoice = 0;
-  bool _recordMessages = false;
+  bool _answeringEnabled = false;
+  String _answeringScenario = 'quiet_mode';
+  bool _answeringLocalNotification = true;
   Future<void> _pendingSettingsWrites = Future<void>.value();
   List<Map<String, Object?>> _phoneRules = [];
   List<Map<String, Object?>> _countries = [];
@@ -118,6 +117,13 @@ class _CallGuardAppState extends State<CallGuardApp>
   Future<void> _restoreSettings() async {
     try {
       await widget.database.initialize();
+      try {
+        await CallScreeningChannel().restorePendingReminders();
+      } on PlatformException {
+        // Reminder alarms are an Android-only integration.
+      } on MissingPluginException {
+        // Keep the local app usable on platforms without the Android channel.
+      }
       final settings = await widget.database.getSettings();
       final whiteRules = await widget.database.getPhoneRules('white');
       final blackRules = await widget.database.getPhoneRules('black');
@@ -160,10 +166,15 @@ class _CallGuardAppState extends State<CallGuardApp>
         _silenceWeekdays = settings.containsKey('silence_weekdays')
             ? weekdays
             : {1, 2, 3, 4, 5, 6, 7};
-        _autoReplyEnabled = parseBool('auto_reply_enabled', false);
-        _autoReplyCondition = parseInt('auto_reply_condition', 0);
-        _greetingChoice = parseInt('greeting_choice', 0);
-        _recordMessages = parseBool('record_messages', false);
+        _answeringEnabled = parseBool('answering_enabled', false);
+        final scenario = settings['answering_scenario'];
+        _answeringScenario = scenario == 'unknown_numbers'
+            ? 'unknown_numbers'
+            : 'quiet_mode';
+        _answeringLocalNotification = parseBool(
+          'answering_local_notification',
+          true,
+        );
         _phoneRules = [...whiteRules, ...blackRules];
         _countries = countries;
         _operators = operators;
@@ -214,16 +225,6 @@ class _CallGuardAppState extends State<CallGuardApp>
     setState(() => _silenceWeekdays = value);
     final days = value.toList()..sort();
     _persistSetting('silence_weekdays', days.join(','));
-  }
-
-  void _setAutoReplyCondition(int value) {
-    setState(() => _autoReplyCondition = value);
-    _persistSetting('auto_reply_condition', value);
-  }
-
-  void _setGreetingChoice(int value) {
-    setState(() => _greetingChoice = value);
-    _persistSetting('greeting_choice', value);
   }
 
   ThemeData _themeFor(Brightness brightness) {
@@ -349,19 +350,20 @@ class _CallGuardAppState extends State<CallGuardApp>
               onSilenceEndChanged: _setSilenceEnd,
               silenceWeekdays: _silenceWeekdays,
               onSilenceWeekdaysChanged: _setSilenceWeekdays,
-              autoReplyEnabled: _autoReplyEnabled,
-              onAutoReplyEnabledChanged: (value) {
-                setState(() => _autoReplyEnabled = value);
-                _persistSetting('auto_reply_enabled', value);
+              answeringEnabled: _answeringEnabled,
+              onAnsweringEnabledChanged: (value) {
+                setState(() => _answeringEnabled = value);
+                _persistSetting('answering_enabled', value);
               },
-              autoReplyCondition: _autoReplyCondition,
-              onAutoReplyConditionChanged: _setAutoReplyCondition,
-              greetingChoice: _greetingChoice,
-              onGreetingChoiceChanged: _setGreetingChoice,
-              recordMessages: _recordMessages,
-              onRecordMessagesChanged: (value) {
-                setState(() => _recordMessages = value);
-                _persistSetting('record_messages', value);
+              answeringScenario: _answeringScenario,
+              onAnsweringScenarioChanged: (value) {
+                setState(() => _answeringScenario = value);
+                _persistSetting('answering_scenario', value);
+              },
+              answeringLocalNotification: _answeringLocalNotification,
+              onAnsweringLocalNotificationChanged: (value) {
+                setState(() => _answeringLocalNotification = value);
+                _persistSetting('answering_local_notification', value);
               },
               phoneRules: _phoneRules,
               countries: _countries,
@@ -401,14 +403,12 @@ class _CallGuardShell extends StatefulWidget {
     required this.onSilenceEndChanged,
     required this.silenceWeekdays,
     required this.onSilenceWeekdaysChanged,
-    required this.autoReplyEnabled,
-    required this.onAutoReplyEnabledChanged,
-    required this.autoReplyCondition,
-    required this.onAutoReplyConditionChanged,
-    required this.greetingChoice,
-    required this.onGreetingChoiceChanged,
-    required this.recordMessages,
-    required this.onRecordMessagesChanged,
+    required this.answeringEnabled,
+    required this.onAnsweringEnabledChanged,
+    required this.answeringScenario,
+    required this.onAnsweringScenarioChanged,
+    required this.answeringLocalNotification,
+    required this.onAnsweringLocalNotificationChanged,
     required this.phoneRules,
     required this.countries,
     required this.operators,
@@ -442,14 +442,12 @@ class _CallGuardShell extends StatefulWidget {
   final ValueChanged<TimeOfDay> onSilenceEndChanged;
   final Set<int> silenceWeekdays;
   final ValueChanged<Set<int>> onSilenceWeekdaysChanged;
-  final bool autoReplyEnabled;
-  final ValueChanged<bool> onAutoReplyEnabledChanged;
-  final int autoReplyCondition;
-  final ValueChanged<int> onAutoReplyConditionChanged;
-  final int greetingChoice;
-  final ValueChanged<int> onGreetingChoiceChanged;
-  final bool recordMessages;
-  final ValueChanged<bool> onRecordMessagesChanged;
+  final bool answeringEnabled;
+  final ValueChanged<bool> onAnsweringEnabledChanged;
+  final String answeringScenario;
+  final ValueChanged<String> onAnsweringScenarioChanged;
+  final bool answeringLocalNotification;
+  final ValueChanged<bool> onAnsweringLocalNotificationChanged;
   final List<Map<String, Object?>> phoneRules;
   final List<Map<String, Object?>> countries;
   final List<Map<String, Object?>> operators;
@@ -597,17 +595,15 @@ class _CallGuardShellState extends State<_CallGuardShell> {
           onSelectedDaysChanged: widget.onSilenceWeekdaysChanged,
           onStub: _showStub,
         ),
-        3 => _AutoReplyPage(
-          onStub: _showStub,
+        3 => _AnsweringModePage(
           strings: widget.strings,
-          enabled: widget.autoReplyEnabled,
-          onEnabledChanged: widget.onAutoReplyEnabledChanged,
-          condition: widget.autoReplyCondition,
-          onConditionChanged: widget.onAutoReplyConditionChanged,
-          greeting: widget.greetingChoice,
-          onGreetingChanged: widget.onGreetingChoiceChanged,
-          recordMessages: widget.recordMessages,
-          onRecordMessagesChanged: widget.onRecordMessagesChanged,
+          enabled: widget.answeringEnabled,
+          onEnabledChanged: widget.onAnsweringEnabledChanged,
+          scenario: widget.answeringScenario,
+          onScenarioChanged: widget.onAnsweringScenarioChanged,
+          localNotification: widget.answeringLocalNotification,
+          onLocalNotificationChanged:
+              widget.onAnsweringLocalNotificationChanged,
         ),
         _ => _MorePage(
           database: widget.database,
@@ -2881,158 +2877,93 @@ class _SchedulePageState extends State<_SchedulePage> {
   }
 }
 
-class _AutoReplyPage extends StatelessWidget {
-  const _AutoReplyPage({
-    required this.onStub,
+class _AnsweringModePage extends StatelessWidget {
+  const _AnsweringModePage({
     required this.strings,
     required this.enabled,
     required this.onEnabledChanged,
-    required this.condition,
-    required this.onConditionChanged,
-    required this.greeting,
-    required this.onGreetingChanged,
-    required this.recordMessages,
-    required this.onRecordMessagesChanged,
+    required this.scenario,
+    required this.onScenarioChanged,
+    required this.localNotification,
+    required this.onLocalNotificationChanged,
   });
 
-  final VoidCallback onStub;
   final AppStrings strings;
   final bool enabled;
   final ValueChanged<bool> onEnabledChanged;
-  final int condition;
-  final ValueChanged<int> onConditionChanged;
-  final int greeting;
-  final ValueChanged<int> onGreetingChanged;
-  final bool recordMessages;
-  final ValueChanged<bool> onRecordMessagesChanged;
+  final String scenario;
+  final ValueChanged<String> onScenarioChanged;
+  final bool localNotification;
+  final ValueChanged<bool> onLocalNotificationChanged;
 
   @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
-      children: [
-        _PageIntro(
-          eyebrow: strings.call('answerEyebrow'),
-          title: strings.answerTitle,
-          subtitle: strings.call('answerSubtitle'),
-        ),
-        const SizedBox(height: 18),
-        _Panel(
-          child: _RuleSwitch(
-            icon: Icons.record_voice_over_outlined,
-            title: strings.call('autoReplyLabel'),
-            subtitle: strings.call(enabled ? 'autoReplyOn' : 'autoReplyOff'),
-            value: enabled,
-            onChanged: onEnabledChanged,
-          ),
-        ),
-        const SizedBox(height: 21),
-        _SectionHeading(
-          title: strings.call('answerWhen'),
-          subtitle: strings.call('answerWhenHint'),
-        ),
-        const SizedBox(height: 10),
-        _Panel(
-          child: RadioGroup<int>(
-            groupValue: condition,
-            onChanged: (next) {
-              if (next != null) onConditionChanged(next);
-            },
-            child: Column(
-              children: [
-                _radioOption(
-                  0,
-                  strings.call('whenBlocked'),
-                  Icons.block_outlined,
-                ),
-                const _ThinDivider(),
-                _radioOption(
-                  1,
-                  strings.call('whenSilence'),
-                  Icons.notifications_off_outlined,
-                ),
-                const _ThinDivider(),
-                _radioOption(
-                  2,
-                  strings.call('whenBusy'),
-                  Icons.phone_in_talk_outlined,
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 21),
-        _SectionHeading(
-          title: strings.call('greetings'),
-          subtitle: strings.call('greetingsHint'),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: _GreetingCard(
-                icon: Icons.graphic_eq_rounded,
-                title: strings.call('greetingStandard'),
-                subtitle: strings.call('greetingSystem'),
-                selected: greeting == 0,
-                onTap: () => onGreetingChanged(0),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _GreetingCard(
-                icon: Icons.audio_file_outlined,
-                title: strings.call('greetingCustom'),
-                subtitle: strings.call('greetingAudio'),
-                selected: greeting == 1,
-                onTap: () => onGreetingChanged(1),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: onStub,
-          icon: const Icon(Icons.mic_none_rounded),
-          label: Text(strings.call('recordVoice')),
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(48),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        _Panel(
-          child: _RuleSwitch(
-            icon: Icons.voicemail_rounded,
-            title: strings.call('recordMessages'),
-            subtitle: strings.call('recordMessagesHint'),
-            value: recordMessages,
-            onChanged: onRecordMessagesChanged,
-            iconColor: _Palette.amber,
-            iconBackground: _Palette.amberPale,
-          ),
-        ),
-        const SizedBox(height: 16),
-        _PrototypeFootnote(label: strings.call('prototypeFootnote')),
-      ],
-    );
-  }
-
-  Widget _radioOption(int value, String title, IconData icon) {
-    return RadioListTile<int>(
-      value: value,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-      activeColor: _Palette.accent(_Palette.blue),
-      title: Text(
-        title,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+  Widget build(BuildContext context) => ListView(
+    padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
+    children: [
+      _PageIntro(
+        eyebrow: strings.call('answerEyebrow'),
+        title: strings.answerTitle,
+        subtitle: strings.call('answerSubtitle'),
       ),
-      secondary: Icon(icon, color: _Palette.muted, size: 19),
-      dense: true,
-    );
-  }
+      const SizedBox(height: 18),
+      _Panel(
+        child: _RuleSwitch(
+          icon: Icons.phone_disabled_outlined,
+          title: strings.call('answeringEnabledLabel'),
+          subtitle: strings.call('answeringEnabledDescription'),
+          value: enabled,
+          onChanged: onEnabledChanged,
+        ),
+      ),
+      const SizedBox(height: 21),
+      _SectionHeading(
+        title: strings.call('answeringScenarioTitle'),
+        subtitle: strings.call('answeringScenarioHint'),
+      ),
+      const SizedBox(height: 10),
+      _Panel(
+        child: RadioGroup<String>(
+          groupValue: scenario,
+          onChanged: (value) {
+            if (value != null) onScenarioChanged(value);
+          },
+          child: Column(
+            children: [
+              RadioListTile<String>(
+                value: 'quiet_mode',
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                title: Text(strings.call('answeringQuietScenario')),
+                secondary: const Icon(Icons.notifications_off_outlined),
+                dense: true,
+              ),
+              const _ThinDivider(),
+              RadioListTile<String>(
+                value: 'unknown_numbers',
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                title: Text(strings.call('answeringUnknownScenario')),
+                secondary: const Icon(Icons.person_search_outlined),
+                dense: true,
+              ),
+            ],
+          ),
+        ),
+      ),
+      const SizedBox(height: 16),
+      _Panel(
+        child: _RuleSwitch(
+          icon: Icons.notifications_active_outlined,
+          title: strings.call('answeringNotificationLabel'),
+          subtitle: strings.call('answeringNotificationHint'),
+          value: localNotification,
+          onChanged: onLocalNotificationChanged,
+          iconColor: _Palette.amber,
+          iconBackground: _Palette.amberPale,
+        ),
+      ),
+      const SizedBox(height: 16),
+      _PrototypeFootnote(label: strings.call('prototypeFootnote')),
+    ],
+  );
 }
 
 class _MorePage extends StatefulWidget {
@@ -3056,6 +2987,7 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
   List<_CallLogEntry> _logs = [];
   bool _loading = true;
   Timer? _logRefreshTimer;
+  final _screeningChannel = CallScreeningChannel();
 
   @override
   void initState() {
@@ -3063,9 +2995,12 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _reload();
     _logRefreshTimer = Timer.periodic(const Duration(seconds: 2), (_) {
-      if (_segment == 1 &&
-          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
-        unawaited(_reloadLogs());
+      if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+        if (_segment == 1) {
+          unawaited(_reloadLogs());
+        } else {
+          unawaited(_reloadReminders());
+        }
       }
     });
   }
@@ -3079,8 +3014,12 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && _segment == 1) {
-      unawaited(_reloadLogs());
+    if (state == AppLifecycleState.resumed) {
+      if (_segment == 1) {
+        unawaited(_reloadLogs());
+      } else {
+        unawaited(_reloadReminders());
+      }
     }
   }
 
@@ -3100,6 +3039,15 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
     if (!mounted) return;
     setState(() {
       _logs = logRows.map(_logFromRow).toList();
+      _loading = false;
+    });
+  }
+
+  Future<void> _reloadReminders() async {
+    final reminderRows = await widget.database.getReminders();
+    if (!mounted) return;
+    setState(() {
+      _reminders = reminderRows.map(_reminderFromRow).toList();
       _loading = false;
     });
   }
@@ -3144,15 +3092,71 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
   Future<void> _toggleReminder(_Reminder reminder) async {
     final id = reminder.id;
     if (id == null) return;
-    await widget.database.updateReminderDone(id, !reminder.isDone);
+    final isDone = !reminder.isDone;
+    await widget.database.updateReminderDone(id, isDone);
+    try {
+      if (isDone) {
+        await _screeningChannel.cancelReminder(id);
+      } else if (reminder.remindAt > DateTime.now().millisecondsSinceEpoch) {
+        await _screeningChannel.scheduleReminder(
+          id: id,
+          remindAt: reminder.remindAt,
+        );
+      }
+    } on PlatformException {
+      // The database remains authoritative if AlarmManager is unavailable.
+    } on MissingPluginException {
+      // Scheduling is available only on Android.
+    }
     await _reload();
   }
 
   Future<void> _deleteReminder(_Reminder reminder) async {
     final id = reminder.id;
     if (id == null) return;
+    try {
+      await _screeningChannel.cancelReminder(id);
+    } on PlatformException {
+      // Still remove the database row if the native scheduler cannot be reached.
+    } on MissingPluginException {
+      // Scheduling is available only on Android.
+    }
     await widget.database.deleteReminder(id);
     await _reload();
+  }
+
+  Future<void> _dialReminder(String phoneNumber) async {
+    try {
+      await _screeningChannel.openDialer(phoneNumber);
+    } on PlatformException {
+      widget.onStub();
+    } on MissingPluginException {
+      widget.onStub();
+    }
+  }
+
+  Future<void> _requestNotificationPermissionOnce() async {
+    final settings = await widget.database.getSettings();
+    if (settings['notification_permission_prompted'] == 'true') return;
+
+    var granted = false;
+    try {
+      granted = await _screeningChannel.requestNotificationPermission();
+    } on PlatformException {
+      // Reminders remain scheduled even if notifications cannot be authorized.
+    } on MissingPluginException {
+      // Notification permission requests are available only on Android.
+    }
+    await widget.database.setSetting('notification_permission_prompted', true);
+    if (!granted && mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(widget.strings.call('notificationsPermissionNeeded')),
+          ),
+        );
+    }
   }
 
   Future<void> _addLogPhone(String phone) async {
@@ -3290,12 +3294,23 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
     phoneController.dispose();
     noteController.dispose();
     if (result != null && mounted) {
-      await widget.database.insertReminder(
+      final reminderId = await widget.database.insertReminder(
         phone: result.phone,
         contactName: result.contactName,
         remindAt: result.remindAt,
         note: result.note,
       );
+      await _requestNotificationPermissionOnce();
+      try {
+        await _screeningChannel.scheduleReminder(
+          id: reminderId,
+          remindAt: result.remindAt,
+        );
+      } on PlatformException {
+        // The reminder is persisted and can still be scheduled after app restart.
+      } on MissingPluginException {
+        // AlarmManager scheduling is available only on Android.
+      }
       await _reload();
     }
   }
@@ -3376,7 +3391,7 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
             reminder: reminder,
             strings: widget.strings,
             dateLabel: _dateTimeLabel(reminder.remindAt),
-            onCall: widget.onStub,
+            onCall: () => _dialReminder(reminder.phone),
             onToggleDone: () => _toggleReminder(reminder),
             onDelete: () => _deleteReminder(reminder),
           ),
@@ -4187,90 +4202,6 @@ class _TimeButton extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _GreetingCard extends StatelessWidget {
-  const _GreetingCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(19),
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: selected ? _Palette.bluePale : _Palette.surface,
-            borderRadius: BorderRadius.circular(19),
-            border: Border.all(
-              color: selected
-                  ? (_Palette.isDark
-                        ? const Color(0xFF64749A)
-                        : const Color(0xFFBFCBFF))
-                  : _Palette.line,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    icon,
-                    color: selected
-                        ? _Palette.accent(_Palette.blue)
-                        : _Palette.muted,
-                    size: 20,
-                  ),
-                  const Spacer(),
-                  Icon(
-                    selected
-                        ? Icons.check_circle_rounded
-                        : Icons.circle_outlined,
-                    color: selected
-                        ? _Palette.accent(_Palette.blue)
-                        : (_Palette.isDark
-                              ? const Color(0xFF607089)
-                              : const Color(0xFFD5DCE7)),
-                    size: 17,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 13),
-              Text(
-                title,
-                style: TextStyle(
-                  color: _Palette.ink,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                subtitle,
-                style: TextStyle(color: _Palette.muted, fontSize: 10),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

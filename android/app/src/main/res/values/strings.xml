@@ -1,0 +1,17 @@
+<resources>
+    <string name="call_reminder_channel_name">Call reminders</string>
+    <string name="call_reminder_channel_description">Scheduled reminders to return a call</string>
+    <string name="call_reminder_title">Call reminder</string>
+    <string name="call_reminder_action_call">Call</string>
+    <string name="call_reminder_action_done">Done</string>
+    <string name="missed_call_channel_name">Missed calls</string>
+    <string name="missed_call_channel_description">Local reminders to call someone back</string>
+    <string name="missed_call_title">Call back</string>
+    <string name="missed_call_action_dial">Call back</string>
+    <string name="reminder_contact_olena">Olena Koval</string>
+    <string name="reminder_contact_unknown">Unknown number</string>
+    <string name="reminder_contact_new">New contact</string>
+    <string name="reminder_note_meeting">Call back about the meeting</string>
+    <string name="reminder_note_check">Check the message</string>
+    <string name="reminder_note_new">Call back</string>
+</resources>

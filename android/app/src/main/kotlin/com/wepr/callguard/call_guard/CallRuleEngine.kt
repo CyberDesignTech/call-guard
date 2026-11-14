@@ -43,21 +43,23 @@ class CallRuleEngine(context: Context) {
     /** Evaluates and persists rejected calls to the shared call_logs table. */
     fun evaluateAndRecord(phoneNumber: String?): CallRuleVerdict {
         val result = evaluate(phoneNumber)
-        if (!result.allowed) {
-            try {
-                openDatabase().use { database ->
-                    val values = android.content.ContentValues().apply {
-                        put("phone", result.phoneNumber.ifBlank { "@numberHidden" })
-                        put("reason", result.reason)
-                        put("timestamp", System.currentTimeMillis())
-                    }
-                    database.insertOrThrow("call_logs", null, values)
-                }
-            } catch (error: Exception) {
-                Log.e(TAG, "Could not persist blocked-call log", error)
-            }
-        }
+        if (!result.allowed) recordCallLog(result.phoneNumber, result.reason)
         return result
+    }
+
+    fun recordCallLog(phoneNumber: String, reason: String) {
+        try {
+            openDatabase().use { database ->
+                val values = android.content.ContentValues().apply {
+                    put("phone", phoneNumber.ifBlank { "@numberHidden" })
+                    put("reason", reason)
+                    put("timestamp", System.currentTimeMillis())
+                }
+                database.insertOrThrow("call_logs", null, values)
+            }
+        } catch (error: Exception) {
+            Log.e(TAG, "Could not persist blocked-call log", error)
+        }
     }
 
     private fun evaluate(database: SQLiteDatabase, rawPhone: String): CallRuleVerdict {

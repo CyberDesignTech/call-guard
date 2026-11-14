@@ -1,0 +1,17 @@
+<resources>
+    <string name="call_reminder_channel_name">Recordatorios de llamadas</string>
+    <string name="call_reminder_channel_description">Recordatorios programados para devolver llamadas</string>
+    <string name="call_reminder_title">Recordatorio de llamada</string>
+    <string name="call_reminder_action_call">Llamar</string>
+    <string name="call_reminder_action_done">Hecho</string>
+    <string name="missed_call_channel_name">Llamadas perdidas</string>
+    <string name="missed_call_channel_description">Recordatorios locales para devolver llamadas</string>
+    <string name="missed_call_title">Devolver llamada</string>
+    <string name="missed_call_action_dial">Devolver llamada</string>
+    <string name="reminder_contact_olena">Olena Koval</string>
+    <string name="reminder_contact_unknown">Número desconocido</string>
+    <string name="reminder_contact_new">Contacto nuevo</string>
+    <string name="reminder_note_meeting">Devolver llamada sobre la reunión</string>
+    <string name="reminder_note_check">Revisar el mensaje</string>
+    <string name="reminder_note_new">Devolver llamada</string>
+</resources>

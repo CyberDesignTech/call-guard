@@ -1,0 +1,17 @@
+<resources>
+    <string name="call_reminder_channel_name">Anruferinnerungen</string>
+    <string name="call_reminder_channel_description">Geplante Erinnerungen zum Zurückrufen</string>
+    <string name="call_reminder_title">Anruferinnerung</string>
+    <string name="call_reminder_action_call">Anrufen</string>
+    <string name="call_reminder_action_done">Erledigt</string>
+    <string name="missed_call_channel_name">Verpasste Anrufe</string>
+    <string name="missed_call_channel_description">Lokale Erinnerungen zum Zurückrufen</string>
+    <string name="missed_call_title">Zurückrufen</string>
+    <string name="missed_call_action_dial">Zurückrufen</string>
+    <string name="reminder_contact_olena">Olena Koval</string>
+    <string name="reminder_contact_unknown">Unbekannte Nummer</string>
+    <string name="reminder_contact_new">Neuer Kontakt</string>
+    <string name="reminder_note_meeting">Wegen des Treffens zurückrufen</string>
+    <string name="reminder_note_check">Nachricht prüfen</string>
+    <string name="reminder_note_new">Zurückrufen</string>
+</resources>

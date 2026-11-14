@@ -2,7 +2,9 @@ package com.wepr.callguard.call_guard
 
 import android.Manifest
 import android.app.role.RoleManager
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -13,6 +15,7 @@ import java.util.concurrent.Executors
 class MainActivity : FlutterActivity() {
     private var pendingRoleResult: MethodChannel.Result? = null
     private var pendingContactsResult: MethodChannel.Result? = null
+    private var pendingNotificationResult: MethodChannel.Result? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -27,6 +30,11 @@ class MainActivity : FlutterActivity() {
             "checkPermissions" -> result.success(permissionState())
             "requestCallScreeningRole" -> requestCallScreeningRole(result)
             "requestContactsPermission" -> requestContactsPermission(result)
+            "requestNotificationPermission" -> requestNotificationPermission(result)
+            "scheduleReminder" -> scheduleReminder(call, result)
+            "cancelReminder" -> cancelReminder(call, result)
+            "restorePendingReminders" -> restorePendingReminders(result)
+            "openDialer" -> openDialer(call, result)
             "simulateCall" -> simulateCall(call, result)
             else -> result.notImplemented()
         }
@@ -79,6 +87,75 @@ class MainActivity : FlutterActivity() {
         requestPermissions(arrayOf(Manifest.permission.READ_CONTACTS), REQUEST_READ_CONTACTS)
     }
 
+    private fun requestNotificationPermission(result: MethodChannel.Result) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || hasNotificationPermission()) {
+            result.success(true)
+            return
+        }
+        if (pendingNotificationResult != null) {
+            result.error("REQUEST_IN_PROGRESS", "A notification permission request is already in progress", null)
+            return
+        }
+
+        pendingNotificationResult = result
+        requestPermissions(
+            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+            REQUEST_POST_NOTIFICATIONS,
+        )
+    }
+
+    private fun scheduleReminder(call: MethodCall, result: MethodChannel.Result) {
+        val reminderId = call.argument<Int>("id")
+        val remindAt = (call.argument<Number>("remindAt"))?.toLong()
+        if (reminderId == null || reminderId <= 0 || remindAt == null) {
+            result.error("INVALID_ARGUMENT", "A valid id and remindAt timestamp are required", null)
+            return
+        }
+        try {
+            CallReminderScheduler.schedule(applicationContext, reminderId, remindAt)
+            result.success(true)
+        } catch (error: Exception) {
+            result.error("REMINDER_SCHEDULE_FAILED", error.message, null)
+        }
+    }
+
+    private fun cancelReminder(call: MethodCall, result: MethodChannel.Result) {
+        val reminderId = call.argument<Int>("id")
+        if (reminderId == null || reminderId <= 0) {
+            result.error("INVALID_ARGUMENT", "A valid reminder id is required", null)
+            return
+        }
+        CallReminderScheduler.cancel(applicationContext, reminderId)
+        result.success(true)
+    }
+
+    private fun restorePendingReminders(result: MethodChannel.Result) {
+        simulationExecutor.execute {
+            try {
+                CallReminderScheduler.restorePending(applicationContext)
+                runOnUiThread { result.success(true) }
+            } catch (error: Exception) {
+                runOnUiThread {
+                    result.error("REMINDER_RESTORE_FAILED", error.message, null)
+                }
+            }
+        }
+    }
+
+    private fun openDialer(call: MethodCall, result: MethodChannel.Result) {
+        val phoneNumber = call.argument<String>("phoneNumber")?.trim()
+        if (phoneNumber.isNullOrEmpty()) {
+            result.error("INVALID_ARGUMENT", "phoneNumber is required", null)
+            return
+        }
+        try {
+            startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${Uri.encode(phoneNumber)}")))
+            result.success(true)
+        } catch (error: Exception) {
+            result.error("DIALER_UNAVAILABLE", error.message, null)
+        }
+    }
+
     private fun simulateCall(call: MethodCall, result: MethodChannel.Result) {
         val phoneNumber = call.argument<String>("phoneNumber")
         if (phoneNumber == null) {
@@ -113,6 +190,11 @@ class MainActivity : FlutterActivity() {
             checkSelfPermission(Manifest.permission.READ_CONTACTS) ==
             PackageManager.PERMISSION_GRANTED
 
+    private fun hasNotificationPermission(): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+
     @Deprecated("Deprecated in Android, retained for role activity results")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
@@ -132,6 +214,9 @@ class MainActivity : FlutterActivity() {
         if (requestCode == REQUEST_READ_CONTACTS) {
             pendingContactsResult?.success(permissionState())
             pendingContactsResult = null
+        } else if (requestCode == REQUEST_POST_NOTIFICATIONS) {
+            pendingNotificationResult?.success(hasNotificationPermission())
+            pendingNotificationResult = null
         }
     }
 
@@ -139,6 +224,7 @@ class MainActivity : FlutterActivity() {
         const val SCREENING_CHANNEL = "com.wepr.callguard/screening"
         const val REQUEST_SCREENING_ROLE = 8401
         const val REQUEST_READ_CONTACTS = 8402
+        const val REQUEST_POST_NOTIFICATIONS = 8403
         val simulationExecutor = Executors.newSingleThreadExecutor { runnable ->
             Thread(runnable, "CallGuardCallSimulation").apply { isDaemon = true }
         }

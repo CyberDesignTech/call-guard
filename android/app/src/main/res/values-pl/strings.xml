@@ -1,0 +1,17 @@
+<resources>
+    <string name="call_reminder_channel_name">Przypomnienia o połączeniach</string>
+    <string name="call_reminder_channel_description">Zaplanowane przypomnienia o oddzwonieniu</string>
+    <string name="call_reminder_title">Przypomnienie o połączeniu</string>
+    <string name="call_reminder_action_call">Zadzwoń</string>
+    <string name="call_reminder_action_done">Gotowe</string>
+    <string name="missed_call_channel_name">Nieodebrane połączenia</string>
+    <string name="missed_call_channel_description">Lokalne przypomnienia o oddzwonieniu</string>
+    <string name="missed_call_title">Oddzwoń</string>
+    <string name="missed_call_action_dial">Oddzwoń</string>
+    <string name="reminder_contact_olena">Olena Koval</string>
+    <string name="reminder_contact_unknown">Nieznany numer</string>
+    <string name="reminder_contact_new">Nowy kontakt</string>
+    <string name="reminder_note_meeting">Oddzwoń w sprawie spotkania</string>
+    <string name="reminder_note_check">Sprawdź wiadomość</string>
+    <string name="reminder_note_new">Oddzwoń</string>
+</resources>

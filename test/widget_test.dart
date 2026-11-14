@@ -9,6 +9,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart' as ffi;
 import 'package:call_guard/data/database_helper.dart';
 import 'package:call_guard/main.dart';
 import 'package:call_guard/l10n/app_strings.dart';
+import 'package:call_guard/platform/call_screening_channel.dart';
 
 late DatabaseHelper _testDatabase;
 
@@ -158,6 +159,38 @@ void main() {
     }
   });
 
+  test(
+    'reminder bridge forwards scheduling and notification methods',
+    () async {
+      const channel = MethodChannel('com.wepr.callguard/reminder-test');
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      final calls = <MethodCall>[];
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        calls.add(call);
+        return true;
+      });
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+      final bridge = CallScreeningChannel(channel: channel);
+      expect(await bridge.requestNotificationPermission(), isTrue);
+      await bridge.scheduleReminder(id: 21, remindAt: 1_900_000_000_000);
+      await bridge.cancelReminder(21);
+      await bridge.restorePendingReminders();
+      await bridge.openDialer('+380 67 123 45 67');
+
+      expect(calls.map((call) => call.method), [
+        'requestNotificationPermission',
+        'scheduleReminder',
+        'cancelReminder',
+        'restorePendingReminders',
+        'openDialer',
+      ]);
+      expect(calls[1].arguments, {'id': 21, 'remindAt': 1_900_000_000_000});
+      expect(calls[4].arguments, {'phoneNumber': '+380 67 123 45 67'});
+    },
+  );
+
   testWidgets('lets the user switch to the dark UI theme', (tester) async {
     tester.view.physicalSize = const Size(360, 800);
     tester.view.devicePixelRatio = 1;
@@ -227,6 +260,24 @@ void main() {
     expect(testedNumber, '+380 67 555 01 01');
     expect(find.text('Відхилити виклик'), findsOneWidget);
     expect(find.text('Причина: Чорний список'), findsOneWidget);
+  });
+
+  testWidgets('answering tab only offers quiet call-back options', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    await tester.tap(find.byTooltip('Автовідповідач'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Увімкнути режим передзвону'), findsOneWidget);
+    expect(find.text('У режимі тиші'), findsOneWidget);
+    expect(find.text('Усі невідомі номери'), findsOneWidget);
+    expect(
+      find.text('Локальне сповіщення про пропущений виклик'),
+      findsOneWidget,
+    );
+    expect(find.text('Записувати повідомлення'), findsNothing);
+    expect(find.text('Записати голос'), findsNothing);
   });
 
   testWidgets('profile menu opens About and Support dialogs', (tester) async {

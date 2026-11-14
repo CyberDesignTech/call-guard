@@ -100,10 +100,10 @@ class DatabaseHelper {
       'silence_start_minute': '1320',
       'silence_end_minute': '420',
       'silence_weekdays': '1,2,3,4,5,6,7',
-      'auto_reply_enabled': 'false',
-      'auto_reply_condition': '0',
-      'greeting_choice': '0',
-      'record_messages': 'false',
+      'answering_enabled': 'false',
+      'answering_scenario': 'quiet_mode',
+      'answering_local_notification': 'true',
+      'notification_permission_prompted': 'false',
     };
     final batch = db.batch();
     for (final setting in settings.entries) {

@@ -1,0 +1,200 @@
+package com.wepr.callguard.call_guard
+
+import android.Manifest
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.res.Configuration
+import android.net.Uri
+import android.os.Build
+import android.util.Log
+import java.util.Locale
+
+object CallNotificationHelper {
+    const val REMINDER_CHANNEL_ID = "call_guard_reminders"
+    const val MISSED_CALL_CHANNEL_ID = "call_guard_missed_calls"
+
+    fun showReminder(context: Context, reminder: CallReminderRecord): Boolean {
+        val localizedContext = localizedContext(context)
+        if (!canPostNotifications(context)) return false
+        createChannel(
+            context,
+            localizedContext.getString(R.string.call_reminder_channel_name),
+            localizedContext.getString(R.string.call_reminder_channel_description),
+            REMINDER_CHANNEL_ID,
+        )
+
+        val dialIntent = dialIntent(context, reminder.phone)
+        val dialPendingIntent = PendingIntent.getActivity(
+            context,
+            reminder.id,
+            dialIntent,
+            pendingIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT),
+        )
+        val doneIntent = Intent(context, CallReminderReceiver::class.java)
+            .setAction(CallReminderScheduler.ACTION_MARK_REMINDER_DONE)
+            .putExtra(CallReminderScheduler.EXTRA_REMINDER_ID, reminder.id)
+        val donePendingIntent = PendingIntent.getBroadcast(
+            context,
+            reminder.id,
+            doneIntent,
+            pendingIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT),
+        )
+
+        val title = localizedDatabaseText(localizedContext, reminder.contactName)
+            ?: localizedContext.getString(R.string.call_reminder_title)
+        val body = buildString {
+            append(reminder.phone)
+            localizedDatabaseText(localizedContext, reminder.note)?.let {
+                append('\n')
+                append(it)
+            }
+        }
+        val notification = notificationBuilder(
+            localizedContext,
+            REMINDER_CHANNEL_ID,
+        )
+            .setSmallIcon(android.R.drawable.ic_menu_call)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(Notification.BigTextStyle().bigText(body))
+            .setCategory(Notification.CATEGORY_REMINDER)
+            .setAutoCancel(true)
+            .setContentIntent(dialPendingIntent)
+            .addAction(
+                android.R.drawable.ic_menu_call,
+                localizedContext.getString(R.string.call_reminder_action_call),
+                dialPendingIntent,
+            )
+            .addAction(
+                android.R.drawable.checkbox_on_background,
+                localizedContext.getString(R.string.call_reminder_action_done),
+                donePendingIntent,
+            )
+            .build()
+
+        return notify(context, reminder.id, notification)
+    }
+
+    fun showMissedCall(context: Context, phone: String): Boolean {
+        val localizedContext = localizedContext(context)
+        if (!canPostNotifications(context)) return false
+        createChannel(
+            context,
+            localizedContext.getString(R.string.missed_call_channel_name),
+            localizedContext.getString(R.string.missed_call_channel_description),
+            MISSED_CALL_CHANNEL_ID,
+        )
+
+        val dialPendingIntent = PendingIntent.getActivity(
+            context,
+            ANSWERING_NOTIFICATION_ID_BASE + phone.hashCode(),
+            dialIntent(context, phone),
+            pendingIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT),
+        )
+        val notification = notificationBuilder(localizedContext, MISSED_CALL_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_menu_call)
+            .setContentTitle(localizedContext.getString(R.string.missed_call_title))
+            .setContentText(phone)
+            .setCategory(Notification.CATEGORY_CALL)
+            .setAutoCancel(true)
+            .setContentIntent(dialPendingIntent)
+            .addAction(
+                android.R.drawable.ic_menu_call,
+                localizedContext.getString(R.string.missed_call_action_dial),
+                dialPendingIntent,
+            )
+            .build()
+        return notify(context, ANSWERING_NOTIFICATION_ID_BASE + phone.hashCode(), notification)
+    }
+
+    private fun dialIntent(context: Context, phone: String): Intent =
+        Intent(Intent.ACTION_DIAL, Uri.parse("tel:${Uri.encode(phone)}"))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    private fun localizedDatabaseText(context: Context, value: String?): String? {
+        if (value.isNullOrBlank()) return null
+        if (!value.startsWith('@')) return value
+        return when (value.removePrefix("@")) {
+            "reminderOlena" -> context.getString(R.string.reminder_contact_olena)
+            "reminderUnknown" -> context.getString(R.string.reminder_contact_unknown)
+            "reminderNew" -> context.getString(R.string.reminder_contact_new)
+            "reminderNoteMeeting" -> context.getString(R.string.reminder_note_meeting)
+            "reminderNoteCheck" -> context.getString(R.string.reminder_note_check)
+            "reminderNewNote" -> context.getString(R.string.reminder_note_new)
+            else -> value.removePrefix("@")
+        }
+    }
+
+    private fun notificationBuilder(context: Context, channelId: String): Notification.Builder =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(context, channelId)
+        } else {
+            @Suppress("DEPRECATION")
+            Notification.Builder(context).setPriority(Notification.PRIORITY_HIGH)
+        }
+
+    private fun createChannel(
+        context: Context,
+        name: String,
+        description: String,
+        channelId: String,
+    ) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val channel = NotificationChannel(
+            channelId,
+            name,
+            NotificationManager.IMPORTANCE_HIGH,
+        ).apply {
+            this.description = description
+            lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+        }
+        (context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager)
+            ?.createNotificationChannel(channel)
+    }
+
+    private fun canPostNotifications(context: Context): Boolean =
+        Build.VERSION.SDK_INT < 33 ||
+            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+
+    private fun notify(context: Context, notificationId: Int, notification: Notification): Boolean =
+        runCatching {
+            (context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager)
+                ?.notify(notificationId, notification)
+                ?: return false
+            true
+        }.onFailure { Log.w(TAG, "Could not show a local call notification", it) }
+            .getOrDefault(false)
+
+    private fun pendingIntentFlags(extra: Int): Int =
+        extra or if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PendingIntent.FLAG_IMMUTABLE
+        } else {
+            0
+        }
+
+    private fun localizedContext(context: Context): Context {
+        val setting = runCatching {
+            CallReminderStore.getSetting(context, "locale", "english")
+        }.getOrDefault("english")
+        val language = when (setting) {
+            "ukrainian" -> "uk"
+            "polish" -> "pl"
+            "german" -> "de"
+            "spanish" -> "es"
+            "french" -> "fr"
+            else -> "en"
+        }
+        val configuration = Configuration(context.resources.configuration)
+        configuration.setLocale(Locale.forLanguageTag(language))
+        return context.createConfigurationContext(configuration)
+    }
+
+    private const val TAG = "CallGuardNotifications"
+    private const val ANSWERING_NOTIFICATION_ID_BASE = 0x43470000
+}
