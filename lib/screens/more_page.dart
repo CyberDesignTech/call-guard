@@ -1,0 +1,817 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../data/database_helper.dart';
+import '../l10n/app_strings.dart';
+import '../models/call_log_entry.dart';
+import '../models/reminder.dart';
+import '../platform/call_screening_channel.dart';
+import '../theme/app_palette.dart';
+import '../widgets/common/empty_state.dart';
+import '../widgets/common/contact_picker.dart';
+import '../widgets/common/journal_card.dart';
+import '../widgets/common/localized_value.dart';
+import '../widgets/common/page_intro.dart';
+import '../widgets/common/prototype_footnote.dart';
+import '../widgets/common/repeat_fields.dart';
+import '../widgets/common/section_heading.dart';
+import '../widgets/reminder_card.dart';
+
+class MorePage extends StatefulWidget {
+  const MorePage({
+    required this.database,
+    required this.onStub,
+    required this.strings,
+  });
+
+  final DatabaseHelper database;
+  final VoidCallback onStub;
+  final AppStrings strings;
+
+  @override
+  State<MorePage> createState() => MorePageState();
+}
+
+class MorePageState extends State<MorePage> with WidgetsBindingObserver {
+  int _segment = 0;
+  List<Reminder> _reminders = [];
+  List<CallLogEntry> _logs = [];
+  bool _loading = true;
+  bool _notificationsGranted = false;
+  Timer? _logRefreshTimer;
+  final _screeningChannel = CallScreeningChannel();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _reload();
+    _refreshNotificationStatus();
+    _logRefreshTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+        if (_segment == 1) unawaited(_reloadLogs());
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _logRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshNotificationStatus());
+      if (_segment == 1) {
+        unawaited(_reloadLogs());
+      } else {
+        unawaited(_reloadReminders());
+      }
+    }
+  }
+
+  Future<void> _reload() async {
+    final reminderRows = await widget.database.getReminders();
+    final logRows = await widget.database.getCallLogs();
+    if (!mounted) return;
+    setState(() {
+      _reminders = reminderRows.map(_reminderFromRow).toList();
+      _logs = logRows.map(_logFromRow).toList();
+      _loading = false;
+    });
+  }
+
+  Future<void> _reloadLogs() async {
+    final logRows = await widget.database.getCallLogs();
+    if (!mounted) return;
+    setState(() {
+      _logs = logRows.map(_logFromRow).toList();
+      _loading = false;
+    });
+  }
+
+  Future<void> _reloadReminders() async {
+    final reminderRows = await widget.database.getReminders();
+    if (!mounted) return;
+    setState(() {
+      _reminders = reminderRows.map(_reminderFromRow).toList();
+      _loading = false;
+    });
+  }
+
+  Future<void> _refreshNotificationStatus() async {
+    try {
+      final permissions = await _screeningChannel.checkPermissions();
+      if (!mounted) return;
+      setState(() => _notificationsGranted = permissions.notificationsGranted);
+      if (permissions.notificationsGranted) {
+        await _screeningChannel.restorePendingReminders();
+      }
+    } on PlatformException {
+      // Non-Android platforms do not expose Android notification permissions.
+    } on MissingPluginException {
+      // The status check is provided by the Android MethodChannel.
+    }
+  }
+
+  Future<void> _requestNotificationAccess() async {
+    try {
+      final granted = await _screeningChannel.requestNotificationPermission();
+      if (granted) {
+        await widget.database.setSetting(
+          'notification_permission_prompted',
+          true,
+        );
+        await _screeningChannel.restorePendingReminders();
+      }
+    } on PlatformException {
+      // Refresh below displays the effective setting after returning from Android settings.
+    } on MissingPluginException {
+      // Notification permission requests are available only on Android.
+    }
+    await _refreshNotificationStatus();
+  }
+
+  Reminder _reminderFromRow(Map<String, Object?> row) => Reminder(
+    id: row['id'] as int,
+    phone: row['phone'] as String,
+    contactName: row['contact_name'] as String? ?? '',
+    remindAt: row['remind_at'] as int,
+    note: row['note'] as String? ?? '',
+    isDone: (row['is_done'] as int? ?? 0) != 0,
+    repeatType: row['repeat_type'] as String? ?? 'none',
+    repeatInterval: (row['repeat_interval'] as int? ?? 1).clamp(1, 365).toInt(),
+  );
+
+  CallLogEntry _logFromRow(Map<String, Object?> row) => CallLogEntry(
+    id: row['id'] as int,
+    phone: row['phone'] as String,
+    reason: row['reason'] as String,
+    timestamp: row['timestamp'] as int,
+  );
+
+  String _dateTimeLabel(int timestamp) {
+    final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final reminderDay = DateTime(date.year, date.month, date.day);
+    final difference = reminderDay.difference(today).inDays;
+    final dayLabel = switch (difference) {
+      0 => widget.strings.call('today'),
+      1 => widget.strings.call('tomorrow'),
+      -1 => widget.strings.call('yesterday'),
+      _ => _dateLabel(date),
+    };
+    return '$dayLabel · ${_timeLabel(TimeOfDay.fromDateTime(date))}';
+  }
+
+  String? _repeatLabel(Reminder reminder) => switch (reminder.repeatType) {
+    'daily' => widget.strings.call('repeatDaily'),
+    'weekly' => widget.strings.call('repeatWeekly'),
+    'custom' =>
+      widget.strings
+          .call('repeatEveryDays')
+          .replaceAll('{count}', reminder.repeatInterval.toString()),
+    _ => null,
+  };
+
+  Future<void> _toggleReminder(Reminder reminder) async {
+    final id = reminder.id;
+    if (id == null) return;
+    final isDone = !reminder.isDone;
+    await widget.database.updateReminderDone(id, isDone);
+    try {
+      if (isDone) {
+        await _screeningChannel.cancelReminder(id);
+      } else if (reminder.remindAt > DateTime.now().millisecondsSinceEpoch) {
+        await _screeningChannel.scheduleReminder(
+          id: id,
+          remindAt: reminder.remindAt,
+        );
+      }
+    } on PlatformException {
+      // The database remains authoritative if AlarmManager is unavailable.
+    } on MissingPluginException {
+      // Scheduling is available only on Android.
+    }
+    await _reload();
+  }
+
+  Future<void> _deleteReminder(Reminder reminder) async {
+    final id = reminder.id;
+    if (id == null) return;
+    try {
+      await _screeningChannel.cancelReminder(id);
+    } on PlatformException {
+      // Still remove the database row if the native scheduler cannot be reached.
+    } on MissingPluginException {
+      // Scheduling is available only on Android.
+    }
+    await widget.database.deleteReminder(id);
+    await _reload();
+  }
+
+  Future<void> _editReminderTime(Reminder reminder) async {
+    final id = reminder.id;
+    if (id == null) return;
+    final current = DateTime.fromMillisecondsSinceEpoch(reminder.remindAt);
+    final selectedDate = await showDatePicker(
+      context: context,
+      initialDate: current,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now().add(const Duration(days: 3650)),
+    );
+    if (selectedDate == null || !mounted) return;
+    final selectedTime = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(current),
+    );
+    if (selectedTime == null || !mounted) return;
+    final repeatRule = await _pickRepeatRule(
+      repeatType: reminder.repeatType,
+      repeatInterval: reminder.repeatInterval,
+    );
+    if (repeatRule == null || !mounted) return;
+
+    final updatedReminderAt = DateTime(
+      selectedDate.year,
+      selectedDate.month,
+      selectedDate.day,
+      selectedTime.hour,
+      selectedTime.minute,
+    ).millisecondsSinceEpoch;
+    await widget.database.updateReminderSchedule(
+      id: id,
+      remindAt: updatedReminderAt,
+      repeatType: repeatRule.type,
+      repeatInterval: repeatRule.interval,
+    );
+    try {
+      if (reminder.isDone) {
+        await _screeningChannel.cancelReminder(id);
+      } else {
+        await _screeningChannel.scheduleReminder(
+          id: id,
+          remindAt: updatedReminderAt,
+        );
+      }
+    } on PlatformException {
+      // The saved date is restored and re-scheduled when the app starts.
+    } on MissingPluginException {
+      // AlarmManager scheduling is available only on Android.
+    }
+    await _reloadReminders();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text(widget.strings.call('reminderTimeUpdated'))),
+      );
+  }
+
+  Future<RepeatRule?> _pickRepeatRule({
+    required String repeatType,
+    required int repeatInterval,
+  }) async {
+    var selectedType = repeatType;
+    final intervalController = TextEditingController(
+      text: repeatInterval.clamp(1, 365).toString(),
+    );
+    final dialogRoute = DialogRoute<RepeatRule>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(widget.strings.call('repeatTitle')),
+          content: RepeatFields(
+            strings: widget.strings,
+            repeatType: selectedType,
+            intervalController: intervalController,
+            onRepeatTypeChanged: (value) =>
+                setDialogState(() => selectedType = value),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(widget.strings.call('cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(
+                dialogContext,
+                RepeatRule(
+                  type: selectedType,
+                  interval: selectedType == 'custom'
+                      ? _repeatIntervalValue(intervalController.text)
+                      : 1,
+                ),
+              ),
+              child: Text(widget.strings.call('save')),
+            ),
+          ],
+        ),
+      ),
+    );
+    final result = await Navigator.of(
+      context,
+      rootNavigator: true,
+    ).push(dialogRoute);
+    await dialogRoute.completed;
+    intervalController.dispose();
+    return result;
+  }
+
+  int _repeatIntervalValue(String raw) =>
+      (int.tryParse(raw) ?? 1).clamp(1, 365).toInt();
+
+  Future<void> _dialReminder(String phoneNumber) async {
+    try {
+      await _screeningChannel.openDialer(phoneNumber);
+    } on PlatformException {
+      widget.onStub();
+    } on MissingPluginException {
+      widget.onStub();
+    }
+  }
+
+  Future<void> _requestNotificationPermissionOnce() async {
+    final settings = await widget.database.getSettings();
+    if (settings['notification_permission_prompted'] == 'true') return;
+
+    var granted = false;
+    try {
+      granted = await _screeningChannel.requestNotificationPermission();
+    } on PlatformException {
+      // Reminders remain scheduled even if notifications cannot be authorized.
+    } on MissingPluginException {
+      // Notification permission requests are available only on Android.
+    }
+    await widget.database.setSetting('notification_permission_prompted', true);
+    await _refreshNotificationStatus();
+    if (!granted && mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(widget.strings.call('notificationsPermissionNeeded')),
+          ),
+        );
+    }
+  }
+
+  Future<void> _addLogPhone(String phone) async {
+    if (phone.startsWith('@')) {
+      widget.onStub();
+      return;
+    }
+    await widget.database.insertPhoneRule(
+      phone: phone,
+      label: null,
+      listType: 'white',
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text(widget.strings.call('allowlistAdded'))),
+      );
+  }
+
+  Future<void> _deleteCallLog(CallLogEntry entry) async {
+    await widget.database.deleteCallLog(entry.id);
+    await _reloadLogs();
+  }
+
+  Future<void> _confirmClearCallLogs() async {
+    if (_logs.isEmpty) return;
+    final shouldClear = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: Icon(
+          Icons.delete_sweep_outlined,
+          color: AppPalette.accent(AppPalette.red),
+        ),
+        title: Text(widget.strings.call('clearJournalTitle')),
+        content: Text(widget.strings.call('clearJournalMessage')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(widget.strings.call('cancel')),
+          ),
+          FilledButton.tonal(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(widget.strings.call('clearJournalConfirm')),
+          ),
+        ],
+      ),
+    );
+    if (shouldClear != true || !mounted) return;
+    await widget.database.clearCallLogs();
+    await _reloadLogs();
+  }
+
+  Future<void> _createReminder() async {
+    final phoneController = TextEditingController();
+    final contactNameController = TextEditingController();
+    final noteController = TextEditingController();
+    final repeatIntervalController = TextEditingController(text: '3');
+    var repeatType = 'none';
+    var selectedDate = DateTime.now().add(const Duration(days: 1));
+    var selectedTime = const TimeOfDay(hour: 9, minute: 0);
+
+    final dialogRoute = DialogRoute<Reminder>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          icon: const Icon(
+            Icons.notifications_active_outlined,
+            color: AppPalette.blue,
+          ),
+          title: Text(widget.strings.call('newReminderTitle')),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    labelText: widget.strings.call('phoneNumber'),
+                    hintText: widget.strings.call('phoneNumberHint'),
+                    prefixIcon: Icon(Icons.phone_outlined),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: contactNameController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: InputDecoration(
+                    labelText: widget.strings.call('optionalName'),
+                    hintText: widget.strings.call('nameExample'),
+                    prefixIcon: Icon(Icons.person_outline_rounded),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final contact = await pickContactFromPhoneBook(
+                      context: dialogContext,
+                      strings: widget.strings,
+                      channel: _screeningChannel,
+                    );
+                    if (contact == null || !dialogContext.mounted) return;
+                    phoneController.text = contact.phone ?? '';
+                    contactNameController.text = contact.name ?? '';
+                  },
+                  icon: const Icon(Icons.contacts_outlined, size: 18),
+                  label: Text(widget.strings.call('pickFromContacts')),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final date = await showDatePicker(
+                            context: context,
+                            initialDate: selectedDate,
+                            firstDate: DateTime.now(),
+                            lastDate: DateTime.now().add(
+                              const Duration(days: 365),
+                            ),
+                          );
+                          if (date != null)
+                            setDialogState(() => selectedDate = date);
+                        },
+                        icon: const Icon(
+                          Icons.calendar_today_outlined,
+                          size: 16,
+                        ),
+                        label: Text(_dateLabel(selectedDate)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton(
+                      onPressed: () async {
+                        final time = await showTimePicker(
+                          context: context,
+                          initialTime: selectedTime,
+                        );
+                        if (time != null)
+                          setDialogState(() => selectedTime = time);
+                      },
+                      child: Text(_timeLabel(selectedTime)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SectionHeading(
+                  title: widget.strings.call('repeatTitle'),
+                  subtitle: widget.strings.call('repeatHint'),
+                ),
+                const SizedBox(height: 6),
+                RepeatFields(
+                  strings: widget.strings,
+                  repeatType: repeatType,
+                  intervalController: repeatIntervalController,
+                  onRepeatTypeChanged: (value) =>
+                      setDialogState(() => repeatType = value),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: noteController,
+                  textCapitalization: TextCapitalization.sentences,
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    labelText: widget.strings.call('note'),
+                    hintText: widget.strings.call('noteHint'),
+                    prefixIcon: Icon(Icons.edit_note_rounded),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(widget.strings.call('cancel')),
+            ),
+            FilledButton(
+              onPressed: () {
+                final phone = phoneController.text.trim();
+                if (phone.isEmpty) return;
+                Navigator.pop(
+                  dialogContext,
+                  Reminder(
+                    phone: phone,
+                    contactName: contactNameController.text.trim().isEmpty
+                        ? '@reminderNew'
+                        : contactNameController.text.trim(),
+                    remindAt: DateTime(
+                      selectedDate.year,
+                      selectedDate.month,
+                      selectedDate.day,
+                      selectedTime.hour,
+                      selectedTime.minute,
+                    ).millisecondsSinceEpoch,
+                    note: noteController.text.trim().isEmpty
+                        ? '@reminderNewNote'
+                        : noteController.text.trim(),
+                    repeatType: repeatType,
+                    repeatInterval: repeatType == 'custom'
+                        ? _repeatIntervalValue(repeatIntervalController.text)
+                        : 1,
+                  ),
+                );
+              },
+              child: Text(widget.strings.call('create')),
+            ),
+          ],
+        ),
+      ),
+    );
+    final result = await Navigator.of(
+      context,
+      rootNavigator: true,
+    ).push(dialogRoute);
+    await dialogRoute.completed;
+
+    phoneController.dispose();
+    contactNameController.dispose();
+    noteController.dispose();
+    repeatIntervalController.dispose();
+    if (result != null && mounted) {
+      final reminderId = await widget.database.insertReminder(
+        phone: result.phone,
+        contactName: result.contactName,
+        remindAt: result.remindAt,
+        note: result.note,
+        repeatType: result.repeatType,
+        repeatInterval: result.repeatInterval,
+      );
+      await _requestNotificationPermissionOnce();
+      try {
+        await _screeningChannel.scheduleReminder(
+          id: reminderId,
+          remindAt: result.remindAt,
+        );
+      } on PlatformException {
+        // The reminder is persisted and can still be scheduled after app restart.
+      } on MissingPluginException {
+        // AlarmManager scheduling is available only on Android.
+      }
+      await _reload();
+    }
+  }
+
+  String _dateLabel(DateTime date) =>
+      '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
+
+  String _timeLabel(TimeOfDay time) =>
+      '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+
+  @override
+  Widget build(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: _reload,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
+        children: [
+          PageIntro(
+            eyebrow: widget.strings.call('moreEyebrow'),
+            title: widget.strings.moreTitle,
+            subtitle: widget.strings.call('moreSubtitle'),
+          ),
+          const SizedBox(height: 17),
+          const SizedBox(height: 8),
+          SegmentedButton<int>(
+            showSelectedIcon: false,
+            segments: [
+              ButtonSegment<int>(
+                value: 0,
+                icon: Icon(Icons.notifications_none_rounded, size: 17),
+                label: Text(widget.strings.call('remindersSegment')),
+              ),
+              ButtonSegment<int>(
+                value: 1,
+                icon: Icon(Icons.receipt_long_outlined, size: 17),
+                label: Text(widget.strings.call('journalSegment')),
+              ),
+            ],
+            selected: {_segment},
+            onSelectionChanged: (selection) {
+              setState(() => _segment = selection.first);
+              if (selection.first == 1) unawaited(_reloadLogs());
+            },
+            style: ButtonStyle(
+              textStyle: const WidgetStatePropertyAll(
+                TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+              ),
+              padding: const WidgetStatePropertyAll(
+                EdgeInsets.symmetric(horizontal: 5, vertical: 13),
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          if (_segment == 0) ..._reminderContent() else ..._journalContent(),
+          const SizedBox(height: 14),
+          PrototypeFootnote(label: widget.strings.call('prototypeFootnote')),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _reminderContent() => [
+    if (!_notificationsGranted) ...[
+      Container(
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          color: AppPalette.accentSurface(AppPalette.amber),
+          borderRadius: BorderRadius.circular(19),
+          border: Border.all(
+            color: AppPalette.accent(AppPalette.amber).withValues(alpha: 0.35),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.notifications_off_outlined,
+                  color: AppPalette.accent(AppPalette.amber),
+                  size: 21,
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    widget.strings.call('notificationReminderBanner'),
+                    style: TextStyle(
+                      color: AppPalette.ink,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 11),
+            FilledButton.icon(
+              onPressed: _requestNotificationAccess,
+              icon: const Icon(Icons.notifications_active_outlined, size: 17),
+              label: Text(widget.strings.call('grantNotificationPermission')),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 14),
+    ],
+    SectionHeading(
+      title: widget.strings.call('scheduledCalls'),
+      subtitle: widget.strings.call('remindersLocalHint'),
+    ),
+    const SizedBox(height: 11),
+    if (_loading)
+      const Center(child: CircularProgressIndicator())
+    else if (_reminders.isEmpty)
+      EmptyState(label: widget.strings.call('noReminders'))
+    else
+      ..._reminders.map(
+        (reminder) => Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: ReminderCard(
+            reminder: reminder,
+            strings: widget.strings,
+            dateLabel: _dateTimeLabel(reminder.remindAt),
+            repeatLabel: _repeatLabel(reminder),
+            onCall: () => _dialReminder(reminder.phone),
+            onEditTime: () => _editReminderTime(reminder),
+            onToggleDone: () => _toggleReminder(reminder),
+            onDelete: () => _deleteReminder(reminder),
+          ),
+        ),
+      ),
+    const SizedBox(height: 2),
+    FilledButton.icon(
+      onPressed: _createReminder,
+      icon: const Icon(Icons.add_rounded),
+      label: Text(widget.strings.call('createReminder')),
+      style: FilledButton.styleFrom(
+        minimumSize: const Size.fromHeight(51),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
+        textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+      ),
+    ),
+  ];
+
+  List<Widget> _journalContent() => [
+    Row(
+      children: [
+        Expanded(
+          child: SectionHeading(
+            title: widget.strings.call('recentBlocks'),
+            subtitle: widget.strings.call('journalDemoHint'),
+          ),
+        ),
+        IconButton(
+          tooltip: widget.strings.call('refresh'),
+          onPressed: _reloadLogs,
+          icon: const Icon(Icons.refresh_rounded),
+        ),
+      ],
+    ),
+    if (_logs.isNotEmpty)
+      Align(
+        alignment: Alignment.centerRight,
+        child: TextButton.icon(
+          onPressed: _confirmClearCallLogs,
+          icon: const Icon(Icons.delete_sweep_outlined, size: 17),
+          label: Text(widget.strings.call('clearJournal')),
+          style: TextButton.styleFrom(
+            foregroundColor: AppPalette.accent(AppPalette.red),
+            visualDensity: VisualDensity.compact,
+          ),
+        ),
+      ),
+    const SizedBox(height: 11),
+    if (_loading)
+      const Center(child: CircularProgressIndicator())
+    else if (_logs.isEmpty)
+      EmptyState(label: widget.strings.call('noLogs'))
+    else
+      ..._logs.map((entry) {
+        final tint = switch (entry.reason) {
+          'reasonCountry' => AppPalette.red,
+          'reasonHidden' => AppPalette.amber,
+          'reasonSilence' => const Color(0xFF7663D9),
+          _ => AppPalette.blue,
+        };
+        final icon = switch (entry.reason) {
+          'reasonCountry' => Icons.public_rounded,
+          'reasonHidden' => Icons.visibility_off_outlined,
+          'reasonSilence' => Icons.notifications_off_outlined,
+          _ => Icons.block_rounded,
+        };
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: JournalCard(
+            strings: widget.strings,
+            phone: localizedValue(widget.strings, entry.phone),
+            caption: _dateTimeLabel(entry.timestamp),
+            reason: localizedValue(widget.strings, entry.reason),
+            tint: tint,
+            pale: AppPalette.accentSurface(tint),
+            icon: icon,
+            onDelete: () => _deleteCallLog(entry),
+            onAdd: () => _addLogPhone(entry.phone),
+            addLabel: widget.strings.call('addToAllowlist'),
+          ),
+        );
+      }),
+  ];
+}
