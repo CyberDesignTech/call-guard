@@ -21,11 +21,13 @@ class DatabaseHelper {
         _databasePath ?? path.join(await getDatabasesPath(), 'call_guard.db');
     final database = await openDatabase(
       databasePath,
-      version: 2,
+      version: 3,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
-      onUpgrade: (db, oldVersion, newVersion) =>
-          _ensureReminderRepeatColumns(db),
+      onUpgrade: (db, oldVersion, newVersion) async {
+        await _ensureReminderRepeatColumns(db);
+        if (oldVersion < 3) await _createIndexes(db);
+      },
       onOpen: _ensureReminderRepeatColumns,
     );
     _openedDatabase = database;
@@ -92,6 +94,7 @@ class DatabaseHelper {
         timestamp INTEGER NOT NULL
       )
     ''');
+    await _createIndexes(db);
 
     final settings = <String, String>{
       'locale': 'ukrainian',
@@ -237,6 +240,36 @@ class DatabaseHelper {
     });
 
     await batch.commit(noResult: true);
+  }
+
+  Future<void> _createIndexes(DatabaseExecutor db) async {
+    final tables = (await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table'",
+    )).map((row) => row['name'] as String?).whereType<String>().toSet();
+    if (tables.contains('phone_rules')) {
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_phone_rules_list_type '
+        'ON phone_rules(list_type)',
+      );
+    }
+    if (tables.contains('operator_rules')) {
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_operator_rules_country_id '
+        'ON operator_rules(country_iso)',
+      );
+    }
+    if (tables.contains('call_reminders')) {
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_call_reminders_pending '
+        'ON call_reminders(is_done, remind_at)',
+      );
+    }
+    if (tables.contains('call_logs')) {
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_call_logs_timestamp '
+        'ON call_logs(timestamp)',
+      );
+    }
   }
 
   Future<void> _ensureReminderRepeatColumns(DatabaseExecutor db) async {
@@ -453,6 +486,14 @@ class DatabaseHelper {
       (await _database).delete('call_logs', where: 'id = ?', whereArgs: [id]);
 
   Future<int> clearCallLogs() async => (await _database).delete('call_logs');
+
+  /// Exposes created index names so tests can verify schema and migrations.
+  Future<Set<String>> getIndexNamesForTesting() async {
+    final rows = await (await _database).rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE 'idx_%'",
+    );
+    return rows.map((row) => row['name']! as String).toSet();
+  }
 
   Future<void> close() async {
     final database = _openedDatabase;

@@ -130,6 +130,10 @@ class CallRuleEngine(context: Context) {
             return verdict(false, "blacklist", canonicalPhone)
         }
 
+        if (settings.bool("allow_only_whitelist", false)) {
+            return verdict(false, "allowlist_only", canonicalPhone.ifBlank { rawPhone })
+        }
+
         return verdict(true, "default_allow", canonicalPhone.ifBlank { rawPhone })
     }
 

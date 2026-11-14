@@ -14,4 +14,5 @@
     <string name="reminder_note_meeting">Wegen des Treffens zurückrufen</string>
     <string name="reminder_note_check">Nachricht prüfen</string>
     <string name="reminder_note_new">Zurückrufen</string>
+    <string name="allowlist_only">Nur Erlaubnisliste</string>
 </resources>

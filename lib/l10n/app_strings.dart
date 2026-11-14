@@ -36,7 +36,7 @@ class AppStrings {
 
   final AppLanguage language;
 
-  static Set<String> get keys => _values.values.first.keys.toSet();
+  static final Set<String> keys = _values.values.first.keys.toSet();
 
   static const _values = <AppLanguage, Map<String, String>>{
     AppLanguage.ukrainian: {
@@ -98,7 +98,6 @@ class AppStrings {
       'testBody':
           'Введіть номер, щоб перевірити його за поточними правилами захисту.',
       'closeLabel': 'Зрозуміло',
-      'testRuleButton': 'Перевірити',
       'homeEyebrow': 'Ваш спокій під контролем',
       'quickHiddenTitle': 'Приховані номери',
       'quickHiddenSubtitle': 'Невідомі / приватні номери',
@@ -287,6 +286,7 @@ class AppStrings {
       'refresh': 'Оновити журнал',
       'protection_disabled': 'Захист вимкнено',
       'allowlist': 'Білий список',
+      'allowlist_only': 'Лише білий список',
       'silent_schedule': 'Режим тиші',
       'hidden_number': 'Прихований номер',
       'not_in_contacts': 'Немає в контактах',
@@ -367,7 +367,6 @@ class AppStrings {
       'testBody':
           'Enter a number to check it against your current protection rules.',
       'closeLabel': 'Got it',
-      'testRuleButton': 'Test rule',
       'homeEyebrow': 'YOUR PEACE OF MIND, UNDER CONTROL',
       'quickHiddenTitle': 'Hidden numbers',
       'quickHiddenSubtitle': 'Unknown / private numbers',
@@ -556,6 +555,7 @@ class AppStrings {
       'refresh': 'Refresh call log',
       'protection_disabled': 'Protection is turned off',
       'allowlist': 'Allowlist',
+      'allowlist_only': 'Allowlist only',
       'silent_schedule': 'Silence mode',
       'hidden_number': 'Hidden number',
       'not_in_contacts': 'Not in contacts',
@@ -636,7 +636,6 @@ class AppStrings {
       'testBody':
           'Wpisz numer, aby sprawdzić go według bieżących reguł ochrony.',
       'closeLabel': 'Rozumiem',
-      'testRuleButton': 'Testuj regułę',
       'homeEyebrow': 'TWÓJ SPOKÓJ JEST POD OCHRONĄ',
       'quickHiddenTitle': 'Numery ukryte',
       'quickHiddenSubtitle': 'Nieznane / prywatne numery',
@@ -826,6 +825,7 @@ class AppStrings {
       'refresh': 'Odśwież rejestr',
       'protection_disabled': 'Ochrona jest wyłączona',
       'allowlist': 'Biała lista',
+      'allowlist_only': 'Tylko biała lista',
       'silent_schedule': 'Tryb ciszy',
       'hidden_number': 'Numer ukryty',
       'not_in_contacts': 'Brak w kontaktach',
@@ -905,7 +905,6 @@ class AppStrings {
       'testTitle': 'Testanruf',
       'testBody': 'Geben Sie eine Nummer ein, um sie mit den aktuellen Schutzregeln zu prüfen.',
       'closeLabel': 'Verstanden',
-      'testRuleButton': 'Regel testen',
       'homeEyebrow': 'IHR RUHEGEFÜHL IST GESCHÜTZT',
       'quickHiddenTitle': 'Verborgene Nummern',
       'quickHiddenSubtitle': 'Unbekannte / private Nummern',
@@ -1096,6 +1095,7 @@ class AppStrings {
       'refresh': 'Anrufprotokoll aktualisieren',
       'protection_disabled': 'Schutz ist deaktiviert',
       'allowlist': 'Erlaubnisliste',
+      'allowlist_only': 'Nur Erlaubnisliste',
       'silent_schedule': 'Ruhemodus',
       'hidden_number': 'Verborgene Nummer',
       'not_in_contacts': 'Nicht in Kontakten',
@@ -1174,7 +1174,6 @@ class AppStrings {
       'testTitle': 'Llamada de prueba',
       'testBody': 'Introduce un número para comprobarlo con las reglas de protección actuales.',
       'closeLabel': 'Entendido',
-      'testRuleButton': 'Probar regla',
       'homeEyebrow': 'TU TRANQUILIDAD, PROTEGIDA',
       'quickHiddenTitle': 'Números ocultos',
       'quickHiddenSubtitle': 'Números desconocidos o privados',
@@ -1368,6 +1367,7 @@ class AppStrings {
       'refresh': 'Actualizar registro',
       'protection_disabled': 'La protección está desactivada',
       'allowlist': 'Lista permitida',
+      'allowlist_only': 'Solo lista permitida',
       'silent_schedule': 'Modo silencio',
       'hidden_number': 'Número oculto',
       'not_in_contacts': 'No está en contactos',
@@ -1448,7 +1448,6 @@ class AppStrings {
       'testTitle': 'Appel test',
       'testBody': 'Saisissez un numéro pour le vérifier avec les règles de protection actuelles.',
       'closeLabel': 'Compris',
-      'testRuleButton': 'Tester la règle',
       'homeEyebrow': 'VOTRE TRANQUILLITÉ EST PROTÉGÉE',
       'quickHiddenTitle': 'Numéros masqués',
       'quickHiddenSubtitle': 'Numéros inconnus / privés',
@@ -1643,6 +1642,7 @@ class AppStrings {
       'refresh': 'Actualiser le journal',
       'protection_disabled': 'Protection désactivée',
       'allowlist': 'Liste autorisée',
+      'allowlist_only': 'Liste autorisée uniquement',
       'silent_schedule': 'Mode silencieux',
       'hidden_number': 'Numéro masqué',
       'not_in_contacts': 'Absent des contacts',

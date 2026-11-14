@@ -61,6 +61,15 @@ void main() {
     expect(countries, hasLength(5));
     expect(await _testDatabase.getOperators('UA'), hasLength(3));
     expect(await _testDatabase.getPhoneRules('white'), hasLength(2));
+    expect(
+      await _testDatabase.getIndexNamesForTesting(),
+      containsAll(<String>[
+        'idx_phone_rules_list_type',
+        'idx_operator_rules_country_id',
+        'idx_call_reminders_pending',
+        'idx_call_logs_timestamp',
+      ]),
+    );
   });
 
   test('legacy reminder tables migrate and persist repeat rules', () async {
@@ -103,6 +112,10 @@ void main() {
 
     final migrated = DatabaseHelper.forTesting(databasePath: databasePath);
     await migrated.initialize();
+    expect(
+      await migrated.getIndexNamesForTesting(),
+      contains('idx_call_reminders_pending'),
+    );
     final legacyRow = (await migrated.getReminders()).firstWhere(
       (row) => row['phone'] == '+380671234567',
     );
@@ -256,6 +269,39 @@ void main() {
     }
   });
 
+  test('all languages use the same placeholders for every key', () {
+    final placeholder = RegExp(r'\{[^{}]+\}');
+    for (final key in AppStrings.keys) {
+      final expected = placeholder
+          .allMatches(AppStrings(AppLanguage.ukrainian).call(key))
+          .map((match) => match.group(0)!)
+          .toSet();
+      for (final language in AppLanguage.values) {
+        final actual = placeholder
+            .allMatches(AppStrings(language).call(key))
+            .map((match) => match.group(0)!)
+            .toSet();
+        expect(
+          actual,
+          expected,
+          reason: '${language.label}: $key placeholders differ',
+        );
+      }
+    }
+  });
+
+  test('allowlist-only verdict is localized in every language', () {
+    for (final language in AppLanguage.values) {
+      final strings = AppStrings(language);
+      expect(strings.call('allowlist_only'), isNotEmpty);
+      expect(
+        strings.call('allowlist_only'),
+        isNot(strings.call('allowlist')),
+        reason: '${language.label}: allowlist-only reason must be distinct',
+      );
+    }
+  });
+
   test(
     'reminder bridge forwards scheduling and notification methods',
     () async {
@@ -343,6 +389,39 @@ void main() {
       expect(find.text('Дозвіл на сповіщення'), findsOneWidget);
     },
   );
+
+  testWidgets('contacts permission row explains missing access', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    const channel = MethodChannel('com.wepr.callguard/screening');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'checkPermissions') {
+        return {
+          'roleAvailable': true,
+          'callScreeningRole': true,
+          'readContacts': false,
+          'notificationsGranted': true,
+        };
+      }
+      return true;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    await pumpApp(tester);
+    await waitForText(tester, 'Потрібен дозвіл для перевірки контактів');
+    expect(
+      find.text('Потрібен дозвіл для перевірки контактів'),
+      findsOneWidget,
+    );
+    expect(find.text('Системну роль не надано'), findsNothing);
+  });
 
   testWidgets('reminder cards display custom repeat badges', (tester) async {
     const channel = MethodChannel('com.wepr.callguard/screening');
@@ -559,6 +638,44 @@ void main() {
     expect(find.text('Причина: Чорний список'), findsOneWidget);
   });
 
+  testWidgets('renders the allowlist-only rejection reason', (tester) async {
+    const channel = MethodChannel('com.wepr.callguard/screening');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'checkPermissions') {
+        return {
+          'roleAvailable': true,
+          'callScreeningRole': false,
+          'readContacts': false,
+        };
+      }
+      if (call.method == 'simulateCall') {
+        return {
+          'verdict': 'REJECT',
+          'reason': 'allowlist_only',
+          'phoneNumber': '+49 151 1234567',
+        };
+      }
+      return null;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    await pumpApp(tester);
+    await tester.drag(find.byType(ListView).first, const Offset(0, -1200));
+    await tester.pumpAndSettle();
+    final testButton = find.text('Тестовий виклик (перевірка правила)');
+    await tester.ensureVisible(testButton);
+    await tester.tap(testButton);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '+49 151 1234567');
+    await tester.tap(find.text('Перевірити номер'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Відхилити виклик'), findsOneWidget);
+    expect(find.text('Причина: Лише білий список'), findsOneWidget);
+  });
+
   testWidgets('granted screening role can be changed from system settings', (
     tester,
   ) async {
@@ -640,7 +757,7 @@ void main() {
     await tester.tap(aboutMenuItem);
     await tester.pumpAndSettle();
     expect(find.text('Call Guard'), findsOneWidget);
-    expect(find.textContaining('v0.2.0-db'), findsOneWidget);
+    expect(find.textContaining('v1.1.0'), findsOneWidget);
     expect(find.textContaining('не надсилаються на сервер'), findsOneWidget);
 
     await tester.tap(find.text('Зрозуміло'));
@@ -696,6 +813,7 @@ void main() {
     await waitForText(tester, 'Країни та оператори');
     await tester.tap(find.text('Країни та оператори'));
     await waitForText(tester, 'Україна');
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Україна'));
     await tester.pumpAndSettle();
 

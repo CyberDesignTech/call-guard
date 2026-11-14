@@ -14,4 +14,5 @@
     <string name="reminder_note_meeting">Devolver llamada sobre la reunión</string>
     <string name="reminder_note_check">Revisar el mensaje</string>
     <string name="reminder_note_new">Devolver llamada</string>
+    <string name="allowlist_only">Solo lista permitida</string>
 </resources>

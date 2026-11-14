@@ -14,4 +14,5 @@
     <string name="reminder_note_meeting">Передзвонити щодо зустрічі</string>
     <string name="reminder_note_check">Перевірити повідомлення</string>
     <string name="reminder_note_new">Передзвонити</string>
+    <string name="allowlist_only">Лише білий список</string>
 </resources>

@@ -58,6 +58,9 @@ object CallReminderScheduler {
             context,
             includeFiredOneTime = afterBoot,
         ).forEach { reminder ->
+            if (reminder.repeatType == "none" && reminder.lastFiredAt != null) {
+                return@forEach
+            }
             if (afterBoot && reminder.repeatType != "none" && reminder.remindAt <= now) {
                 val next = ReminderRepeatPolicy.nextOccurrence(reminder, now) ?: return@forEach
                 if (CallReminderStore.updateReminderSchedule(

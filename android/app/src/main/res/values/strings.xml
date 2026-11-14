@@ -14,4 +14,5 @@
     <string name="reminder_note_meeting">Call back about the meeting</string>
     <string name="reminder_note_check">Check the message</string>
     <string name="reminder_note_new">Call back</string>
+    <string name="allowlist_only">Allowlist only</string>
 </resources>

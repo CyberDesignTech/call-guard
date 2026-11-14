@@ -141,6 +141,7 @@ object CallReminderStore {
             null,
             SQLiteDatabase.OPEN_READWRITE,
         )
+        database.rawQuery("PRAGMA busy_timeout = 3000", null).use { }
         ensureRepeatColumns(database)
         return database
     }

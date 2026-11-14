@@ -135,11 +135,6 @@ class _CallGuardAppState extends State<CallGuardApp>
   String _answeringScenario = 'quiet_mode';
   bool _answeringLocalNotification = true;
   Future<void> _pendingSettingsWrites = Future<void>.value();
-  List<Map<String, Object?>> _phoneRules = [];
-  List<Map<String, Object?>> _countries = [];
-  List<Map<String, Object?>> _operators = [];
-  List<Map<String, Object?>> _reminders = [];
-  List<Map<String, Object?>> _callLogs = [];
 
   @override
   void initState() {
@@ -170,12 +165,6 @@ class _CallGuardAppState extends State<CallGuardApp>
         // Keep the local app usable on platforms without the Android channel.
       }
       final settings = await widget.database.getSettings();
-      final whiteRules = await widget.database.getPhoneRules('white');
-      final blackRules = await widget.database.getPhoneRules('black');
-      final countries = await widget.database.getCountries();
-      final operators = await widget.database.getAllOperators();
-      final reminders = await widget.database.getReminders();
-      final callLogs = await widget.database.getCallLogs();
       AppLanguage parseLanguage(String? value) =>
           AppLanguage.values
               .where((language) => language.name == value)
@@ -220,11 +209,6 @@ class _CallGuardAppState extends State<CallGuardApp>
           'answering_local_notification',
           true,
         );
-        _phoneRules = [...whiteRules, ...blackRules];
-        _countries = countries;
-        _operators = operators;
-        _reminders = reminders;
-        _callLogs = callLogs;
         _ready = true;
       });
     } catch (error, stackTrace) {
@@ -410,11 +394,6 @@ class _CallGuardAppState extends State<CallGuardApp>
                 setState(() => _answeringLocalNotification = value);
                 _persistSetting('answering_local_notification', value);
               },
-              phoneRules: _phoneRules,
-              countries: _countries,
-              operators: _operators,
-              reminders: _reminders,
-              callLogs: _callLogs,
               themeMode: _themeMode,
               language: _language,
               strings: strings,
@@ -454,11 +433,6 @@ class _CallGuardShell extends StatefulWidget {
     required this.onAnsweringScenarioChanged,
     required this.answeringLocalNotification,
     required this.onAnsweringLocalNotificationChanged,
-    required this.phoneRules,
-    required this.countries,
-    required this.operators,
-    required this.reminders,
-    required this.callLogs,
     required this.themeMode,
     required this.language,
     required this.strings,
@@ -493,11 +467,6 @@ class _CallGuardShell extends StatefulWidget {
   final ValueChanged<String> onAnsweringScenarioChanged;
   final bool answeringLocalNotification;
   final ValueChanged<bool> onAnsweringLocalNotificationChanged;
-  final List<Map<String, Object?>> phoneRules;
-  final List<Map<String, Object?>> countries;
-  final List<Map<String, Object?>> operators;
-  final List<Map<String, Object?>> reminders;
-  final List<Map<String, Object?>> callLogs;
   final ThemeMode themeMode;
   final AppLanguage language;
   final AppStrings strings;
@@ -1087,6 +1056,7 @@ class _SystemCallPermissionsCardState extends State<_SystemCallPermissionsCard>
             grantedLabel: widget.strings.call('contactsGranted'),
             actionLabel: widget.strings.call('grantContacts'),
             onRequest: _requestContacts,
+            missingLabel: 'contactsMissing',
           ),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 10),
@@ -1150,7 +1120,7 @@ class _ProfileSettingsSheetState extends State<_ProfileSettingsSheet> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              '${widget.strings.call('versionLabel')}  v0.2.0-db',
+              '${widget.strings.call('versionLabel')}  v1.1.0',
               style: TextStyle(
                 color: _Palette.accent(_Palette.blue),
                 fontWeight: FontWeight.w800,
@@ -2154,12 +2124,23 @@ class _CountryOperatorsPageState extends State<_CountryOperatorsPage> {
   }
 
   Future<void> _loadCountries() async {
-    final rows = await widget.database.getCountries();
+    final results = await Future.wait([
+      widget.database.getCountries(),
+      widget.database.getAllOperators(),
+    ]);
+    final countryRows = results[0];
+    final operatorRows = results[1];
+    final operatorsByCountry = <String, List<_OperatorEntry>>{};
+    for (final row in operatorRows) {
+      final isoCode = row['country_iso'] as String;
+      operatorsByCountry
+          .putIfAbsent(isoCode, () => <_OperatorEntry>[])
+          .add(_operatorFromRow(row));
+    }
     final countries = <_CountryEntry>[];
-    for (final row in rows) {
+    for (final row in countryRows) {
       final isoCode = row['iso_code'] as String;
       final customName = row['custom_name'] as String?;
-      final operatorRows = await widget.database.getOperators(isoCode);
       countries.add(
         _CountryEntry(
           isoCode: isoCode,
@@ -2168,7 +2149,7 @@ class _CountryOperatorsPageState extends State<_CountryOperatorsPage> {
           nameKey: customName == null ? row['name_key'] as String : null,
           code: row['dial_code'] as String,
           action: _ruleState(row['action'] as String),
-          operators: operatorRows.map(_operatorFromRow).toList(),
+          operators: operatorsByCountry[isoCode] ?? const <_OperatorEntry>[],
         ),
       );
     }
