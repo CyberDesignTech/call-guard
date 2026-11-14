@@ -4,7 +4,7 @@
     <string name="call_reminder_title">Recordatorio de llamada</string>
     <string name="call_reminder_action_call">Llamar</string>
     <string name="call_reminder_action_done">Hecho</string>
-    <string name="missed_call_channel_name">Llamadas perdidas</string>
+    <string name="missed_call_channel_name">Llamadas entrantes perdidas</string>
     <string name="missed_call_channel_description">Recordatorios locales para devolver llamadas</string>
     <string name="missed_call_title">Devolver llamada</string>
     <string name="missed_call_action_dial">Devolver llamada</string>

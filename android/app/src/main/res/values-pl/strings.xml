@@ -4,7 +4,7 @@
     <string name="call_reminder_title">Przypomnienie o połączeniu</string>
     <string name="call_reminder_action_call">Zadzwoń</string>
     <string name="call_reminder_action_done">Gotowe</string>
-    <string name="missed_call_channel_name">Nieodebrane połączenia</string>
+    <string name="missed_call_channel_name">Nieodebrane połączenia przychodzące</string>
     <string name="missed_call_channel_description">Lokalne przypomnienia o oddzwonieniu</string>
     <string name="missed_call_title">Oddzwoń</string>
     <string name="missed_call_action_dial">Oddzwoń</string>

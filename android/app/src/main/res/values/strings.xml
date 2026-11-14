@@ -4,7 +4,7 @@
     <string name="call_reminder_title">Call reminder</string>
     <string name="call_reminder_action_call">Call</string>
     <string name="call_reminder_action_done">Done</string>
-    <string name="missed_call_channel_name">Missed calls</string>
+    <string name="missed_call_channel_name">Missed incoming calls</string>
     <string name="missed_call_channel_description">Local reminders to call someone back</string>
     <string name="missed_call_title">Call back</string>
     <string name="missed_call_action_dial">Call back</string>

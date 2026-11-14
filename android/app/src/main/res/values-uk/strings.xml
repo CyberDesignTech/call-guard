@@ -4,7 +4,7 @@
     <string name="call_reminder_title">Нагадування про дзвінок</string>
     <string name="call_reminder_action_call">Подзвонити</string>
     <string name="call_reminder_action_done">Виконано</string>
-    <string name="missed_call_channel_name">Пропущені дзвінки</string>
+    <string name="missed_call_channel_name">Пропущені вхідні дзвінки</string>
     <string name="missed_call_channel_description">Локальні нагадування передзвонити</string>
     <string name="missed_call_title">Передзвонити</string>
     <string name="missed_call_action_dial">Передзвонити</string>

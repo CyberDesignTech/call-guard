@@ -89,6 +89,38 @@ class CallGuardShell extends StatefulWidget {
 
 class CallGuardShellState extends State<CallGuardShell> {
   AppSection _section = AppSection.home;
+  late final PageController _pageController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: _section.index);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _selectSection(AppSection section) {
+    if (_section != section) {
+      setState(() => _section = section);
+    }
+    if (_pageController.hasClients) {
+      final currentPage = _pageController.page?.round();
+      if (currentPage == section.index) return;
+      if (currentPage != null && (currentPage - section.index).abs() > 1) {
+        _pageController.jumpToPage(section.index);
+      } else {
+        _pageController.animateToPage(
+          section.index,
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeInOutCubic,
+        );
+      }
+    }
+  }
 
   void _showStub() {
     ScaffoldMessenger.of(context)
@@ -183,63 +215,73 @@ class CallGuardShellState extends State<CallGuardShell> {
           const SizedBox(width: 5),
         ],
       ),
-      body: switch (_section) {
-        AppSection.home => HomePage(
-          strings: widget.strings,
-          protectionEnabled: widget.protectionEnabled,
-          onProtectionChanged: widget.onProtectionChanged,
-          blockUnknown: widget.blockUnknown,
-          onBlockUnknownChanged: widget.onBlockUnknownChanged,
-          blockNonContacts: widget.blockNonContacts,
-          onBlockNonContactsChanged: widget.onBlockNonContactsChanged,
-          blockInternational: widget.blockInternational,
-          onBlockInternationalChanged: widget.onBlockInternationalChanged,
-          automaticSilence: widget.automaticSilence,
-          manualSilenceEnabled: widget.manualSilenceEnabled,
-          onManualSilenceChanged: widget.onManualSilenceChanged,
-          onOpenSchedule: () => setState(() => _section = AppSection.schedule),
-          onTest: _openTestDialog,
-        ),
-        AppSection.lists => ListsPage(
-          database: widget.database,
-          onStub: _showStub,
-          strings: widget.strings,
-        ),
-        AppSection.schedule => SchedulePage(
-          strings: widget.strings,
-          automaticSilence: widget.automaticSilence,
-          onAutomaticSilenceChanged: widget.onAutomaticSilenceChanged,
-          allowOnlyWhitelist: widget.allowOnlyWhitelist,
-          onAllowOnlyWhitelistChanged: widget.onAllowOnlyWhitelistChanged,
-          startTime: widget.silenceStart,
-          onStartTimeChanged: widget.onSilenceStartChanged,
-          endTime: widget.silenceEnd,
-          onEndTimeChanged: widget.onSilenceEndChanged,
-          selectedDays: widget.silenceWeekdays,
-          onSelectedDaysChanged: widget.onSilenceWeekdaysChanged,
-          onStub: _showStub,
-        ),
-        AppSection.answering => AnsweringModePage(
-          strings: widget.strings,
-          enabled: widget.answeringEnabled,
-          onEnabledChanged: widget.onAnsweringEnabledChanged,
-          scenario: widget.answeringScenario,
-          onScenarioChanged: widget.onAnsweringScenarioChanged,
-          localNotification: widget.answeringLocalNotification,
-          onLocalNotificationChanged:
-              widget.onAnsweringLocalNotificationChanged,
-        ),
-        AppSection.more => MorePage(
-          database: widget.database,
-          onStub: _showStub,
-          strings: widget.strings,
-        ),
-      },
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: (index) {
+          final section = AppSection.values[index];
+          if (_section != section) setState(() => _section = section);
+        },
+        children: [
+          HomePage(
+            strings: widget.strings,
+            protectionEnabled: widget.protectionEnabled,
+            onProtectionChanged: widget.onProtectionChanged,
+            blockUnknown: widget.blockUnknown,
+            onBlockUnknownChanged: widget.onBlockUnknownChanged,
+            blockNonContacts: widget.blockNonContacts,
+            onBlockNonContactsChanged: widget.onBlockNonContactsChanged,
+            blockInternational: widget.blockInternational,
+            onBlockInternationalChanged: widget.onBlockInternationalChanged,
+            automaticSilence: widget.automaticSilence,
+            manualSilenceEnabled: widget.manualSilenceEnabled,
+            onManualSilenceChanged: widget.onManualSilenceChanged,
+            onOpenSchedule: () => _selectSection(AppSection.schedule),
+            onTest: _openTestDialog,
+          ),
+          ListsPage(
+            database: widget.database,
+            onStub: _showStub,
+            strings: widget.strings,
+            onEdgeSwipe: (direction) => _selectSection(
+              AppSection.values[AppSection.lists.index + direction],
+            ),
+          ),
+          SchedulePage(
+            strings: widget.strings,
+            automaticSilence: widget.automaticSilence,
+            onAutomaticSilenceChanged: widget.onAutomaticSilenceChanged,
+            allowOnlyWhitelist: widget.allowOnlyWhitelist,
+            onAllowOnlyWhitelistChanged: widget.onAllowOnlyWhitelistChanged,
+            startTime: widget.silenceStart,
+            onStartTimeChanged: widget.onSilenceStartChanged,
+            endTime: widget.silenceEnd,
+            onEndTimeChanged: widget.onSilenceEndChanged,
+            selectedDays: widget.silenceWeekdays,
+            onSelectedDaysChanged: widget.onSilenceWeekdaysChanged,
+            onStub: _showStub,
+          ),
+          AnsweringModePage(
+            strings: widget.strings,
+            enabled: widget.answeringEnabled,
+            onEnabledChanged: widget.onAnsweringEnabledChanged,
+            scenario: widget.answeringScenario,
+            onScenarioChanged: widget.onAnsweringScenarioChanged,
+            localNotification: widget.answeringLocalNotification,
+            onLocalNotificationChanged:
+                widget.onAnsweringLocalNotificationChanged,
+          ),
+          MorePage(
+            database: widget.database,
+            onStub: _showStub,
+            strings: widget.strings,
+          ),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         height: 70,
         selectedIndex: _section.index,
         onDestinationSelected: (index) =>
-            setState(() => _section = AppSection.values[index]),
+            _selectSection(AppSection.values[index]),
         destinations: [
           NavigationDestination(
             icon: Icon(Icons.shield_outlined),

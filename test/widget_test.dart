@@ -43,7 +43,7 @@ void main() {
 
   Future<void> pumpApp(WidgetTester tester) async {
     await tester.pumpWidget(CallGuardApp(database: _testDatabase));
-    await waitForText(tester, 'Захист викликів');
+    await waitForText(tester, 'Захист вхідних дзвінків');
     await tester.pumpAndSettle();
   }
 
@@ -52,6 +52,12 @@ void main() {
       () => Future<void>.delayed(const Duration(milliseconds: 300)),
     );
     await tester.pump();
+  }
+
+  Future<void> finishSectionTransition(WidgetTester tester) async {
+    for (var frame = 0; frame < 5; frame++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
   }
 
   test('SQLite schema seeds settings, countries and operators', () async {
@@ -243,12 +249,37 @@ void main() {
   testWidgets('renders the Call Guard protection prototype', (tester) async {
     await pumpApp(tester);
 
-    expect(find.text('Захист викликів'), findsOneWidget);
+    expect(find.text('Захист вхідних дзвінків'), findsOneWidget);
     expect(find.text('Захист активний'), findsOneWidget);
     expect(find.byType(ShieldPhoneLogo), findsNWidgets(2));
     await tester.drag(find.byType(ListView).first, const Offset(0, -700));
     await tester.pumpAndSettle();
     expect(find.text('Швидкі правила'), findsOneWidget);
+  });
+
+  testWidgets('horizontal swipe changes the main navigation section', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+
+    await tester.drag(find.byType(PageView).first, const Offset(-450, 0));
+    await tester.pump(const Duration(milliseconds: 500));
+    await waitForText(tester, 'Мама');
+
+    expect(
+      tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+      1,
+    );
+    expect(find.text('Мама'), findsOneWidget);
+
+    await tester.drag(find.byType(PageView).first, const Offset(450, 0));
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(
+      tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+      0,
+    );
+    expect(find.text('Захист активний'), findsOneWidget);
   });
 
   test('every supported language has a complete UI dictionary', () {
@@ -366,6 +397,7 @@ void main() {
 
       await pumpApp(tester);
       await tester.tap(find.byTooltip('Нагадування та Журнал'));
+      await finishSectionTransition(tester);
       await waitForText(
         tester,
         'Надайте Call Guard дозвіл на сповіщення, щоб нагадування спрацьовували вчасно при вимкненому екрані',
@@ -384,9 +416,11 @@ void main() {
         findsNothing,
       );
 
-      await tester.tap(find.byTooltip('Захист викликів'));
+      await tester.tap(find.byTooltip('Захист вхідних дзвінків'));
+      await finishSectionTransition(tester);
       await waitForText(tester, 'Сповіщення дозволено');
       expect(find.text('Дозвіл на сповіщення'), findsOneWidget);
+      await waitForDatabase(tester);
     },
   );
 
@@ -453,6 +487,7 @@ void main() {
     });
     await pumpApp(tester);
     await tester.tap(find.byTooltip('Нагадування та Журнал'));
+    await finishSectionTransition(tester);
     await waitForText(tester, 'Олена Коваль');
     await tester.drag(find.byType(ListView).last, const Offset(0, -500));
     await tester.pumpAndSettle();
@@ -526,6 +561,7 @@ void main() {
 
     await pumpApp(tester);
     await tester.tap(find.byTooltip('Списки та фільтри'));
+    await finishSectionTransition(tester);
     await waitForText(tester, 'Мама');
     await tester.tap(find.byTooltip('Додати номер'));
     await tester.pumpAndSettle();
@@ -543,6 +579,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.byTooltip('Нагадування та Журнал'));
+    await finishSectionTransition(tester);
     await waitForText(tester, 'Олена Коваль');
     await tester.drag(find.byType(ListView).last, const Offset(0, -700));
     await tester.pumpAndSettle();
@@ -724,13 +761,14 @@ void main() {
   ) async {
     await pumpApp(tester);
     await tester.tap(find.byTooltip('Автовідповідач'));
+    await finishSectionTransition(tester);
     await tester.pumpAndSettle();
 
     expect(find.text('Увімкнути режим передзвону'), findsOneWidget);
     expect(find.text('У режимі тиші'), findsOneWidget);
     expect(find.text('Усі невідомі номери'), findsOneWidget);
     expect(
-      find.text('Локальне сповіщення про пропущений виклик'),
+      find.text('Сповіщення про пропущений вхідний дзвінок'),
       findsOneWidget,
     );
     expect(find.text('Записувати повідомлення'), findsNothing);
@@ -790,13 +828,15 @@ void main() {
     tester.state<NavigatorState>(find.byType(Navigator).first).pop();
     await tester.pumpAndSettle();
 
-    expect(find.text('Call protection'), findsOneWidget);
+    expect(find.text('Incoming call protection'), findsOneWidget);
     expect(find.text('Protection is active'), findsOneWidget);
     expect(find.text('Home'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Lists & filters'));
+    await finishSectionTransition(tester);
     await waitForText(tester, 'Countries & operators');
     await tester.tap(find.text('Countries & operators'));
+    await finishSectionTransition(tester);
     await waitForText(tester, 'Ukraine');
     expect(find.text('Ukraine'), findsOneWidget);
   });
@@ -810,8 +850,10 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await pumpApp(tester);
     await tester.tap(find.byTooltip('Списки та фільтри'));
+    await finishSectionTransition(tester);
     await waitForText(tester, 'Країни та оператори');
     await tester.tap(find.text('Країни та оператори'));
+    await finishSectionTransition(tester);
     await waitForText(tester, 'Україна');
     await tester.pumpAndSettle();
     await tester.tap(find.text('Україна'));
@@ -831,8 +873,10 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await pumpApp(tester);
     await tester.tap(find.byTooltip('Списки та фільтри'));
+    await finishSectionTransition(tester);
     await waitForText(tester, 'Країни та оператори');
     await tester.tap(find.text('Країни та оператори'));
+    await finishSectionTransition(tester);
     await waitForText(tester, 'Україна');
     await tester.tap(find.byTooltip('Додати країну або оператора'));
     await tester.pumpAndSettle();

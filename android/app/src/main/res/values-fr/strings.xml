@@ -4,7 +4,7 @@
     <string name="call_reminder_title">Rappel d’appel</string>
     <string name="call_reminder_action_call">Appeler</string>
     <string name="call_reminder_action_done">Terminé</string>
-    <string name="missed_call_channel_name">Appels manqués</string>
+    <string name="missed_call_channel_name">Appels entrants manqués</string>
     <string name="missed_call_channel_description">Rappels locaux pour rappeler</string>
     <string name="missed_call_title">Rappeler</string>
     <string name="missed_call_action_dial">Rappeler</string>

@@ -16,19 +16,24 @@ class ListsPage extends StatefulWidget {
     required this.database,
     required this.onStub,
     required this.strings,
+    this.onEdgeSwipe,
   });
 
   final DatabaseHelper database;
   final VoidCallback onStub;
   final AppStrings strings;
+  final ValueChanged<int>? onEdgeSwipe;
 
   @override
   State<ListsPage> createState() => ListsPageState();
 }
 
-class ListsPageState extends State<ListsPage> {
+class ListsPageState extends State<ListsPage>
+    with SingleTickerProviderStateMixin {
   int _tab = 0;
   bool _loadingRules = true;
+  double _edgeOverscroll = 0;
+  late final TabController _tabController;
   final _countryPageKey = GlobalKey<CountryOperatorsPageState>();
   List<ListEntry> _whitelist = [];
   List<ListEntry> _blacklist = [];
@@ -36,7 +41,50 @@ class ListsPageState extends State<ListsPage> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this)
+      ..addListener(_handleTabChanged);
     _reloadRules();
+  }
+
+  @override
+  void dispose() {
+    _tabController
+      ..removeListener(_handleTabChanged)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _handleTabChanged() {
+    if (_tab != _tabController.index) {
+      setState(() => _tab = _tabController.index);
+    }
+  }
+
+  bool _handleTabScroll(ScrollNotification notification) {
+    if (notification is ScrollStartNotification) {
+      _edgeOverscroll = 0;
+    } else if (notification is OverscrollNotification &&
+        notification.metrics.axis == Axis.horizontal &&
+        widget.onEdgeSwipe != null) {
+      final direction = notification.overscroll > 0 ? 1 : -1;
+      final atFirstTab = notification.metrics.extentBefore <= 0.5;
+      final atLastTab = notification.metrics.extentAfter <= 0.5;
+      final isOutwardSwipe =
+          (direction < 0 && _tab == 0 && atFirstTab) ||
+          (direction > 0 && _tab == 2 && atLastTab);
+      if (isOutwardSwipe) {
+        _edgeOverscroll += notification.overscroll.abs();
+        if (_edgeOverscroll >= 24) {
+          _edgeOverscroll = 0;
+          widget.onEdgeSwipe!(direction);
+        }
+      } else {
+        _edgeOverscroll = 0;
+      }
+    } else if (notification is ScrollEndNotification) {
+      _edgeOverscroll = 0;
+    }
+    return false;
   }
 
   Future<void> _reloadRules() async {
@@ -191,84 +239,85 @@ class ListsPageState extends State<ListsPage> {
         icon: const Icon(Icons.add_rounded),
         label: Text(widget.strings.call('add')),
       ),
-      body: DefaultTabController(
-        length: 3,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 8, 18, 14),
-              child: PageIntro(
-                eyebrow: widget.strings.call('listsEyebrow'),
-                title: widget.strings.listsScreenTitle,
-                subtitle: widget.strings.call('listsSubtitle'),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 8, 18, 14),
+            child: PageIntro(
+              eyebrow: widget.strings.call('listsEyebrow'),
+              title: widget.strings.listsScreenTitle,
+              subtitle: widget.strings.call('listsSubtitle'),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: AppPalette.surface,
+                borderRadius: BorderRadius.circular(17),
+                border: Border.all(color: AppPalette.line),
+              ),
+              child: TabBar(
+                controller: _tabController,
+                isScrollable: false,
+                tabAlignment: TabAlignment.fill,
+                dividerColor: Colors.transparent,
+                indicatorSize: TabBarIndicatorSize.tab,
+                indicator: BoxDecoration(
+                  color: AppPalette.bluePale,
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                labelColor: AppPalette.accent(AppPalette.blue),
+                unselectedLabelColor: AppPalette.muted,
+                labelStyle: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+                tabs: [
+                  Tab(
+                    height: 50,
+                    child: Text(
+                      widget.strings.whiteListTab,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  Tab(
+                    height: 50,
+                    child: Text(
+                      widget.strings.blackListTab,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  Tab(
+                    height: 50,
+                    child: Text(
+                      widget.strings.countryOperatorsTab,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18),
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: AppPalette.surface,
-                  borderRadius: BorderRadius.circular(17),
-                  border: Border.all(color: AppPalette.line),
-                ),
-                child: TabBar(
-                  onTap: (index) => setState(() => _tab = index),
-                  isScrollable: false,
-                  tabAlignment: TabAlignment.fill,
-                  dividerColor: Colors.transparent,
-                  indicatorSize: TabBarIndicatorSize.tab,
-                  indicator: BoxDecoration(
-                    color: AppPalette.bluePale,
-                    borderRadius: BorderRadius.circular(13),
-                  ),
-                  labelColor: AppPalette.accent(AppPalette.blue),
-                  unselectedLabelColor: AppPalette.muted,
-                  labelStyle: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                  ),
-                  tabs: [
-                    Tab(
-                      height: 50,
-                      child: Text(
-                        widget.strings.whiteListTab,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    Tab(
-                      height: 50,
-                      child: Text(
-                        widget.strings.blackListTab,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    Tab(
-                      height: 50,
-                      child: Text(
-                        widget.strings.countryOperatorsTab,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Expanded(
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: NotificationListener<ScrollNotification>(
+              onNotification: _handleTabScroll,
               child: TabBarView(
+                controller: _tabController,
                 children: [
                   _entryList(_whitelist, widget.strings.call('whiteListHint')),
                   _entryList(_blacklist, widget.strings.call('blackListHint')),
@@ -281,14 +330,14 @@ class ListsPageState extends State<ListsPage> {
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 0, 18, 8),
-              child: PrototypeFootnote(
-                label: widget.strings.call('prototypeFootnote'),
-              ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 0, 18, 8),
+            child: PrototypeFootnote(
+              label: widget.strings.call('prototypeFootnote'),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

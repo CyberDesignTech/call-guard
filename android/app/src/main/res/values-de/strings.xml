@@ -4,7 +4,7 @@
     <string name="call_reminder_title">Anruferinnerung</string>
     <string name="call_reminder_action_call">Anrufen</string>
     <string name="call_reminder_action_done">Erledigt</string>
-    <string name="missed_call_channel_name">Verpasste Anrufe</string>
+    <string name="missed_call_channel_name">Verpasste eingehende Anrufe</string>
     <string name="missed_call_channel_description">Lokale Erinnerungen zum Zurückrufen</string>
     <string name="missed_call_title">Zurückrufen</string>
     <string name="missed_call_action_dial">Zurückrufen</string>
