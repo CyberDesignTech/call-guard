@@ -5,10 +5,16 @@ import android.telecom.CallScreeningService
 import android.util.Log
 import android.os.Handler
 import android.os.Looper
+import android.os.Build
 import java.util.concurrent.Executors
 
 class CallGuardScreeningService : CallScreeningService() {
     override fun onScreenCall(callDetails: Call.Details) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
+            callDetails.callDirection != Call.Details.DIRECTION_INCOMING
+        ) {
+            return
+        }
         val phoneNumber = callDetails.handle?.schemeSpecificPart.orEmpty()
         executor.execute {
             val appContext = applicationContext
@@ -25,18 +31,32 @@ class CallGuardScreeningService : CallScreeningService() {
                     settings,
                 )
             ) {
-                verdict = verdict.copy(allowed = false, reason = "not_in_contacts")
+                verdict = verdict.copy(
+                    allowed = false,
+                    reason = "not_in_contacts",
+                    phoneNumber = if (
+                        PhoneNumbers.isHidden(phoneNumber) ||
+                        phoneNumber.equals(PhoneNumbers.HIDDEN_NUMBER, ignoreCase = true)
+                    ) {
+                        PhoneNumbers.HIDDEN_NUMBER
+                    } else {
+                        verdict.phoneNumber
+                    },
+                )
             }
             if (!verdict.allowed) {
-                val handledByOptionalModule = OptionalAnsweringModule.handleRejectedCall(
-                    appContext,
-                    verdict.phoneNumber,
-                    verdict.reason,
-                    settings,
-                )
-                if (!handledByOptionalModule) {
-                    ruleEngine.recordCallLog(verdict.phoneNumber, verdict.reason)
+                runCatching {
+                    OptionalAnsweringModule.handleRejectedCall(
+                        appContext,
+                        verdict.phoneNumber,
+                        verdict.reason,
+                        settings,
+                    )
+                }.onFailure {
+                    Log.e(TAG, "Could not process callback-assistant notification", it)
                 }
+                // The service owns rejection logging so every blocked call is recorded once.
+                ruleEngine.recordCallLog(verdict.phoneNumber, verdict.reason)
             }
             val response = CallResponse.Builder().apply {
                 if (!verdict.allowed) {

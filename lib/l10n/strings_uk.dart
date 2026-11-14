@@ -2,13 +2,13 @@ const Map<String, String> stringsUk = {
   'navHome': 'Головна',
   'navLists': 'Списки',
   'navSchedule': 'Розклад',
-  'navAnswer': 'Автовідп.',
+  'navAnswer': 'Передзвін',
   'navMore': 'Ще',
   'homeTitle': 'Захист вхідних дзвінків',
   'homeSubtitle': 'Керуйте правилами для вхідних дзвінків в одному місці.',
   'listsTitle': 'Списки та фільтри',
   'scheduleTitle': 'Графік режиму тиші',
-  'answerTitle': 'Автовідповідач',
+  'answerTitle': 'Помічник передзвону',
   'moreTitle': 'Нагадування та Журнал',
   'moreEyebrow': 'ВАЖЛИВЕ ПІД РУКОЮ',
   'moreSubtitle': 'Керуйте нагадуваннями передзвонити та переглядайте історію фільтрації вхідних дзвінків.',
@@ -154,7 +154,7 @@ const Map<String, String> stringsUk = {
   'onlyAllowlist': 'Лише Білий список',
   'onlyAllowlistHint': 'Дозволити вхідні дзвінки ЛИШЕ з Білого списку',
   'answerEyebrow': 'ПЕРЕДЗВОНІТЬ, КОЛИ БУДЕ ЗРУЧНО',
-  'answerSubtitle': 'Тихо відхиляйте вхідні дзвінки в обраному сценарії та отримуйте локальне нагадування передзвонити.',
+  'answerSubtitle': 'Застосунок тихо відхиляє вхідні дзвінки за обраним сценарієм і допомагає передзвонити пізніше. Він не відповідає на дзвінки автоматично.',
   'newReminderTitle': 'Нове нагадування',
   'notificationPermissionLabel': 'Дозвіл на сповіщення',
   'notificationsGranted': 'Сповіщення дозволено',
@@ -209,7 +209,7 @@ const Map<String, String> stringsUk = {
   'clearJournalMessage':
       'Усі записи журналу буде видалено без можливості відновлення.',
   'clearJournalConfirm': 'Очистити',
-  'answeringEnabledLabel': 'Увімкнути режим передзвону',
+  'answeringEnabledLabel': 'Увімкнути помічник передзвону',
   'answeringEnabledDescription':
       'Тихо відхиляти вхідні дзвінки за обраним сценарієм.',
   'answeringScenarioTitle': 'Сценарій відхилення',
@@ -219,6 +219,8 @@ const Map<String, String> stringsUk = {
   'answeringNotificationLabel': 'Сповіщення про пропущений вхідний дзвінок',
   'answeringNotificationHint':
       'Показувати сповіщення з кнопкою «Передзвонити».',
+  'answeringNotificationsPermissionWarning': 'Дозвіл на сповіщення вимкнено — відхилені дзвінки не з’являтимуться у сповіщеннях.',
+  'answeringContactsPermissionWarning': 'Доступ до контактів потрібен, щоб відрізнити збережені номери від невідомих.',
   'notificationsPermissionNeeded':
       'Дозвольте сповіщення, щоб бачити нагадування про дзвінки.',
   'answering_machine': 'Нагадування передзвонити',

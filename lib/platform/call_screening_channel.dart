@@ -104,6 +104,16 @@ class CallScreeningChannel {
     await _channel.invokeMethod<bool>('openNotificationSettings');
   }
 
+  Future<bool> consumePendingCallJournal() async =>
+      await _channel.invokeMethod<bool>('consumePendingCallJournal') ?? false;
+
+  void setOpenCallJournalHandler(Future<bool> Function() handler) {
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'openCallJournal') return handler();
+      return null;
+    });
+  }
+
   Future<void> scheduleReminder({
     required int id,
     required int remindAt,

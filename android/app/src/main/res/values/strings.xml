@@ -4,10 +4,14 @@
     <string name="call_reminder_title">Call reminder</string>
     <string name="call_reminder_action_call">Call</string>
     <string name="call_reminder_action_done">Done</string>
-    <string name="missed_call_channel_name">Missed incoming calls</string>
-    <string name="missed_call_channel_description">Local reminders to call someone back</string>
+    <string name="missed_call_channel_name">Callback Assistant</string>
+    <string name="missed_call_channel_description">Notifications about rejected incoming calls</string>
     <string name="missed_call_title">Call back</string>
     <string name="missed_call_action_dial">Call back</string>
+    <string name="missed_call_public_title">Call Guard</string>
+    <string name="missed_call_public_text">Incoming call declined</string>
+    <string name="missed_call_hidden_title">Hidden number declined</string>
+    <string name="missed_call_hidden_text">Tap to view the call journal</string>
     <string name="reminder_contact_olena">Olena Koval</string>
     <string name="reminder_contact_unknown">Unknown number</string>
     <string name="reminder_contact_new">New contact</string>

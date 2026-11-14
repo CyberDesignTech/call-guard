@@ -23,18 +23,58 @@ class MainActivity : FlutterActivity() {
     private var pendingContactsResult: MethodChannel.Result? = null
     private var pendingNotificationResult: MethodChannel.Result? = null
     private var pendingContactPickerResult: MethodChannel.Result? = null
+    private var screeningChannel: MethodChannel? = null
+    private var pendingCallJournalOpen = false
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(
+        screeningChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             BridgeContract.CHANNEL_NAME,
-        ).setMethodCallHandler { call, result -> handleScreeningMethod(call, result) }
+        ).also { channel ->
+            channel.setMethodCallHandler { call, result -> handleScreeningMethod(call, result) }
+        }
+        captureCallJournalIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        captureCallJournalIntent(intent)
+        dispatchCallJournalRequest()
+    }
+
+    private fun captureCallJournalIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra(BridgeContract.Extras.OPEN_CALL_JOURNAL, false) == true) {
+            pendingCallJournalOpen = true
+            intent.removeExtra(BridgeContract.Extras.OPEN_CALL_JOURNAL)
+        }
+    }
+
+    private fun dispatchCallJournalRequest() {
+        screeningChannel?.invokeMethod(
+            BridgeContract.Methods.OPEN_CALL_JOURNAL,
+            null,
+            object : MethodChannel.Result {
+                override fun success(result: Any?) {
+                    if (result == true) pendingCallJournalOpen = false
+                }
+
+                override fun error(errorCode: String, errorMessage: String?, errorDetails: Any?) = Unit
+
+                override fun notImplemented() = Unit
+            },
+        )
     }
 
     private fun handleScreeningMethod(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             BridgeContract.Methods.CHECK_PERMISSIONS -> result.success(permissionState())
+            BridgeContract.Methods.CONSUME_PENDING_CALL_JOURNAL -> {
+                val shouldOpenJournal = pendingCallJournalOpen
+                pendingCallJournalOpen = false
+                result.success(shouldOpenJournal)
+            }
             BridgeContract.Methods.REQUEST_CALL_SCREENING_ROLE -> requestCallScreeningRole(result)
             BridgeContract.Methods.OPEN_DEFAULT_APPS_SETTINGS -> openDefaultAppsSettings(result)
             BridgeContract.Methods.REQUEST_CONTACTS_PERMISSION -> requestContactsPermission(result)

@@ -43,6 +43,7 @@ class CallGuardShell extends StatefulWidget {
     required this.onAnsweringScenarioChanged,
     required this.answeringLocalNotification,
     required this.onAnsweringLocalNotificationChanged,
+    required this.openCallJournalRequest,
     required this.themeMode,
     required this.language,
     required this.strings,
@@ -77,6 +78,7 @@ class CallGuardShell extends StatefulWidget {
   final ValueChanged<String> onAnsweringScenarioChanged;
   final bool answeringLocalNotification;
   final ValueChanged<bool> onAnsweringLocalNotificationChanged;
+  final int openCallJournalRequest;
   final ThemeMode themeMode;
   final AppLanguage language;
   final AppStrings strings;
@@ -94,7 +96,18 @@ class CallGuardShellState extends State<CallGuardShell> {
   @override
   void initState() {
     super.initState();
+    if (widget.openCallJournalRequest > 0) _section = AppSection.more;
     _pageController = PageController(initialPage: _section.index);
+  }
+
+  @override
+  void didUpdateWidget(covariant CallGuardShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.openCallJournalRequest != widget.openCallJournalRequest) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _selectSection(AppSection.more);
+      });
+    }
   }
 
   @override

@@ -17,6 +17,8 @@ object BridgeContract {
         const val RESTORE_PENDING_REMINDERS = "restorePendingReminders"
         const val OPEN_DIALER = "openDialer"
         const val SIMULATE_CALL = "simulateCall"
+        const val CONSUME_PENDING_CALL_JOURNAL = "consumePendingCallJournal"
+        const val OPEN_CALL_JOURNAL = "openCallJournal"
     }
 
     object Arguments {
@@ -45,5 +47,9 @@ object BridgeContract {
 
     object Errors {
         const val ACTIVITY_DESTROYED = "ACTIVITY_DESTROYED"
+    }
+
+    object Extras {
+        const val OPEN_CALL_JOURNAL = "com.wepr.callguard.extra.OPEN_CALL_JOURNAL"
     }
 }

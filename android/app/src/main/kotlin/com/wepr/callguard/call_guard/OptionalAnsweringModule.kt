@@ -23,7 +23,7 @@ object OptionalAnsweringModule {
         return isUnknownNumber(context, phoneNumber)
     }
 
-    /** Returns true when this rejected call was handled by the optional module. */
+    /** Returns true when this rejected call matches the selected callback scenario. */
     fun handleRejectedCall(
         context: Context,
         phoneNumber: String,
@@ -40,17 +40,21 @@ object OptionalAnsweringModule {
         }
         if (!applies) return false
 
-        return try {
-            CallReminderStore.insertCallLog(context, phoneNumber, ANSWERING_REASON)
-            val showNotification = (
-                snapshot[DbContract.SettingKeys.ANSWERING_LOCAL_NOTIFICATION] ?: "true"
-                ).equals("true", ignoreCase = true)
-            if (showNotification) CallNotificationHelper.showMissedCall(context, phoneNumber)
-            true
-        } catch (error: Exception) {
-            Log.e(TAG, "Could not handle rejected call in the optional module", error)
-            false
+        val showNotification = (
+            snapshot[DbContract.SettingKeys.ANSWERING_LOCAL_NOTIFICATION] ?: "true"
+            ).equals("true", ignoreCase = true)
+        if (showNotification) {
+            runCatching {
+                CallNotificationHelper.showMissedCall(
+                    context,
+                    phoneNumber,
+                    quietMode = ruleReason == "silent_schedule",
+                )
+            }.onFailure {
+                Log.e(TAG, "Could not notify about the rejected call", it)
+            }
         }
+        return true
     }
 
     private fun settingsOrLoad(
@@ -72,7 +76,7 @@ object OptionalAnsweringModule {
             .equals("true", ignoreCase = true)
 
     private fun isUnknownNumber(context: Context, phoneNumber: String): Boolean {
-        if (PhoneNumbers.isHidden(phoneNumber)) return true
+        if (PhoneNumbers.isHidden(phoneNumber) || isHiddenMarker(phoneNumber)) return true
         if (!ContactLookup.hasPermission(context)) return false
         return ContactLookup.isUnknownNumber(
             context,
@@ -80,8 +84,10 @@ object OptionalAnsweringModule {
         )
     }
 
+    private fun isHiddenMarker(phoneNumber: String): Boolean =
+        phoneNumber.equals(PhoneNumbers.HIDDEN_NUMBER, ignoreCase = true)
+
     private const val TAG = "OptionalAnsweringModule"
-    private const val ANSWERING_REASON = "answering_machine"
     const val SCENARIO_SILENCE = "quiet_mode"
     const val SCENARIO_UNKNOWN_NUMBERS = "unknown_numbers"
 }

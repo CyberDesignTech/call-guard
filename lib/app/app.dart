@@ -38,12 +38,20 @@ class CallGuardAppState extends State<CallGuardApp>
   bool _answeringEnabled = false;
   String _answeringScenario = 'quiet_mode';
   bool _answeringLocalNotification = true;
+  int _openCallJournalRequest = 0;
+  late final CallScreeningChannel _screeningChannel;
   Future<void> _pendingSettingsWrites = Future<void>.value();
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _screeningChannel = CallScreeningChannel()
+      ..setOpenCallJournalHandler(() async {
+        if (!mounted) return false;
+        setState(() => _openCallJournalRequest++);
+        return true;
+      });
     _restoreSettings();
   }
 
@@ -61,8 +69,16 @@ class CallGuardAppState extends State<CallGuardApp>
   Future<void> _restoreSettings() async {
     try {
       await widget.database.initialize();
+      var openCallJournal = false;
       try {
-        await CallScreeningChannel().restorePendingReminders();
+        openCallJournal = await _screeningChannel.consumePendingCallJournal();
+      } on PlatformException {
+        // Notification navigation is available only on Android.
+      } on MissingPluginException {
+        // Keep the app usable on platforms without the Android channel.
+      }
+      try {
+        await _screeningChannel.restorePendingReminders();
       } on PlatformException {
         // Reminder alarms are an Android-only integration.
       } on MissingPluginException {
@@ -90,6 +106,7 @@ class CallGuardAppState extends State<CallGuardApp>
 
       if (!mounted) return;
       setState(() {
+        if (openCallJournal) _openCallJournalRequest++;
         _language = parseLanguage(settings['locale']);
         _themeMode = parseTheme(settings['theme_mode']);
         _protectionEnabled = parseBool('protection_enabled', true);
@@ -239,6 +256,7 @@ class CallGuardAppState extends State<CallGuardApp>
                 setState(() => _answeringLocalNotification = value);
                 _persistSetting('answering_local_notification', value);
               },
+              openCallJournalRequest: _openCallJournalRequest,
               themeMode: _themeMode,
               language: _language,
               strings: strings,

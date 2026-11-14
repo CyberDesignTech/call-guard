@@ -4,10 +4,14 @@
     <string name="call_reminder_title">Нагадування про дзвінок</string>
     <string name="call_reminder_action_call">Подзвонити</string>
     <string name="call_reminder_action_done">Виконано</string>
-    <string name="missed_call_channel_name">Пропущені вхідні дзвінки</string>
-    <string name="missed_call_channel_description">Локальні нагадування передзвонити</string>
+    <string name="missed_call_channel_name">Помічник передзвону</string>
+    <string name="missed_call_channel_description">Сповіщення про відхилені вхідні дзвінки</string>
     <string name="missed_call_title">Передзвонити</string>
     <string name="missed_call_action_dial">Передзвонити</string>
+    <string name="missed_call_public_title">Call Guard</string>
+    <string name="missed_call_public_text">Вхідний дзвінок відхилено</string>
+    <string name="missed_call_hidden_title">Відхилено дзвінок із прихованого номера</string>
+    <string name="missed_call_hidden_text">Натисніть, щоб відкрити журнал дзвінків</string>
     <string name="reminder_contact_olena">Олена Коваль</string>
     <string name="reminder_contact_unknown">Невідомий номер</string>
     <string name="reminder_contact_new">Новий контакт</string>

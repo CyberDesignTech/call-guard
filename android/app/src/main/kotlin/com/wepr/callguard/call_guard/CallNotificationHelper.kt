@@ -14,12 +14,14 @@ import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.util.Log
+import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import java.util.Locale
 
 object CallNotificationHelper {
     const val REMINDER_CHANNEL_ID = "call_guard_reminders_v2"
-    const val MISSED_CALL_CHANNEL_ID = "call_guard_missed_calls_v2"
+    const val MISSED_CALL_CHANNEL_ID = "call_guard_missed_calls_v3"
+    const val QUIET_MISSED_CALL_CHANNEL_ID = "call_guard_missed_calls_quiet_v1"
 
     fun showReminder(context: Context, reminder: CallReminderRecord): Boolean {
         val localizedContext = localizedContext(context)
@@ -87,45 +89,99 @@ object CallNotificationHelper {
         return notify(context, reminder.id, notification)
     }
 
-    fun showMissedCall(context: Context, phone: String): Boolean {
+    fun showMissedCall(
+        context: Context,
+        phone: String,
+        quietMode: Boolean = false,
+    ): Boolean {
         val localizedContext = localizedContext(context)
+        val hiddenNumber = isHiddenPhone(phone)
+        val channelId = if (quietMode) QUIET_MISSED_CALL_CHANNEL_ID else MISSED_CALL_CHANNEL_ID
         createChannel(
             context,
             localizedContext.getString(R.string.missed_call_channel_name),
             localizedContext.getString(R.string.missed_call_channel_description),
-            MISSED_CALL_CHANNEL_ID,
+            channelId,
+            importance = if (quietMode) {
+                NotificationManager.IMPORTANCE_LOW
+            } else {
+                NotificationManager.IMPORTANCE_HIGH
+            },
+            lockscreenVisibility = NotificationCompat.VISIBILITY_PRIVATE,
+            silent = quietMode,
         )
-        if (!canPostNotifications(context) || !isChannelEnabled(context, MISSED_CALL_CHANNEL_ID)) {
+        if (!canPostNotifications(context) || !isChannelEnabled(context, channelId)) {
             return false
         }
 
-        val dialPendingIntent = PendingIntent.getActivity(
-            context,
-            ANSWERING_NOTIFICATION_ID_BASE + phone.hashCode(),
-            dialIntent(context, phone),
-            pendingIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT),
-        )
-        val notification = notificationBuilder(localizedContext, MISSED_CALL_CHANNEL_ID)
+        val notificationId = ANSWERING_NOTIFICATION_ID_BASE + phone.hashCode()
+        val contentPendingIntent = if (hiddenNumber) {
+            PendingIntent.getActivity(
+                context,
+                notificationId,
+                Intent(context, MainActivity::class.java)
+                    .putExtra(BridgeContract.Extras.OPEN_CALL_JOURNAL, true)
+                    .addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP,
+                    ),
+                pendingIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT),
+            )
+        } else {
+            PendingIntent.getActivity(
+                context,
+                notificationId,
+                dialIntent(context, phone),
+                pendingIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT),
+            )
+        }
+        val publicNotification = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(android.R.drawable.ic_menu_call)
-            .setVisibility(Notification.VISIBILITY_PUBLIC)
-            .setDefaults(Notification.DEFAULT_ALL)
-            .setContentTitle(localizedContext.getString(R.string.missed_call_title))
-            .setContentText(phone)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setContentTitle(localizedContext.getString(R.string.missed_call_public_title))
+            .setContentText(localizedContext.getString(R.string.missed_call_public_text))
+            .setCategory(Notification.CATEGORY_CALL)
+            .build()
+        val builder = NotificationCompat.Builder(localizedContext, channelId)
+            .setSmallIcon(android.R.drawable.ic_menu_call)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setDefaults(if (quietMode) 0 else Notification.DEFAULT_ALL)
+            .setSilent(quietMode)
+            .setContentTitle(
+                localizedContext.getString(
+                    if (hiddenNumber) R.string.missed_call_hidden_title
+                    else R.string.missed_call_title,
+                ),
+            )
+            .setContentText(
+                if (hiddenNumber) {
+                    localizedContext.getString(R.string.missed_call_hidden_text)
+                } else {
+                    phone
+                },
+            )
             .setCategory(Notification.CATEGORY_CALL)
             .setAutoCancel(true)
-            .setContentIntent(dialPendingIntent)
-            .addAction(
+            .setContentIntent(contentPendingIntent)
+            .setPublicVersion(publicNotification)
+        if (!hiddenNumber) {
+            builder.addAction(
                 android.R.drawable.ic_menu_call,
                 localizedContext.getString(R.string.missed_call_action_dial),
-                dialPendingIntent,
+                contentPendingIntent,
             )
-            .build()
-        return notify(context, ANSWERING_NOTIFICATION_ID_BASE + phone.hashCode(), notification)
+        }
+        return notify(context, notificationId, builder.build())
     }
 
     private fun dialIntent(context: Context, phone: String): Intent =
         Intent(Intent.ACTION_DIAL, Uri.parse("tel:${Uri.encode(phone)}"))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    private fun isHiddenPhone(phone: String): Boolean =
+        PhoneNumbers.isHidden(phone) ||
+            phone.equals(PhoneNumbers.HIDDEN_NUMBER, ignoreCase = true)
 
     private fun localizedDatabaseText(context: Context, value: String?): String? {
         if (value.isNullOrBlank()) return null
@@ -154,24 +210,31 @@ object CallNotificationHelper {
         name: String,
         description: String,
         channelId: String,
+        importance: Int = NotificationManager.IMPORTANCE_HIGH,
+        lockscreenVisibility: Int = Notification.VISIBILITY_PUBLIC,
+        silent: Boolean = false,
     ) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val channel = NotificationChannel(
             channelId,
             name,
-            NotificationManager.IMPORTANCE_HIGH,
+            importance,
         ).apply {
             this.description = description
-            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-            enableVibration(true)
-            vibrationPattern = longArrayOf(0L, 250L, 150L, 250L)
-            setSound(
-                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .build(),
-            )
+            this.lockscreenVisibility = lockscreenVisibility
+            enableVibration(!silent)
+            if (silent) {
+                setSound(null, null)
+            } else {
+                vibrationPattern = longArrayOf(0L, 250L, 150L, 250L)
+                setSound(
+                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build(),
+                )
+            }
         }
         (context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager)
             ?.createNotificationChannel(channel)

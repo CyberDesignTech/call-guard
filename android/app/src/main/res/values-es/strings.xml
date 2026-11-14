@@ -4,10 +4,14 @@
     <string name="call_reminder_title">Recordatorio de llamada</string>
     <string name="call_reminder_action_call">Llamar</string>
     <string name="call_reminder_action_done">Hecho</string>
-    <string name="missed_call_channel_name">Llamadas entrantes perdidas</string>
-    <string name="missed_call_channel_description">Recordatorios locales para devolver llamadas</string>
+    <string name="missed_call_channel_name">Asistente de devolución</string>
+    <string name="missed_call_channel_description">Avisos sobre llamadas entrantes rechazadas</string>
     <string name="missed_call_title">Devolver llamada</string>
     <string name="missed_call_action_dial">Devolver llamada</string>
+    <string name="missed_call_public_title">Call Guard</string>
+    <string name="missed_call_public_text">Llamada entrante rechazada</string>
+    <string name="missed_call_hidden_title">Llamada de número oculto rechazada</string>
+    <string name="missed_call_hidden_text">Toca para abrir el registro de llamadas</string>
     <string name="reminder_contact_olena">Olena Koval</string>
     <string name="reminder_contact_unknown">Número desconocido</string>
     <string name="reminder_contact_new">Contacto nuevo</string>

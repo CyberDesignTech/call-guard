@@ -4,10 +4,14 @@
     <string name="call_reminder_title">Anruferinnerung</string>
     <string name="call_reminder_action_call">Anrufen</string>
     <string name="call_reminder_action_done">Erledigt</string>
-    <string name="missed_call_channel_name">Verpasste eingehende Anrufe</string>
-    <string name="missed_call_channel_description">Lokale Erinnerungen zum Zurückrufen</string>
+    <string name="missed_call_channel_name">Rückruf-Assistent</string>
+    <string name="missed_call_channel_description">Benachrichtigungen über abgelehnte eingehende Anrufe</string>
     <string name="missed_call_title">Zurückrufen</string>
     <string name="missed_call_action_dial">Zurückrufen</string>
+    <string name="missed_call_public_title">Call Guard</string>
+    <string name="missed_call_public_text">Eingehender Anruf abgelehnt</string>
+    <string name="missed_call_hidden_title">Anruf einer verborgenen Nummer abgelehnt</string>
+    <string name="missed_call_hidden_text">Tippen, um das Anrufprotokoll zu öffnen</string>
     <string name="reminder_contact_olena">Olena Koval</string>
     <string name="reminder_contact_unknown">Unbekannte Nummer</string>
     <string name="reminder_contact_new">Neuer Kontakt</string>

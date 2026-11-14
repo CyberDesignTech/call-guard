@@ -2,14 +2,14 @@ const Map<String, String> stringsPl = {
   'navHome': 'Ochrona',
   'navLists': 'Listy',
   'navSchedule': 'Harmonogram',
-  'navAnswer': 'Odpowiedź',
+  'navAnswer': 'Oddzwanianie',
   'navMore': 'Więcej',
   'homeTitle': 'Ochrona połączeń przychodzących',
   'homeSubtitle':
       'Zarządzaj regułami połączeń przychodzących w jednym miejscu.',
   'listsTitle': 'Listy i filtry',
   'scheduleTitle': 'Harmonogram ciszy',
-  'answerTitle': 'Automatyczna odpowiedź',
+  'answerTitle': 'Asystent oddzwaniania',
   'moreTitle': 'Przypomnienia i rejestr',
   'moreEyebrow': 'WAŻNE INFORMACJE',
   'moreSubtitle': 'Zarządzaj przypomnieniami o oddzwonieniu i przeglądaj ostatnią aktywność filtrowania połączeń przychodzących.',
@@ -153,7 +153,7 @@ const Map<String, String> stringsPl = {
   'onlyAllowlistHint':
       'Zezwalaj WYŁĄCZNIE na połączenia przychodzące z białej listy',
   'answerEyebrow': 'ODDZWOŃ, GDY BĘDZIE CI WYGODNIE',
-  'answerSubtitle': 'Cicho odrzucaj połączenia przychodzące w wybranym scenariuszu i otrzymuj lokalne przypomnienie o oddzwonieniu.',
+  'answerSubtitle': 'Aplikacja cicho odrzuca połączenia przychodzące zgodnie z wybranym scenariuszem i pomaga oddzwonić później. Nie odbiera połączeń automatycznie.',
   'newReminderTitle': 'Nowe przypomnienie',
   'notificationPermissionLabel': 'Uprawnienia do powiadomień',
   'notificationsGranted': 'Powiadomienia dozwolone',
@@ -206,7 +206,7 @@ const Map<String, String> stringsPl = {
   'clearJournalTitle': 'Wyczyścić rejestr blokad?',
   'clearJournalMessage': 'Wszystkie wpisy rejestru zostaną trwale usunięte.',
   'clearJournalConfirm': 'Wyczyść rejestr',
-  'answeringEnabledLabel': 'Włącz tryb oddzwaniania',
+  'answeringEnabledLabel': 'Włącz asystenta oddzwaniania',
   'answeringEnabledDescription':
       'Cicho odrzucaj połączenia przychodzące w wybranym scenariuszu.',
   'answeringScenarioTitle': 'Scenariusz odrzucania',
@@ -217,6 +217,8 @@ const Map<String, String> stringsPl = {
       'Lokalne powiadomienie o nieodebranym połączeniu przychodzącym',
   'answeringNotificationHint':
       'Pokaż powiadomienie z przyciskiem oddzwonienia.',
+  'answeringNotificationsPermissionWarning': 'Powiadomienia są wyłączone, więc odrzucone połączenia nie będą widoczne w powiadomieniach.',
+  'answeringContactsPermissionWarning': 'Dostęp do kontaktów jest potrzebny, aby odróżniać zapisane kontakty od nieznanych numerów.',
   'notificationsPermissionNeeded':
       'Zezwól na powiadomienia, aby widzieć przypomnienia o połączeniach.',
   'answering_machine': 'Przypomnienie o oddzwonieniu',

@@ -391,6 +391,7 @@ void main() {
           };
         }
         if (call.method == 'restorePendingReminders') return true;
+        if (call.method == 'consumePendingCallJournal') return false;
         return true;
       });
       addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
@@ -444,6 +445,7 @@ void main() {
           'notificationsGranted': true,
         };
       }
+      if (call.method == 'consumePendingCallJournal') return false;
       return true;
     });
     addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
@@ -470,6 +472,7 @@ void main() {
           'notificationsGranted': false,
         };
       }
+      if (call.method == 'consumePendingCallJournal') return false;
       return true;
     });
     addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
@@ -535,6 +538,7 @@ void main() {
     var pickerCalls = 0;
     messenger.setMockMethodCallHandler(channel, (call) async {
       if (call.method == 'restorePendingReminders') return true;
+      if (call.method == 'consumePendingCallJournal') return false;
       if (call.method == 'checkPermissions') {
         return {
           'roleAvailable': true,
@@ -760,19 +764,51 @@ void main() {
     tester,
   ) async {
     await pumpApp(tester);
-    await tester.tap(find.byTooltip('Автовідповідач'));
+    await tester.tap(find.byTooltip('Помічник передзвону'));
     await finishSectionTransition(tester);
     await tester.pumpAndSettle();
 
-    expect(find.text('Увімкнути режим передзвону'), findsOneWidget);
+    expect(find.text('Увімкнути помічник передзвону'), findsOneWidget);
     expect(find.text('У режимі тиші'), findsOneWidget);
     expect(find.text('Усі невідомі номери'), findsOneWidget);
-    expect(
-      find.text('Сповіщення про пропущений вхідний дзвінок'),
-      findsOneWidget,
-    );
     expect(find.text('Записувати повідомлення'), findsNothing);
     expect(find.text('Записати голос'), findsNothing);
+  });
+
+  testWidgets('callback assistant explains missing contacts permission', (
+    tester,
+  ) async {
+    const channel = MethodChannel('com.wepr.callguard/screening');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'checkPermissions') {
+        return {
+          'roleAvailable': true,
+          'callScreeningRole': true,
+          'readContacts': false,
+          'notificationsGranted': true,
+        };
+      }
+      if (call.method == 'consumePendingCallJournal') return false;
+      if (call.method == 'restorePendingReminders') return true;
+      return true;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    await pumpApp(tester);
+    await tester.tap(find.byTooltip('Помічник передзвону'));
+    await finishSectionTransition(tester);
+    await waitForText(tester, 'Помічник передзвону');
+
+    expect(find.text('Передзвін'), findsOneWidget);
+    expect(find.text('Помічник передзвону'), findsOneWidget);
+    await tester.tap(find.text('Усі невідомі номери'));
+    await waitForText(
+      tester,
+      'Доступ до контактів потрібен, щоб відрізнити збережені номери від невідомих.',
+    );
+    expect(find.text('Надати доступ'), findsOneWidget);
   });
 
   testWidgets('profile menu opens About and Support dialogs', (tester) async {

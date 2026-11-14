@@ -2,13 +2,13 @@ const Map<String, String> stringsFr = {
   'navHome': 'Accueil',
   'navLists': 'Listes',
   'navSchedule': 'Planning',
-  'navAnswer': 'Réponse',
+  'navAnswer': 'Rappel',
   'navMore': 'Plus',
   'homeTitle': 'Protection contre les appels entrants',
   'homeSubtitle': 'Gérez vos règles d’appels entrants au même endroit.',
   'listsTitle': 'Listes et filtres',
   'scheduleTitle': 'Plage silencieuse',
-  'answerTitle': 'Réponse automatique',
+  'answerTitle': 'Assistant de rappel',
   'moreTitle': 'Rappels et journal',
   'moreEyebrow': 'TOUT À PORTÉE DE MAIN',
   'moreSubtitle': 'Gérez les rappels pour rappeler et consultez l’activité récente du filtrage des appels entrants.',
@@ -154,7 +154,7 @@ const Map<String, String> stringsFr = {
   'onlyAllowlistHint':
       'Autoriser UNIQUEMENT les appels entrants de la liste autorisée',
   'answerEyebrow': 'RAPPELEZ QUAND VOUS LE SOUHAITEZ',
-  'answerSubtitle': 'Rejetez silencieusement les appels entrants selon le scénario et recevez un rappel local pour rappeler.',
+  'answerSubtitle': 'L’application rejette silencieusement les appels entrants selon le scénario choisi et vous aide à rappeler plus tard. Elle ne répond pas automatiquement aux appels.',
   'newReminderTitle': 'Nouveau rappel',
   'notificationPermissionLabel': 'Autorisation des notifications',
   'notificationsGranted': 'Notifications autorisées',
@@ -207,7 +207,7 @@ const Map<String, String> stringsFr = {
   'clearJournalTitle': 'Effacer le journal des blocages ?',
   'clearJournalMessage': 'Toutes les entrées seront définitivement supprimées.',
   'clearJournalConfirm': 'Effacer le journal',
-  'answeringEnabledLabel': 'Activer le mode rappel',
+  'answeringEnabledLabel': 'Activer l’assistant de rappel',
   'answeringEnabledDescription':
       'Rejeter silencieusement les appels entrants du scénario choisi.',
   'answeringScenarioTitle': 'Scénario de rejet',
@@ -218,6 +218,8 @@ const Map<String, String> stringsFr = {
   'answeringNotificationLabel': 'Notification locale d’appel entrant manqué',
   'answeringNotificationHint':
       'Afficher une notification avec un bouton pour rappeler.',
+  'answeringNotificationsPermissionWarning': 'Les notifications sont désactivées : les appels rejetés ne s’afficheront pas dans les notifications.',
+  'answeringContactsPermissionWarning': 'L’accès aux contacts est nécessaire pour distinguer les contacts enregistrés des numéros inconnus.',
   'notificationsPermissionNeeded':
       'Autorisez les notifications pour voir les rappels d’appel.',
   'answering_machine': 'Rappel pour rappeler',
