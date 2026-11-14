@@ -861,6 +861,56 @@ class _SystemCallPermissionsCardState extends State<_SystemCallPermissionsCard>
     await _refresh();
   }
 
+  Future<void> _openDefaultAppsSettings() async {
+    try {
+      await _channel.openDefaultAppsSettings();
+    } on PlatformException {
+      if (!mounted) return;
+      setState(() => _hasError = true);
+    } on MissingPluginException {
+      if (!mounted) return;
+      setState(() => _hasError = true);
+    }
+  }
+
+  Widget _roleManagementButton() => PopupMenuButton<String>(
+    tooltip: widget.strings.call('changeRevokeRole'),
+    onSelected: (action) {
+      if (action == 'request') {
+        unawaited(_requestRole());
+      } else {
+        unawaited(_openDefaultAppsSettings());
+      }
+    },
+    itemBuilder: (context) => [
+      PopupMenuItem(
+        value: 'request',
+        child: Text(widget.strings.call('requestRoleAgain')),
+      ),
+      PopupMenuItem(
+        value: 'settings',
+        child: Text(widget.strings.call('defaultAppsSettings')),
+      ),
+    ],
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 8),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            widget.strings.call('changeRevokeRole'),
+            style: TextStyle(
+              color: _Palette.accent(_Palette.blue),
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const Icon(Icons.arrow_drop_down_rounded, size: 18),
+        ],
+      ),
+    ),
+  );
+
   Future<void> _requestContacts() async {
     try {
       await _channel.requestContactsPermission();
@@ -879,6 +929,7 @@ class _SystemCallPermissionsCardState extends State<_SystemCallPermissionsCard>
     required String grantedLabel,
     required String actionLabel,
     required VoidCallback onRequest,
+    Widget? grantedAction,
     bool unavailable = false,
   }) {
     final color = granted ? _Palette.green : _Palette.amber;
@@ -912,6 +963,8 @@ class _SystemCallPermissionsCardState extends State<_SystemCallPermissionsCard>
         ),
         if (_loading)
           Icon(Icons.sync_rounded, color: _Palette.muted, size: 20)
+        else if (granted && grantedAction != null)
+          grantedAction
         else if (!granted && !unavailable)
           TextButton(
             onPressed: onRequest,
@@ -949,6 +1002,7 @@ class _SystemCallPermissionsCardState extends State<_SystemCallPermissionsCard>
             grantedLabel: widget.strings.call('roleGranted'),
             actionLabel: widget.strings.call('grantRole'),
             onRequest: _requestRole,
+            grantedAction: _roleManagementButton(),
             unavailable: !_permissions.roleAvailable && !_loading,
           ),
           const Padding(
@@ -3125,6 +3179,54 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
     await _reload();
   }
 
+  Future<void> _editReminderTime(_Reminder reminder) async {
+    final id = reminder.id;
+    if (id == null) return;
+    final current = DateTime.fromMillisecondsSinceEpoch(reminder.remindAt);
+    final selectedDate = await showDatePicker(
+      context: context,
+      initialDate: current,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now().add(const Duration(days: 3650)),
+    );
+    if (selectedDate == null || !mounted) return;
+    final selectedTime = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(current),
+    );
+    if (selectedTime == null || !mounted) return;
+
+    final updatedReminderAt = DateTime(
+      selectedDate.year,
+      selectedDate.month,
+      selectedDate.day,
+      selectedTime.hour,
+      selectedTime.minute,
+    ).millisecondsSinceEpoch;
+    await widget.database.updateReminderTime(id, updatedReminderAt);
+    try {
+      if (reminder.isDone) {
+        await _screeningChannel.cancelReminder(id);
+      } else {
+        await _screeningChannel.scheduleReminder(
+          id: id,
+          remindAt: updatedReminderAt,
+        );
+      }
+    } on PlatformException {
+      // The saved date is restored and re-scheduled when the app starts.
+    } on MissingPluginException {
+      // AlarmManager scheduling is available only on Android.
+    }
+    await _reloadReminders();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text(widget.strings.call('reminderTimeUpdated'))),
+      );
+  }
+
   Future<void> _dialReminder(String phoneNumber) async {
     try {
       await _screeningChannel.openDialer(phoneNumber);
@@ -3175,6 +3277,39 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
       ..showSnackBar(
         SnackBar(content: Text(widget.strings.call('allowlistAdded'))),
       );
+  }
+
+  Future<void> _deleteCallLog(_CallLogEntry entry) async {
+    await widget.database.deleteCallLog(entry.id);
+    await _reloadLogs();
+  }
+
+  Future<void> _confirmClearCallLogs() async {
+    if (_logs.isEmpty) return;
+    final shouldClear = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: Icon(
+          Icons.delete_sweep_outlined,
+          color: _Palette.accent(_Palette.red),
+        ),
+        title: Text(widget.strings.call('clearJournalTitle')),
+        content: Text(widget.strings.call('clearJournalMessage')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(widget.strings.call('cancel')),
+          ),
+          FilledButton.tonal(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(widget.strings.call('clearJournalConfirm')),
+          ),
+        ],
+      ),
+    );
+    if (shouldClear != true || !mounted) return;
+    await widget.database.clearCallLogs();
+    await _reloadLogs();
   }
 
   Future<void> _createReminder() async {
@@ -3392,6 +3527,7 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
             strings: widget.strings,
             dateLabel: _dateTimeLabel(reminder.remindAt),
             onCall: () => _dialReminder(reminder.phone),
+            onEditTime: () => _editReminderTime(reminder),
             onToggleDone: () => _toggleReminder(reminder),
             onDelete: () => _deleteReminder(reminder),
           ),
@@ -3426,6 +3562,19 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
         ),
       ],
     ),
+    if (_logs.isNotEmpty)
+      Align(
+        alignment: Alignment.centerRight,
+        child: TextButton.icon(
+          onPressed: _confirmClearCallLogs,
+          icon: const Icon(Icons.delete_sweep_outlined, size: 17),
+          label: Text(widget.strings.call('clearJournal')),
+          style: TextButton.styleFrom(
+            foregroundColor: _Palette.accent(_Palette.red),
+            visualDensity: VisualDensity.compact,
+          ),
+        ),
+      ),
     const SizedBox(height: 11),
     if (_loading)
       const Center(child: CircularProgressIndicator())
@@ -3448,12 +3597,14 @@ class _MorePageState extends State<_MorePage> with WidgetsBindingObserver {
         return Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: _JournalCard(
+            strings: widget.strings,
             phone: _localizedOrRaw(entry.phone),
             caption: _dateTimeLabel(entry.timestamp),
             reason: _localizedOrRaw(entry.reason),
             tint: tint,
             pale: _Palette.accentSurface(tint),
             icon: icon,
+            onDelete: () => _deleteCallLog(entry),
             onAdd: () => _addLogPhone(entry.phone),
             addLabel: widget.strings.call('addToAllowlist'),
           ),
@@ -3500,6 +3651,7 @@ class _ReminderCard extends StatelessWidget {
     required this.strings,
     required this.dateLabel,
     required this.onCall,
+    required this.onEditTime,
     required this.onToggleDone,
     required this.onDelete,
   });
@@ -3508,6 +3660,7 @@ class _ReminderCard extends StatelessWidget {
   final AppStrings strings;
   final String dateLabel;
   final VoidCallback onCall;
+  final VoidCallback onEditTime;
   final VoidCallback onToggleDone;
   final VoidCallback onDelete;
 
@@ -3555,20 +3708,51 @@ class _ReminderCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                Icon(
-                  Icons.schedule_rounded,
-                  size: 15,
-                  color: _Palette.accent(_Palette.blue),
-                ),
-                const SizedBox(width: 5),
                 Flexible(
-                  child: Text(
-                    dateLabel,
-                    textAlign: TextAlign.right,
-                    style: TextStyle(
-                      color: _Palette.accent(_Palette.blue),
-                      fontWeight: FontWeight.w800,
-                      fontSize: 10,
+                  child: Tooltip(
+                    message: strings.call('editReminderTime'),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: onEditTime,
+                        borderRadius: BorderRadius.circular(10),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 7,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.schedule_rounded,
+                                size: 15,
+                                color: _Palette.accent(_Palette.blue),
+                              ),
+                              const SizedBox(width: 5),
+                              Flexible(
+                                child: Text(
+                                  dateLabel,
+                                  textAlign: TextAlign.right,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: _Palette.accent(_Palette.blue),
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 3),
+                              Icon(
+                                Icons.edit_calendar_outlined,
+                                size: 13,
+                                color: _Palette.muted,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -3671,22 +3855,26 @@ class _EmptyState extends StatelessWidget {
 
 class _JournalCard extends StatelessWidget {
   const _JournalCard({
+    required this.strings,
     required this.phone,
     required this.caption,
     required this.reason,
     required this.tint,
     required this.pale,
     required this.icon,
+    required this.onDelete,
     required this.onAdd,
     required this.addLabel,
   });
 
+  final AppStrings strings;
   final String phone;
   final String caption;
   final String reason;
   final Color tint;
   final Color pale;
   final IconData icon;
+  final VoidCallback onDelete;
   final VoidCallback onAdd;
   final String addLabel;
 
@@ -3726,21 +3914,38 @@ class _JournalCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: onAdd,
-                icon: const Icon(Icons.person_add_alt_1_outlined, size: 16),
-                label: Text(addLabel),
-                style: TextButton.styleFrom(
-                  foregroundColor: _Palette.accent(_Palette.blue),
-                  visualDensity: VisualDensity.compact,
-                  textStyle: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton.icon(
+                  onPressed: onAdd,
+                  icon: const Icon(Icons.person_add_alt_1_outlined, size: 16),
+                  label: Text(addLabel),
+                  style: TextButton.styleFrom(
+                    foregroundColor: _Palette.accent(_Palette.blue),
+                    visualDensity: VisualDensity.compact,
+                    textStyle: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
-              ),
+                IconButton(
+                  tooltip: strings.call('deleteCallLog'),
+                  onPressed: onDelete,
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 36,
+                    height: 36,
+                  ),
+                  icon: Icon(
+                    Icons.delete_outline_rounded,
+                    color: _Palette.muted,
+                    size: 19,
+                  ),
+                ),
+              ],
             ),
           ],
         ),

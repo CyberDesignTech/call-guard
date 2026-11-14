@@ -372,6 +372,14 @@ class DatabaseHelper {
         whereArgs: [id],
       );
 
+  Future<int> updateReminderTime(int id, int remindAt) async =>
+      (await _database).update(
+        'call_reminders',
+        {'remind_at': remindAt},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+
   Future<int> deleteReminder(int id) async => (await _database).delete(
     'call_reminders',
     where: 'id = ?',
@@ -393,6 +401,8 @@ class DatabaseHelper {
 
   Future<int> deleteCallLog(int id) async =>
       (await _database).delete('call_logs', where: 'id = ?', whereArgs: [id]);
+
+  Future<int> clearCallLogs() async => (await _database).delete('call_logs');
 
   Future<void> close() async {
     final database = _openedDatabase;

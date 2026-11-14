@@ -64,6 +64,30 @@ void main() {
   });
 
   test(
+    'can edit a reminder time and delete or clear call log entries',
+    () async {
+      final reminder = (await _testDatabase.getReminders()).first;
+      final newReminderAt = DateTime(2027, 2, 3, 14, 45).millisecondsSinceEpoch;
+      await _testDatabase.updateReminderTime(
+        reminder['id'] as int,
+        newReminderAt,
+      );
+      expect(
+        (await _testDatabase.getReminders()).firstWhere(
+          (row) => row['id'] == reminder['id'],
+        )['remind_at'],
+        newReminderAt,
+      );
+
+      final firstLog = (await _testDatabase.getCallLogs()).first;
+      await _testDatabase.deleteCallLog(firstLog['id'] as int);
+      expect(await _testDatabase.getCallLogs(), hasLength(2));
+      await _testDatabase.clearCallLogs();
+      expect(await _testDatabase.getCallLogs(), isEmpty);
+    },
+  );
+
+  test(
     'SQLite preferences and records survive closing and reopening',
     () async {
       const databasePath = 'test/call_guard_persistence_test.db';
@@ -177,6 +201,7 @@ void main() {
       await bridge.scheduleReminder(id: 21, remindAt: 1_900_000_000_000);
       await bridge.cancelReminder(21);
       await bridge.restorePendingReminders();
+      await bridge.openDefaultAppsSettings();
       await bridge.openDialer('+380 67 123 45 67');
 
       expect(calls.map((call) => call.method), [
@@ -184,10 +209,11 @@ void main() {
         'scheduleReminder',
         'cancelReminder',
         'restorePendingReminders',
+        'openDefaultAppsSettings',
         'openDialer',
       ]);
       expect(calls[1].arguments, {'id': 21, 'remindAt': 1_900_000_000_000});
-      expect(calls[4].arguments, {'phoneNumber': '+380 67 123 45 67'});
+      expect(calls[5].arguments, {'phoneNumber': '+380 67 123 45 67'});
     },
   );
 
@@ -260,6 +286,49 @@ void main() {
     expect(testedNumber, '+380 67 555 01 01');
     expect(find.text('Відхилити виклик'), findsOneWidget);
     expect(find.text('Причина: Чорний список'), findsOneWidget);
+  });
+
+  testWidgets('granted screening role can be changed from system settings', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    const channel = MethodChannel('com.wepr.callguard/screening');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    var roleHeld = true;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'checkPermissions') {
+        return {
+          'roleAvailable': true,
+          'callScreeningRole': roleHeld,
+          'readContacts': true,
+        };
+      }
+      if (call.method == 'openDefaultAppsSettings') {
+        roleHeld = false;
+        return true;
+      }
+      return null;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    await pumpApp(tester);
+    await waitForText(tester, 'Змінити / відкликати');
+    await tester.ensureVisible(find.text('Змінити / відкликати'));
+    await tester.tap(find.text('Змінити / відкликати'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Налаштування програм за замовчуванням'));
+    await tester.pumpAndSettle();
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await waitForText(tester, 'Надати системну роль');
+    expect(find.text('Системну роль не надано'), findsOneWidget);
   });
 
   testWidgets('answering tab only offers quiet call-back options', (

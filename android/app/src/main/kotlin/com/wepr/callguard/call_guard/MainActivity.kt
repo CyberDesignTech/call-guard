@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
@@ -29,6 +30,7 @@ class MainActivity : FlutterActivity() {
         when (call.method) {
             "checkPermissions" -> result.success(permissionState())
             "requestCallScreeningRole" -> requestCallScreeningRole(result)
+            "openDefaultAppsSettings" -> openDefaultAppsSettings(result)
             "requestContactsPermission" -> requestContactsPermission(result)
             "requestNotificationPermission" -> requestNotificationPermission(result)
             "scheduleReminder" -> scheduleReminder(call, result)
@@ -51,10 +53,6 @@ class MainActivity : FlutterActivity() {
             result.error("ROLE_UNAVAILABLE", "Call-screening role is not available on this device", null)
             return
         }
-        if (roleManager.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)) {
-            result.success(permissionState())
-            return
-        }
         if (pendingRoleResult != null) {
             result.error("REQUEST_IN_PROGRESS", "A role request is already in progress", null)
             return
@@ -70,6 +68,29 @@ class MainActivity : FlutterActivity() {
         } catch (error: Exception) {
             pendingRoleResult = null
             result.error("ROLE_REQUEST_FAILED", error.message, null)
+        }
+    }
+
+    private fun openDefaultAppsSettings(result: MethodChannel.Result) {
+        try {
+            startActivity(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
+            result.success(true)
+        } catch (settingsError: Exception) {
+            try {
+                startActivity(
+                    Intent(
+                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.fromParts("package", packageName, null),
+                    ),
+                )
+                result.success(true)
+            } catch (fallbackError: Exception) {
+                result.error(
+                    "DEFAULT_APPS_SETTINGS_UNAVAILABLE",
+                    fallbackError.message ?: settingsError.message,
+                    null,
+                )
+            }
         }
     }
 

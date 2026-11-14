@@ -56,6 +56,10 @@ class CallScreeningChannel {
         ),
       );
 
+  Future<void> openDefaultAppsSettings() async {
+    await _channel.invokeMethod<bool>('openDefaultAppsSettings');
+  }
+
   Future<CallScreeningPermissions> requestContactsPermission() async =>
       CallScreeningPermissions.fromMap(
         await _channel.invokeMapMethod<String, Object?>(
