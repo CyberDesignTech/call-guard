@@ -7,7 +7,6 @@ import '../l10n/app_strings.dart';
 import '../models/list_entry.dart';
 import '../platform/call_screening_channel.dart';
 import '../theme/app_palette.dart';
-import '../widgets/common/app_info_footnote.dart';
 import '../widgets/common/contact_picker.dart';
 import '../widgets/common/entry_card.dart';
 import '../widgets/common/page_intro.dart';
@@ -19,7 +18,6 @@ class ListsPage extends StatefulWidget {
     required this.onStub,
     required this.strings,
     required this.isActive,
-    required this.onSupport,
     this.onEdgeSwipe,
   });
 
@@ -27,7 +25,6 @@ class ListsPage extends StatefulWidget {
   final VoidCallback onStub;
   final AppStrings strings;
   final bool isActive;
-  final VoidCallback onSupport;
   final ValueChanged<int>? onEdgeSwipe;
 
   @override
@@ -365,14 +362,6 @@ class ListsPageState extends State<ListsPage>
                   ),
                 ],
               ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 8, 18, 8),
-            child: AppInfoFootnote(
-              message: widget.strings.call('freeForeverMessage'),
-              linkLabel: widget.strings.call('freeForeverSupportLink'),
-              onSupport: widget.onSupport,
             ),
           ),
         ],

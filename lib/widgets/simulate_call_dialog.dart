@@ -115,8 +115,17 @@ class SimulateCallDialogState extends State<SimulateCallDialog> {
                   ),
                   const SizedBox(height: 5),
                   Text(
-                    '${widget.strings.call('ruleReason')}: ${_reasonLabel(verdict.reason)}',
+                    widget.strings.call(
+                      verdict.allowed
+                          ? 'verdictAllowedExplanation'
+                          : 'verdictRejectedExplanation',
+                    ),
                     style: TextStyle(color: AppPalette.ink, fontSize: 12),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    '${widget.strings.call('ruleReason')}: ${_reasonLabel(verdict.reason)}',
+                    style: TextStyle(color: AppPalette.muted, fontSize: 12),
                   ),
                 ],
               ),

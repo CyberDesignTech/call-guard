@@ -243,8 +243,12 @@ const Map<String, String> stringsEn = {
       'Reject incoming calls outside your allowlist right now',
   'runSimulation': 'Check number',
   'checkingCallRules': 'Checking rules…',
-  'verdictAllowed': 'Allow call',
-  'verdictRejected': 'Reject call',
+  'verdictAllowed': 'This call is allowed',
+  'verdictRejected': 'This call is rejected',
+  'verdictAllowedExplanation':
+      'Current app rules allow an incoming call from this number',
+  'verdictRejectedExplanation':
+      'Current app rules do not allow an incoming call from this number',
   'ruleReason': 'Reason',
   'simulationUnavailable':
       'Could not check this number. Make sure the Android app is running.',

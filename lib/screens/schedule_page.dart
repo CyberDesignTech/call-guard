@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../l10n/app_strings.dart';
 import '../theme/app_palette.dart';
 import '../widgets/common/app_panel.dart';
-import '../widgets/common/app_info_footnote.dart';
 import '../widgets/common/page_intro.dart';
 import '../widgets/common/rule_switch.dart';
 import '../widgets/common/section_heading.dart';
@@ -22,7 +21,6 @@ class SchedulePage extends StatefulWidget {
     required this.onEndTimeChanged,
     required this.selectedDays,
     required this.onSelectedDaysChanged,
-    required this.onSupport,
   });
 
   final AppStrings strings;
@@ -36,7 +34,6 @@ class SchedulePage extends StatefulWidget {
   final ValueChanged<TimeOfDay> onEndTimeChanged;
   final Set<int> selectedDays;
   final ValueChanged<Set<int>> onSelectedDaysChanged;
-  final VoidCallback onSupport;
 
   @override
   State<SchedulePage> createState() => SchedulePageState();
@@ -199,12 +196,6 @@ class SchedulePageState extends State<SchedulePage> {
             iconColor: AppPalette.green,
             iconBackground: AppPalette.greenPale,
           ),
-        ),
-        const SizedBox(height: 16),
-        AppInfoFootnote(
-          message: widget.strings.call('freeForeverMessage'),
-          linkLabel: widget.strings.call('freeForeverSupportLink'),
-          onSupport: widget.onSupport,
         ),
       ],
     );

@@ -311,7 +311,9 @@ void main() {
     );
   });
 
-  testWidgets('bottom info banner appears on every section', (tester) async {
+  testWidgets('bottom info banner appears only on the Home section', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(390, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -321,18 +323,18 @@ void main() {
         'Call Gate працює повністю безкоштовно, без реклами та прихованих платежів і завжди залишатиметься таким.';
     const link = 'Підтримати проєкт';
 
-    Future<void> expectBannerVisible() async {
+    Future<void> scrollToBottom() async {
       final listViews = find.byType(ListView);
       if (listViews.evaluate().isNotEmpty) {
         await tester.drag(listViews.first, const Offset(0, -3000));
         await tester.pump(const Duration(milliseconds: 400));
       }
-      expect(find.text(message).hitTestable(), findsOneWidget);
-      expect(find.text(link).hitTestable(), findsOneWidget);
     }
 
     await pumpApp(tester);
-    await expectBannerVisible();
+    await scrollToBottom();
+    expect(find.text(message).hitTestable(), findsOneWidget);
+    expect(find.text(link).hitTestable(), findsOneWidget);
 
     for (final tooltip in [
       'Списки та фільтри',
@@ -342,7 +344,9 @@ void main() {
     ]) {
       await tester.tap(find.byTooltip(tooltip));
       await finishSectionTransition(tester);
-      await expectBannerVisible();
+      await scrollToBottom();
+      expect(find.text(message).hitTestable(), findsNothing);
+      expect(find.text(link).hitTestable(), findsNothing);
     }
 
     await waitForText(tester, 'Олена Коваль');
@@ -823,7 +827,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(testedNumber, '+380 67 555 01 01');
-    expect(find.text('Відхилити виклик'), findsOneWidget);
+    expect(find.text('Цей виклик відхилено'), findsOneWidget);
+    expect(
+      find.text(
+        'Діючі правила застосунку не дозволяють вхідний дзвінок із цього номера',
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Причина: Чорний список'), findsOneWidget);
   });
 
@@ -861,7 +871,7 @@ void main() {
     await tester.tap(find.text('Перевірити номер'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Відхилити виклик'), findsOneWidget);
+    expect(find.text('Цей виклик відхилено'), findsOneWidget);
     expect(find.text('Причина: Лише білий список'), findsOneWidget);
   });
 
@@ -1042,7 +1052,7 @@ void main() {
     await tester.tap(aboutMenuItem);
     await tester.pumpAndSettle();
     expect(find.text('Call Gate'), findsOneWidget);
-    expect(find.textContaining('v1.6.1'), findsOneWidget);
+    expect(find.textContaining('v1.6.2'), findsOneWidget);
     expect(find.textContaining('не надсилаються на сервер'), findsOneWidget);
 
     await tester.tap(find.text('Зрозуміло'));

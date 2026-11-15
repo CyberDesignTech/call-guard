@@ -247,8 +247,12 @@ const Map<String, String> stringsUk = {
       'Відхиляти вхідні дзвінки поза білим списком просто зараз',
   'runSimulation': 'Перевірити номер',
   'checkingCallRules': 'Перевіряємо правила…',
-  'verdictAllowed': 'Дозволити виклик',
-  'verdictRejected': 'Відхилити виклик',
+  'verdictAllowed': 'Цей виклик дозволено',
+  'verdictRejected': 'Цей виклик відхилено',
+  'verdictAllowedExplanation':
+      'Діючі правила застосунку дозволяють вхідний дзвінок із цього номера',
+  'verdictRejectedExplanation':
+      'Діючі правила застосунку не дозволяють вхідний дзвінок із цього номера',
   'ruleReason': 'Причина',
   'simulationUnavailable': 'Не вдалося перевірити номер. Переконайтеся, що працює Android-застосунок.',
   'refresh': 'Оновити журнал',
