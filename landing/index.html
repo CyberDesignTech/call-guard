@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Call Gate — Ваш спокій під контролем</title>
+  <meta name="description" content="Інтелектуальний офлайн-фільтр вхідних дзвінків для Android. Блокуйте спам, налаштовуйте розклад тиші, зберігайте 100% приватності." />
+  <link rel="icon" type="image/svg+xml" href="assets/images/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+  <header class="navbar">
+    <div class="container nav-inner">
+      <a class="brand" href="#top">
+        <img src="assets/images/logo.svg" alt="Call Gate logo" />
+        <span>Call Gate</span>
+      </a>
+      <nav class="nav-links">
+        <a href="#features" data-i18n="navFeatures">Можливості</a>
+        <a href="#how" data-i18n="navHow">Як це працює</a>
+        <a href="#privacy" data-i18n="navPrivacy">Приватність</a>
+        <a href="#faq" data-i18n="navFaq">FAQ</a>
+      </nav>
+      <div class="nav-actions">
+        <div class="lang-switch" role="group" aria-label="Language">
+          <button data-lang="uk" class="active">UA</button>
+          <button data-lang="en">EN</button>
+        </div>
+        <a class="btn btn-primary btn-sm" href="../release/CallGate-1.6.2.apk" data-i18n="navDownload">Завантажити APK</a>
+        <button class="hamburger" id="hamburger" aria-label="Menu">☰</button>
+      </div>
+    </div>
+    <div class="mobile-menu" id="mobileMenu">
+      <a href="#features" data-i18n="navFeatures">Можливості</a>
+      <a href="#how" data-i18n="navHow">Як це працює</a>
+      <a href="#privacy" data-i18n="navPrivacy">Приватність</a>
+      <a href="#faq" data-i18n="navFaq">FAQ</a>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="container hero-grid">
+        <div>
+          <span class="badge" data-i18n="badge">100% Offline • Без реклами • Безкоштовно назавжди</span>
+          <h1 data-i18n-html="heroTitle">Call Gate — <span class="accent">Ваш спокій під контролем</span></h1>
+          <p data-i18n="heroSub">Інтелектуальний офлайн-фільтр вхідних дзвінків для Android. Блокуйте спам, налаштовуйте розклад тиші та зберігайте 100% приватності без передачі контактів у хмару.</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="../release/CallGate-1.6.2.apk" data-i18n="heroDownload">Завантажити APK</a>
+            <a class="btn btn-ghost" href="#demo" data-i18n="heroSim">Спробувати симулятор</a>
+          </div>
+          <div class="hero-meta" data-i18n="heroMeta">v1.6.2 • Android 10+ • 19 MB</div>
+        </div>
+        <div class="phone-wrap">
+          <div class="phone">
+            <div class="phone-screen">
+              <div class="notch"></div>
+              <div class="status"><span>9:41</span><span>●●● WiFi</span></div>
+              <div class="phone-header"><img src="assets/images/logo.svg" alt="" /> Call Gate</div>
+              <div class="toggle-row">
+                <div>
+                  <div style="font-weight:600;font-size:14px" data-i18n="phoneProtection">Захист</div>
+                  <div style="color:var(--muted);font-size:12px" data-i18n="phoneOn">Увімкнено</div>
+                </div>
+                <div class="toggle"></div>
+              </div>
+              <div class="quiet-card">
+                <div class="title" data-i18n="phoneQuietTitle">Тихий режим активний</div>
+                <div class="sub" data-i18n="phoneQuietSub">22:00 — 07:00 • Вихідні</div>
+              </div>
+              <div class="section-label" data-i18n="phoneRejected">Відхилені</div>
+              <div class="call-item"><span class="num">+380 99 111 22 33</span><span class="tag tag-rejected" data-i18n="tagSpam">Спам</span></div>
+              <div class="call-item"><span class="num">+44 20 7946 0958</span><span class="tag tag-rejected" data-i18n="tagForeign">Закордон</span></div>
+              <div class="section-label" data-i18n="phoneMissed">Пропущені</div>
+              <div class="call-item"><span class="num">Мама</span><span class="tag tag-missed" data-i18n="tagCallback">Передзвонити</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="features">
+      <div class="container">
+        <div class="section-head">
+          <h2 data-i18n="featuresTitle">Ключові переваги</h2>
+          <p data-i18n="featuresSub">Все, що потрібно для спокою — без хмари, реклами та підписок.</p>
+        </div>
+        <div class="features">
+          <div class="card">
+            <div class="icon">🔒</div>
+            <h3 data-i18n="f1t">100% локальна приватність</h3>
+            <p data-i18n="f1d">Жодних хмарних баз, збору адресної книги чи аналітики. Усі правила живуть лише на вашому пристрої.</p>
+          </div>
+          <div class="card">
+            <div class="icon">🌙</div>
+            <h3 data-i18n="f2t">Розумний розклад тиші</h3>
+            <p data-i18n="f2d">Автоматичне ввімкнення тиші вночі, у вихідні або під час відпочинку.</p>
+          </div>
+          <div class="card">
+            <div class="icon">🚨</div>
+            <h3 data-i18n="f3t">Екстрений прорив (3-й дзвінок за 5 хв)</h3>
+            <p data-i18n="f3d">Відсіює подвійні автодозвони спамерів, але пропускає близьких у справді терміновій ситуації.</p>
+          </div>
+          <div class="card">
+            <div class="icon">🌍</div>
+            <h3 data-i18n="f4t">Фільтр країн та операторів</h3>
+            <p data-i18n="f4d">Блокування небажаних міжнародних префіксів та мобільних кодів одним перемикачем.</p>
+          </div>
+          <div class="card">
+            <div class="icon">📞</div>
+            <h3 data-i18n="f5t">Помічник передзвону та нагадування</h3>
+            <p data-i18n="f5d">Тихе відхилення викликів за сценарієм і зручні нагадування передзвонити пізніше.</p>
+          </div>
+          <div class="card">
+            <div class="icon">💚</div>
+            <h3 data-i18n="f6t">Безкоштовно і без реклами назавжди</h3>
+            <p data-i18n="f6d">Жодних прихованих підписок, банерів і нав'язливих платних функцій.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="demo">
+      <div class="container">
+        <div class="section-head">
+          <h2 data-i18n="demoTitle">Тестовий виклик</h2>
+          <p data-i18n="demoSub">Перевірте, як Call Gate прийме виклик — прямо тут.</p>
+        </div>
+        <div class="demo">
+          <div class="demo-grid">
+            <div class="demo-controls">
+              <div class="scenarios">
+                <button class="scenario-btn active" data-scenario="mama" data-i18n="scMama">Мама (Білий список)</button>
+                <button class="scenario-btn" data-scenario="unknownNight" data-i18n="scUnknown">Невідомий номер уночі (1-й дзвінок)</button>
+                <button class="scenario-btn" data-scenario="emergency" data-i18n="scEmergency">Екстрений дзвінок (3-й раз за 5 хв)</button>
+                <button class="scenario-btn" data-scenario="foreign" data-i18n="scForeign">Закордонний спам-префікс</button>
+              </div>
+              <div class="input-row">
+                <input id="phoneInput" type="tel" placeholder="+380..." value="+380 67 123 45 67" />
+                <button class="btn btn-primary" id="checkBtn" data-i18n="checkBtn">Перевірити правило</button>
+              </div>
+            </div>
+            <div class="verdict" id="verdict">
+              <div class="status" id="verdictStatus" data-i18n="verdictIdle">Оберіть сценарій або введіть номер</div>
+              <div class="reason" id="verdictReason" data-i18n="verdictIdleReason">Натисніть «Перевірити правило», щоб побачити рішення Call Gate.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="how">
+      <div class="container">
+        <div class="section-head">
+          <h2 data-i18n="howTitle">Як почати за 3 кроки</h2>
+        </div>
+        <div class="steps">
+          <div class="step">
+            <div class="num">1</div>
+            <h3 data-i18n="step1t">Завантажити APK</h3>
+            <p data-i18n="step1d">Встановіть Call Gate з релізу та відкрийте застосунок.</p>
+          </div>
+          <div class="step">
+            <div class="num">2</div>
+            <h3 data-i18n="step2t">Надати роль фільтрації</h3>
+            <p data-i18n="step2d">Призначте Call Gate системною роллю визначення/фільтрації викликів (CallScreeningService).</p>
+          </div>
+          <div class="step">
+            <div class="num">3</div>
+            <h3 data-i18n="step3t">Обрати режим спокою</h3>
+            <p data-i18n="step3d">Налаштуйте розклад тиші та списки — і насолоджуйтесь спокоєм.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="privacy" style="background:rgba(16,185,129,0.04)">
+      <div class="container">
+        <div class="section-head">
+          <h2 data-i18n="privacyTitle">Приватність понад усе</h2>
+          <p data-i18n="privacySub">Call Gate не надсилає ваші контакти, журнали дзвінків чи правила на сервер. Усе працює офлайн, прямо на пристрої.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="faq">
+      <div class="container">
+        <div class="section-head">
+          <h2 data-i18n="faqTitle">Часті запитання</h2>
+        </div>
+        <div class="faq">
+          <div class="faq-item">
+            <button class="faq-q"><span data-i18n="q1">Чи передаються мої контакти на сервер?</span><span class="chev">▾</span></button>
+            <div class="faq-a" data-i18n="a1">Ні. Call Gate працює повністю офлайн. Ваші контакти, журнали дзвінків і правила ніколи не залишають пристрій.</div>
+          </div>
+          <div class="faq-item">
+            <button class="faq-q"><span data-i18n="q2">Чому екстрений прорив спрацьовує саме з 3-го дзвінка?</span><span class="chev">▾</span></button>
+            <div class="faq-a" data-i18n="a2">Спамери зазвичай роблять 1–2 автодозвони. Три дзвінки за 5 хвилин від одного номера — ознака реальної термінової ситуації, тому виклик пропускається.</div>
+          </div>
+          <div class="faq-item">
+            <button class="faq-q"><span data-i18n="q3">Чи працює без інтернету?</span><span class="chev">▾</span></button>
+            <div class="faq-a" data-i18n="a3">Так, усі правила та фільтрація працюють локально без жодного з'єднання.</div>
+          </div>
+          <div class="faq-item">
+            <button class="faq-q"><span data-i18n="q4">На яких версіях Android працює застосунок?</span><span class="chev">▾</span></button>
+            <div class="faq-a" data-i18n="a4">Android 10 і новіші (API 29+).</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container footer-grid">
+      <div>
+        <strong>Call Gate</strong> • v1.6.2
+        <div style="font-size:13px;margin-top:4px" data-i18n="footerNote">Локальна приватність. Жодної хмари.</div>
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/CyberDesignTech/call-guard" target="_blank" rel="noopener">GitHub</a>
+        <button class="btn btn-ghost btn-sm" id="shareBtn" data-i18n="shareBtn">Поділитися сторінкою</button>
+      </div>
+    </div>
+  </footer>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="assets/js/main.js"></script>
+</body>
+</html>
