@@ -19,12 +19,14 @@ object BridgeContract {
         const val SIMULATE_CALL = "simulateCall"
         const val CONSUME_PENDING_CALL_JOURNAL = "consumePendingCallJournal"
         const val OPEN_CALL_JOURNAL = "openCallJournal"
+        const val OPEN_EXTERNAL_URL = "openExternalUrl"
     }
 
     object Arguments {
         const val ID = "id"
         const val REMIND_AT = "remindAt"
         const val PHONE_NUMBER = "phoneNumber"
+        const val URL = "url"
     }
 
     object ResultKeys {

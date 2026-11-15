@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Activity
 import android.app.NotificationManager
 import android.app.role.RoleManager
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -87,6 +88,7 @@ class MainActivity : FlutterActivity() {
             BridgeContract.Methods.CANCEL_REMINDER -> cancelReminder(call, result)
             BridgeContract.Methods.RESTORE_PENDING_REMINDERS -> restorePendingReminders(result)
             BridgeContract.Methods.OPEN_DIALER -> openDialer(call, result)
+            BridgeContract.Methods.OPEN_EXTERNAL_URL -> openExternalUrl(call, result)
             BridgeContract.Methods.SIMULATE_CALL -> simulateCall(call, result)
             else -> result.notImplemented()
         }
@@ -326,6 +328,63 @@ class MainActivity : FlutterActivity() {
             result.success(true)
         } catch (error: Exception) {
             result.error("DIALER_UNAVAILABLE", error.message, null)
+        }
+    }
+
+    private fun openExternalUrl(call: MethodCall, result: MethodChannel.Result) {
+        val url = call.argument<String>(BridgeContract.Arguments.URL)?.trim()
+        if (url.isNullOrEmpty()) {
+            result.error("INVALID_ARGUMENT", "url is required", null)
+            return
+        }
+        try {
+            if (url.startsWith("market://")) {
+                val marketIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                if (marketIntent.resolveActivity(packageManager) == null) {
+                    val fallbackUrl = url.replace(
+                        "market://details?id=",
+                        "https://play.google.com/store/apps/details?id=",
+                    )
+                    val fallbackIntent = Intent(Intent.ACTION_VIEW, Uri.parse(fallbackUrl)).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    startActivity(fallbackIntent)
+                    result.success(false)
+                    return
+                }
+                startActivity(marketIntent)
+                result.success(true)
+                return
+            }
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(intent)
+            result.success(true)
+        } catch (error: ActivityNotFoundException) {
+            if (url.startsWith("market://")) {
+                val fallbackUrl = url.replace(
+                    "market://details?id=",
+                    "https://play.google.com/store/apps/details?id=",
+                )
+                try {
+                    startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse(fallbackUrl)).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        },
+                    )
+                    result.success(true)
+                    return
+                } catch (fallbackError: ActivityNotFoundException) {
+                    result.success(false)
+                    return
+                }
+            }
+            result.success(false)
+        } catch (error: Exception) {
+            result.success(false)
         }
     }
 

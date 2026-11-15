@@ -367,10 +367,7 @@ void main() {
     await tester.tap(find.text('Підтримати проєкт'));
     await tester.pumpAndSettle();
 
-    expect(
-      find.text('Buy Me a Coffee · Подякувати розробнику'),
-      findsOneWidget,
-    );
+    expect(find.text('Підтримати на Ko-fi'), findsOneWidget);
     expect(find.text('Поділитися застосунком'), findsOneWidget);
   });
 
@@ -1052,25 +1049,21 @@ void main() {
     await tester.tap(aboutMenuItem);
     await tester.pumpAndSettle();
     expect(find.text('Call Gate'), findsOneWidget);
-    expect(find.textContaining('v1.6.2'), findsOneWidget);
+    expect(find.textContaining('v1.6.3'), findsOneWidget);
     expect(find.textContaining('не надсилаються на сервер'), findsOneWidget);
 
-    await tester.tap(find.text('Зрозуміло'));
+    await tester.tap(find.text('Закрити вікно'));
     await tester.pumpAndSettle();
     final supportMenuItem = find.text('Підтримати проєкт');
     await tester.ensureVisible(supportMenuItem);
     await tester.tap(supportMenuItem);
     await tester.pumpAndSettle();
-    expect(
-      find.text('Buy Me a Coffee · Подякувати розробнику'),
-      findsOneWidget,
-    );
+    expect(find.text('Підтримати на Ko-fi'), findsOneWidget);
     expect(find.text('Поділитися застосунком'), findsOneWidget);
-
-    await tester.tap(find.text('Копіювати посилання'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Посилання скопійовано'), findsOneWidget);
+    expect(find.text('Оцінити застосунок'), findsOneWidget);
+    expect(find.text('Закрити вікно'), findsOneWidget);
+    expect(find.text('Зрозуміло'), findsNothing);
+    expect(find.text('Копіювати посилання'), findsNothing);
   });
 
   testWidgets('changes the app language and shows country operators', (

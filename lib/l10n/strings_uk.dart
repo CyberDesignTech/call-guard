@@ -42,12 +42,14 @@ const Map<String, String> stringsUk = {
   'aboutPrivacy': 'Ваші налаштування та списки зберігаються лише на цьому пристрої. Дані не надсилаються на сервер.',
   'supportThanks':
       'Дякуємо, що користуєтеся Call Gate і допомагаєте проєкту розвиватися!',
-  'supportCoffeeTitle': 'Buy Me a Coffee · Подякувати розробнику',
-  'supportCoffeeDescription': 'Посилання на підтримку з’явиться тут незабаром.',
+  'supportKofiTitle': 'Підтримати на Ko-fi',
+  'supportKofiDescription': 'Відкрити сторінку підтримки розробника на Ko-fi.',
   'supportShareTitle': 'Поділитися застосунком',
   'supportShareDescription':
       'Розкажіть друзям про локальний захист від небажаних вхідних дзвінків.',
-  'copyLink': 'Копіювати посилання',
+  'rateAppTitle': 'Оцінити застосунок',
+  'rateAppDescription': 'Залишіть оцінку в Google Play.',
+  'playStoreSoon': 'Сторінка в Google Play зʼявиться незабаром',
   'linkCopied': 'Посилання скопійовано',
   'languageTitle': 'Мова застосунку',
   'themeTitle': 'Тема оформлення',
@@ -58,7 +60,7 @@ const Map<String, String> stringsUk = {
   'testTitle': 'Тестовий виклик',
   'testBody':
       'Введіть номер, щоб перевірити його за поточними правилами захисту.',
-  'closeLabel': 'Зрозуміло',
+  'closeLabel': 'Закрити вікно',
   'homeEyebrow': 'Ваш спокій під контролем',
   'quickHiddenTitle': 'Приховані номери',
   'quickHiddenSubtitle': 'Невідомі / приватні номери',

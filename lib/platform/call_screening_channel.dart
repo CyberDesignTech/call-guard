@@ -138,6 +138,13 @@ class CallScreeningChannel {
     });
   }
 
+  Future<bool> openExternalUrl(String url) async {
+    return await _channel.invokeMethod<bool>('openExternalUrl', {
+          'url': url,
+        }) ??
+        false;
+  }
+
   Future<CallSimulationVerdict> simulateCall(String phoneNumber) async {
     final values = await _channel.invokeMapMethod<String, Object?>(
       'simulateCall',
