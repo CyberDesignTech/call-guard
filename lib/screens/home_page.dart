@@ -82,7 +82,7 @@ class HomePage extends StatelessWidget {
                 children: [
                   const DarkPill(
                     icon: Icons.auto_awesome_rounded,
-                    label: 'CALL GUARD',
+                    label: 'CALL GATE',
                   ),
                   const Spacer(),
                   AnimatedContainer(

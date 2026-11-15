@@ -199,7 +199,7 @@ class CallGuardShellState extends State<CallGuardShell> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'CALL GUARD',
+                    'CALL GATE',
                     style: TextStyle(
                       color: AppPalette.ink,
                       fontSize: 15,
@@ -287,6 +287,7 @@ class CallGuardShellState extends State<CallGuardShell> {
           ),
           AnsweringModePage(
             strings: widget.strings,
+            protectionEnabled: widget.protectionEnabled,
             enabled: widget.answeringEnabled,
             onEnabledChanged: widget.onAnsweringEnabledChanged,
             scenario: widget.answeringScenario,

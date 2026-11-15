@@ -7,7 +7,7 @@
     <string name="missed_call_channel_name">Callback Assistant</string>
     <string name="missed_call_channel_description">Notifications about rejected incoming calls</string>
     <string name="missed_call_title">Call back</string>
-    <string name="missed_call_public_title">Call Guard</string>
+    <string name="missed_call_public_title">Call Gate</string>
     <string name="missed_call_public_text">Incoming call declined</string>
     <string name="missed_call_hidden_title">Hidden number declined</string>
     <string name="missed_call_hidden_text">Tap to view the call journal</string>

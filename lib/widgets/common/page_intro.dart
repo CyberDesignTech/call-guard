@@ -20,6 +20,7 @@ class PageIntro extends StatelessWidget {
       children: [
         Text(
           eyebrow,
+          textAlign: TextAlign.start,
           style: TextStyle(
             color: AppPalette.accent(AppPalette.blue),
             fontSize: 9,
@@ -30,6 +31,7 @@ class PageIntro extends StatelessWidget {
         const SizedBox(height: 5),
         Text(
           title,
+          textAlign: TextAlign.start,
           style: TextStyle(
             color: AppPalette.ink,
             fontSize: 23,
@@ -38,7 +40,11 @@ class PageIntro extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
-        Text(subtitle, style: TextStyle(color: AppPalette.muted, fontSize: 12)),
+        Text(
+          subtitle,
+          textAlign: TextAlign.start,
+          style: TextStyle(color: AppPalette.muted, fontSize: 12),
+        ),
       ],
     );
   }

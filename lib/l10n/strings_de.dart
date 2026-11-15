@@ -41,7 +41,7 @@ const Map<String, String> stringsDe = {
   'aboutDescription': 'Schützen Sie sich mit Nummernlisten, Länder- und Anbieterregeln sowie Ruhezeiten vor unerwünschten eingehenden Anrufen.',
   'aboutPrivacy': 'Ihre Einstellungen und Listen werden nur auf diesem Gerät gespeichert. Es werden keine Daten an einen Server gesendet.',
   'supportThanks':
-      'Danke, dass Sie Call Guard nutzen und das Projekt unterstützen!',
+      'Danke, dass Sie Call Gate nutzen und das Projekt unterstützen!',
   'supportCoffeeTitle': 'Buy Me a Coffee · Entwickler unterstützen',
   'supportCoffeeDescription':
       'Ein Unterstützungslink wird hier bald verfügbar sein.',
@@ -159,7 +159,7 @@ const Map<String, String> stringsDe = {
   'notificationsGranted': 'Benachrichtigungen erlaubt',
   'notificationsMissing': 'Benachrichtigungen nicht erlaubt',
   'grantNotificationPermission': 'Berechtigung erteilen',
-  'notificationReminderBanner': 'Erlauben Sie Call Guard Benachrichtigungen, damit Erinnerungen bei ausgeschaltetem Bildschirm pünktlich ausgelöst werden.',
+  'notificationReminderBanner': 'Erlauben Sie Call Gate Benachrichtigungen, damit Erinnerungen bei ausgeschaltetem Bildschirm pünktlich ausgelöst werden.',
   'repeatTitle': 'Wiederholen',
   'repeatHint': 'Wählen Sie, wie oft die Erinnerung wiederholt wird',
   'repeatNone': 'Einmalig',
@@ -204,8 +204,7 @@ const Map<String, String> stringsDe = {
   'clearJournalMessage': 'Alle Protokolleinträge werden dauerhaft gelöscht.',
   'clearJournalConfirm': 'Protokoll leeren',
   'answeringEnabledLabel': 'Rückruf-Assistent aktivieren',
-  'answeringEnabledDescription':
-      'Eingehende Anrufe im gewählten Szenario lautlos ablehnen.',
+  'answeringEnabledDescription': 'Funktioniert nur, wenn der Hauptschutz (Filterung) auf dem Startbildschirm aktiviert ist. Eingehende Anrufe im gewählten Szenario werden lautlos abgelehnt.',
   'answeringScenarioTitle': 'Ablehnungsszenario',
   'answeringScenarioHint': 'Wählen Sie, für welche abgelehnten eingehenden Anrufe eine Rückruferinnerung erstellt wird.',
   'answeringQuietScenario': 'Während des Ruhemodus',
@@ -226,8 +225,8 @@ const Map<String, String> stringsDe = {
   'answeringInterval30': '30 Min.',
   'answeringInterval60': '1 Std.',
   'answeringEmergencyRepeatLabel':
-      'Notfall-Durchlass (Rückruf innerhalb von 5 Min.)',
-  'answeringEmergencyRepeatDescription': 'Ein erneuter Anruf derselben sichtbaren Nummer klingelt innerhalb von 5 Minuten auch im Ruhemodus. Nummern auf der Sperrliste bleiben blockiert.',
+      'Notfall-Durchlass (3. Anruf innerhalb von 5 Min.)',
+  'answeringEmergencyRepeatDescription': 'Ein dritter Anruf derselben sichtbaren Nummer klingelt innerhalb von 5 Minuten auch im Ruhemodus. Nummern auf der Sperrliste bleiben blockiert.',
   'emergency_repeat': 'Erneuter Notfallanruf durchgelassen',
   'systemRoleLabel': 'Anrufer-ID und Spam',
   'roleGranted': 'Systemrolle erteilt',
@@ -274,5 +273,7 @@ const Map<String, String> stringsDe = {
   'markReminderDone': 'Als erledigt markieren',
   'restoreReminder': 'Erinnerung wiederherstellen',
   'delete': 'Löschen',
-  'prototypeFootnote': 'Systemfilterung eingehender Anrufe ist nicht verbunden · Daten bleiben lokal gespeichert',
+  'reminderDoneStatus': 'Erledigt',
+  'answeringProtectionDisabledWarning': 'Der Hauptschutz auf dem Startbildschirm ist ausgeschaltet, daher fängt der Assistent derzeit keine Anrufe ab.',
+  'prototypeFootnote': 'Alle Daten und Regeln werden ausschließlich lokal auf Ihrem Gerät gespeichert und nirgendwohin übertragen',
 };

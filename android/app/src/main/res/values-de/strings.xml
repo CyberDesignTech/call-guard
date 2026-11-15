@@ -7,7 +7,7 @@
     <string name="missed_call_channel_name">Rückruf-Assistent</string>
     <string name="missed_call_channel_description">Benachrichtigungen über abgelehnte eingehende Anrufe</string>
     <string name="missed_call_title">Zurückrufen</string>
-    <string name="missed_call_public_title">Call Guard</string>
+    <string name="missed_call_public_title">Call Gate</string>
     <string name="missed_call_public_text">Eingehender Anruf abgelehnt</string>
     <string name="missed_call_hidden_title">Anruf einer verborgenen Nummer abgelehnt</string>
     <string name="missed_call_hidden_text">Tippen, um das Anrufprotokoll zu öffnen</string>

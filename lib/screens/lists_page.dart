@@ -274,10 +274,13 @@ class ListsPageState extends State<ListsPage>
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 8, 18, 14),
-            child: PageIntro(
-              eyebrow: widget.strings.call('listsEyebrow'),
-              title: widget.strings.listsScreenTitle,
-              subtitle: widget.strings.call('listsSubtitle'),
+            child: SizedBox(
+              width: double.infinity,
+              child: PageIntro(
+                eyebrow: widget.strings.call('listsEyebrow'),
+                title: widget.strings.listsScreenTitle,
+                subtitle: widget.strings.call('listsSubtitle'),
+              ),
             ),
           ),
           Padding(

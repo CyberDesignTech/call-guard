@@ -14,6 +14,7 @@ import '../widgets/common/thin_divider.dart';
 class AnsweringModePage extends StatefulWidget {
   const AnsweringModePage({
     required this.strings,
+    required this.protectionEnabled,
     required this.enabled,
     required this.onEnabledChanged,
     required this.scenario,
@@ -29,6 +30,7 @@ class AnsweringModePage extends StatefulWidget {
   });
 
   final AppStrings strings;
+  final bool protectionEnabled;
   final bool enabled;
   final ValueChanged<bool> onEnabledChanged;
   final String scenario;
@@ -153,6 +155,33 @@ class _AnsweringModePageState extends State<AnsweringModePage>
     ),
   );
 
+  Widget _statusWarning(String message) => Container(
+    margin: const EdgeInsets.only(bottom: 10),
+    padding: const EdgeInsets.all(13),
+    decoration: BoxDecoration(
+      color: AppPalette.amberPale,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: AppPalette.amber.withValues(alpha: 0.35)),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          Icons.shield_outlined,
+          size: 19,
+          color: AppPalette.accent(AppPalette.amber),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            message,
+            style: TextStyle(color: AppPalette.ink, fontSize: 12),
+          ),
+        ),
+      ],
+    ),
+  );
+
   @override
   Widget build(BuildContext context) => ListView(
     padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
@@ -162,6 +191,12 @@ class _AnsweringModePageState extends State<AnsweringModePage>
         title: widget.strings.answerTitle,
         subtitle: widget.strings.call('answerSubtitle'),
       ),
+      if (!widget.protectionEnabled) ...[
+        const SizedBox(height: 12),
+        _statusWarning(
+          widget.strings.call('answeringProtectionDisabledWarning'),
+        ),
+      ],
       if (widget.localNotification && !_notificationsGranted) ...[
         const SizedBox(height: 12),
         _permissionWarning(

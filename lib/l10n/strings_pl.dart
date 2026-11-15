@@ -41,7 +41,7 @@ const Map<String, String> stringsPl = {
   'aboutDescription': 'Chroń się przed niechcianymi połączeniami przychodzącymi za pomocą list numerów, reguł krajów i operatorów oraz harmonogramu ciszy.',
   'aboutPrivacy': 'Ustawienia i listy są przechowywane wyłącznie na tym urządzeniu. Dane nie trafiają na serwer.',
   'supportThanks':
-      'Dziękujemy za korzystanie z Call Guard i wsparcie rozwoju projektu!',
+      'Dziękujemy za korzystanie z Call Gate i wsparcie rozwoju projektu!',
   'supportCoffeeTitle': 'Buy Me a Coffee · Podziękuj twórcy',
   'supportCoffeeDescription': 'Link do wsparcia pojawi się tutaj wkrótce.',
   'supportShareTitle': 'Udostępnij aplikację',
@@ -159,7 +159,7 @@ const Map<String, String> stringsPl = {
   'notificationsGranted': 'Powiadomienia dozwolone',
   'notificationsMissing': 'Powiadomienia niedozwolone',
   'grantNotificationPermission': 'Udziel uprawnienia',
-  'notificationReminderBanner': 'Zezwól aplikacji Call Guard na powiadomienia, aby przypomnienia pojawiały się na czas przy wyłączonym ekranie.',
+  'notificationReminderBanner': 'Zezwól aplikacji Call Gate na powiadomienia, aby przypomnienia pojawiały się na czas przy wyłączonym ekranie.',
   'repeatTitle': 'Powtarzaj',
   'repeatHint': 'Wybierz częstotliwość przypomnienia',
   'repeatNone': 'Tylko raz',
@@ -204,8 +204,7 @@ const Map<String, String> stringsPl = {
   'clearJournalMessage': 'Wszystkie wpisy rejestru zostaną trwale usunięte.',
   'clearJournalConfirm': 'Wyczyść rejestr',
   'answeringEnabledLabel': 'Włącz asystenta oddzwaniania',
-  'answeringEnabledDescription':
-      'Cicho odrzucaj połączenia przychodzące w wybranym scenariuszu.',
+  'answeringEnabledDescription': 'Działa tylko wtedy, gdy na ekranie głównym włączona jest główna ochrona (filtrowanie). Cicho odrzuca połączenia przychodzące w wybranym scenariuszu.',
   'answeringScenarioTitle': 'Scenariusz odrzucania',
   'answeringScenarioHint': 'Wybierz, które odrzucone połączenia przychodzące mają przypominać o oddzwonieniu.',
   'answeringQuietScenario': 'W trybie ciszy',
@@ -226,8 +225,8 @@ const Map<String, String> stringsPl = {
   'answeringInterval30': '30 min',
   'answeringInterval60': '1 godz.',
   'answeringEmergencyRepeatLabel':
-      'Przebicie awaryjne (ponowny telefon w ciągu 5 min)',
-  'answeringEmergencyRepeatDescription': 'Ponowne połączenie z tego samego widocznego numeru w ciągu 5 minut zadzwoni w trybie ciszy. Numery z czarnej listy nadal będą blokowane.',
+      'Przebicie awaryjne (3. połączenie w ciągu 5 min)',
+  'answeringEmergencyRepeatDescription': 'Trzecie połączenie z tego samego widocznego numeru w ciągu 5 minut zadzwoni w trybie ciszy. Numery z czarnej listy nadal będą blokowane.',
   'emergency_repeat': 'Przepuszczono pilne ponowne połączenie',
   'systemRoleLabel': 'Identyfikacja i spam',
   'roleGranted': 'Rola systemowa przyznana',
@@ -274,5 +273,7 @@ const Map<String, String> stringsPl = {
   'markReminderDone': 'Oznacz jako wykonane',
   'restoreReminder': 'Przywróć przypomnienie',
   'delete': 'Usuń',
-  'prototypeFootnote': 'Filtrowanie systemowe połączeń przychodzących nie jest podłączone · dane są zapisywane lokalnie',
+  'reminderDoneStatus': 'Wykonane',
+  'answeringProtectionDisabledWarning': 'Główna ochrona na ekranie głównym jest wyłączona, więc asystent nie będzie teraz przechwytywać połączeń.',
+  'prototypeFootnote': 'Wszystkie dane i reguły są przechowywane wyłącznie lokalnie na Twoim urządzeniu i nigdzie nie są wysyłane',
 };

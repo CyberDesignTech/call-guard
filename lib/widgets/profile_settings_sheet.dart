@@ -34,7 +34,7 @@ class ProfileSettingsSheetState extends State<ProfileSettingsSheet> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         icon: const ShieldPhoneLogo(size: 76),
-        title: const Text('Call Guard'),
+        title: const Text('Call Gate'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

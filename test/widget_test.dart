@@ -272,15 +272,98 @@ void main() {
     },
   );
 
-  testWidgets('renders the Call Guard protection prototype', (tester) async {
+  testWidgets('renders the Call Gate protection prototype', (tester) async {
     await pumpApp(tester);
 
     expect(find.text('Захист вхідних дзвінків'), findsOneWidget);
     expect(find.text('Захист активний'), findsOneWidget);
+    expect(find.text('CALL GATE'), findsNWidgets(2));
     expect(find.byType(ShieldPhoneLogo), findsNWidgets(2));
     await tester.drag(find.byType(ListView).first, const Offset(0, -700));
     await tester.pumpAndSettle();
     expect(find.text('Швидкі правила'), findsOneWidget);
+  });
+
+  testWidgets('lists header is left aligned like the other sections', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await pumpApp(tester);
+    await tester.tap(find.byTooltip('Списки та фільтри'));
+    await finishSectionTransition(tester);
+    await waitForText(tester, 'Списки та фільтри');
+
+    final title = tester.widget<Text>(find.text('Списки та фільтри'));
+    expect(title.textAlign, TextAlign.start);
+    expect(
+      tester.getTopLeft(find.text('Списки та фільтри')).dx,
+      closeTo(18, 0.5),
+    );
+    expect(
+      tester
+          .getTopLeft(find.text('Визначте, від кого приймати вхідні дзвінки.'))
+          .dx,
+      closeTo(18, 0.5),
+    );
+  });
+
+  testWidgets('privacy banner confirms local-only storage', (tester) async {
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await pumpApp(tester);
+    await tester.drag(find.byType(ListView).first, const Offset(0, -3000));
+    await tester.pumpAndSettle();
+
+    const expected =
+        'Усі дані та правила зберігаються виключно локально на вашому пристрої і нікуди не передаються';
+    expect(
+      AppStrings(AppLanguage.ukrainian).call('prototypeFootnote'),
+      expected,
+    );
+    expect(find.text(expected), findsOneWidget);
+    expect(find.textContaining('системно'), findsNothing);
+  });
+
+  testWidgets('answering assistant warns when main protection is off', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.runAsync(
+      () => _testDatabase.setSetting('protection_enabled', false),
+    );
+    await pumpApp(tester);
+    await tester.tap(find.byTooltip('Помічник передзвону'));
+    await finishSectionTransition(tester);
+
+    const warning =
+        'Основний захист на «Головній» вимкнено, тому помічник зараз не перехоплюватиме дзвінки.';
+    await waitForText(tester, warning);
+    expect(find.text(warning), findsOneWidget);
+  });
+
+  testWidgets('reminder card labels the done checkbox', (tester) async {
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await pumpApp(tester);
+    await tester.tap(find.byTooltip('Нагадування та Журнал'));
+    await finishSectionTransition(tester);
+    await waitForText(tester, 'Олена Коваль');
+
+    expect(find.text('Позначити виконаним'), findsWidgets);
   });
 
   testWidgets('horizontal swipe changes the main navigation section', (
@@ -427,7 +510,7 @@ void main() {
       await finishSectionTransition(tester);
       await waitForText(
         tester,
-        'Надайте Call Guard дозвіл на сповіщення, щоб нагадування спрацьовували вчасно при вимкненому екрані',
+        'Надайте Call Gate дозвіл на сповіщення, щоб нагадування спрацьовували вчасно при вимкненому екрані',
       );
       expect(find.text('Надати дозвіл'), findsOneWidget);
 
@@ -438,7 +521,7 @@ void main() {
       await waitForText(tester, 'Створити нагадування');
       expect(
         find.text(
-          'Надайте Call Guard дозвіл на сповіщення, щоб нагадування спрацьовували вчасно при вимкненому екрані',
+          'Надайте Call Gate дозвіл на сповіщення, щоб нагадування спрацьовували вчасно при вимкненому екрані',
         ),
         findsNothing,
       );
@@ -877,9 +960,7 @@ void main() {
     await tester.tap(find.text('15 хв'));
     await tester.pump();
 
-    final emergencyLabel = find.text(
-      'Екстрений прорив (повторний дзвінок за 5 хв)',
-    );
+    final emergencyLabel = find.text('Екстрений прорив (3-й дзвінок за 5 хв)');
     await tester.ensureVisible(emergencyLabel);
     await tester.pump();
     await tester.tap(emergencyLabel);
@@ -921,7 +1002,7 @@ void main() {
     await tester.ensureVisible(aboutMenuItem);
     await tester.tap(aboutMenuItem);
     await tester.pumpAndSettle();
-    expect(find.text('Call Guard'), findsOneWidget);
+    expect(find.text('Call Gate'), findsOneWidget);
     expect(find.textContaining('v1.1.0'), findsOneWidget);
     expect(find.textContaining('не надсилаються на сервер'), findsOneWidget);
 

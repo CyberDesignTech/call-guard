@@ -93,7 +93,7 @@ class CallRuleEngine(context: Context) {
             ) && settings.bool(DbContract.SettingKeys.ANSWERING_ENABLED, false)
             if (emergencyRepeatEnabled && !hidden && canonicalPhone.isNotBlank() &&
                 !isExplicitlyBlocked(database, rawPhone, canonicalPhone, settings) &&
-                wasRecentlyRejectedBySilence(database, canonicalPhone)
+                hasRecentRejectedSilenceCalls(database, canonicalPhone)
             ) {
                 return verdict(true, "emergency_repeat", canonicalPhone)
             }
@@ -229,7 +229,13 @@ class CallRuleEngine(context: Context) {
         return false
     }
 
-    private fun wasRecentlyRejectedBySilence(
+    /**
+     * True once the same canonical number already has at least
+     * [EMERGENCY_REPEAT_MIN_REJECTED_CALLS] rejected calls inside the emergency window.
+     * With a threshold of two, the third and every following call within
+     * [EMERGENCY_REPEAT_WINDOW_MS] breaks through, while spammers' double auto-dials do not.
+     */
+    private fun hasRecentRejectedSilenceCalls(
         database: SQLiteDatabase,
         canonicalPhone: String,
     ): Boolean {
@@ -237,6 +243,7 @@ class CallRuleEngine(context: Context) {
         val targetDigits = PhoneNumbers.digits(canonicalPhone)
         if (targetDigits.isEmpty()) return false
 
+        var rejectedMatches = 0
         database.rawQuery(
             "SELECT ${DbContract.CallLogs.PHONE} FROM ${DbContract.CallLogs.TABLE} " +
                 "WHERE ${DbContract.CallLogs.TIMESTAMP} >= ? AND " +
@@ -248,7 +255,10 @@ class CallRuleEngine(context: Context) {
                 val recentPhone = cursor.getString(phoneColumn).orEmpty()
                 if (PhoneNumbers.isHidden(recentPhone)) continue
                 val recentCanonical = PhoneNumbers.canonicalize(appContext, recentPhone)
-                if (PhoneNumbers.digits(recentCanonical) == targetDigits) return true
+                if (PhoneNumbers.digits(recentCanonical) == targetDigits) {
+                    rejectedMatches++
+                    if (rejectedMatches >= EMERGENCY_REPEAT_MIN_REJECTED_CALLS) return true
+                }
             }
         }
         return false
@@ -374,5 +384,6 @@ class CallRuleEngine(context: Context) {
         const val DEFAULT_START_MINUTE = 22 * 60
         const val DEFAULT_END_MINUTE = 7 * 60
         const val EMERGENCY_REPEAT_WINDOW_MS = 5 * 60 * 1000L
+        const val EMERGENCY_REPEAT_MIN_REJECTED_CALLS = 2
     }
 }

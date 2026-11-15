@@ -41,7 +41,7 @@ const Map<String, String> stringsUk = {
   'aboutDescription': 'Захищайте від небажаних вхідних дзвінків за допомогою списків номерів, правил для країн і операторів та розкладу тиші.',
   'aboutPrivacy': 'Ваші налаштування та списки зберігаються лише на цьому пристрої. Дані не надсилаються на сервер.',
   'supportThanks':
-      'Дякуємо, що користуєтеся Call Guard і допомагаєте проєкту розвиватися!',
+      'Дякуємо, що користуєтеся Call Gate і допомагаєте проєкту розвиватися!',
   'supportCoffeeTitle': 'Buy Me a Coffee · Подякувати розробнику',
   'supportCoffeeDescription': 'Посилання на підтримку з’явиться тут незабаром.',
   'supportShareTitle': 'Поділитися застосунком',
@@ -160,7 +160,7 @@ const Map<String, String> stringsUk = {
   'notificationsGranted': 'Сповіщення дозволено',
   'notificationsMissing': 'Сповіщення не дозволено',
   'grantNotificationPermission': 'Надати дозвіл',
-  'notificationReminderBanner': 'Надайте Call Guard дозвіл на сповіщення, щоб нагадування спрацьовували вчасно при вимкненому екрані',
+  'notificationReminderBanner': 'Надайте Call Gate дозвіл на сповіщення, щоб нагадування спрацьовували вчасно при вимкненому екрані',
   'repeatTitle': 'Повторювати',
   'repeatHint': 'Виберіть, як часто повторювати нагадування',
   'repeatNone': 'Одноразово',
@@ -206,8 +206,7 @@ const Map<String, String> stringsUk = {
       'Усі записи журналу буде видалено без можливості відновлення.',
   'clearJournalConfirm': 'Очистити',
   'answeringEnabledLabel': 'Увімкнути помічник передзвону',
-  'answeringEnabledDescription':
-      'Тихо відхиляти вхідні дзвінки за обраним сценарієм.',
+  'answeringEnabledDescription': 'Працює лише тоді, коли на головному екрані увімкнено основний захист (фільтрацію). Тихо відхиляє вхідні дзвінки за обраним сценарієм.',
   'answeringScenarioTitle': 'Сценарій відхилення',
   'answeringScenarioHint': 'Оберіть, для яких відхилених вхідних дзвінків створювати подію передзвону.',
   'answeringQuietScenario': 'У режимі тиші',
@@ -226,9 +225,8 @@ const Map<String, String> stringsUk = {
   'answeringInterval15': '15 хв',
   'answeringInterval30': '30 хв',
   'answeringInterval60': '1 год',
-  'answeringEmergencyRepeatLabel':
-      'Екстрений прорив (повторний дзвінок за 5 хв)',
-  'answeringEmergencyRepeatDescription': 'Повторний дзвінок із того самого відкритого номера протягом 5 хв у режимі тиші пройде зі звуком. Номери з Чорного списку залишаться заблокованими.',
+  'answeringEmergencyRepeatLabel': 'Екстрений прорив (3-й дзвінок за 5 хв)',
+  'answeringEmergencyRepeatDescription': '3-й дзвінок із того самого відкритого номера протягом 5 хв у режимі тиші пройде зі звуком. Номери з Чорного списку залишаться заблокованими.',
   'emergency_repeat': 'Екстрений повторний дзвінок пропущено',
   'systemRoleLabel': 'АОН і спам',
   'roleGranted': 'Системну роль надано',
@@ -274,6 +272,7 @@ const Map<String, String> stringsUk = {
   'markReminderDone': 'Позначити виконаним',
   'restoreReminder': 'Відновити нагадування',
   'delete': 'Видалити',
-  'prototypeFootnote':
-      'Вхідні дзвінки ще не фільтруються системно · дані зберігаються локально',
+  'reminderDoneStatus': 'Виконано',
+  'answeringProtectionDisabledWarning': 'Основний захист на «Головній» вимкнено, тому помічник зараз не перехоплюватиме дзвінки.',
+  'prototypeFootnote': 'Усі дані та правила зберігаються виключно локально на вашому пристрої і нікуди не передаються',
 };

@@ -7,7 +7,7 @@
     <string name="missed_call_channel_name">Помічник передзвону</string>
     <string name="missed_call_channel_description">Сповіщення про відхилені вхідні дзвінки</string>
     <string name="missed_call_title">Передзвонити</string>
-    <string name="missed_call_public_title">Call Guard</string>
+    <string name="missed_call_public_title">Call Gate</string>
     <string name="missed_call_public_text">Вхідний дзвінок відхилено</string>
     <string name="missed_call_hidden_title">Відхилено дзвінок із прихованого номера</string>
     <string name="missed_call_hidden_text">Натисніть, щоб відкрити журнал дзвінків</string>

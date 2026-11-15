@@ -147,7 +147,7 @@ class CallGuardAppState extends State<CallGuardApp>
       });
     } catch (error, stackTrace) {
       debugPrint(
-        'Call Guard settings could not be restored: $error\n$stackTrace',
+        'Call Gate settings could not be restored: $error\n$stackTrace',
       );
       if (mounted) setState(() => _ready = true);
     }
@@ -201,7 +201,7 @@ class CallGuardAppState extends State<CallGuardApp>
     };
     final strings = AppStrings(_language);
     return MaterialApp(
-      title: 'Call Guard',
+      title: 'Call Gate',
       debugShowCheckedModeBanner: false,
       locale: _language.locale,
       supportedLocales: AppLanguage.values.map((language) => language.locale),

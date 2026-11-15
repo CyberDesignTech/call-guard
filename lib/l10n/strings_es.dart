@@ -40,7 +40,7 @@ const Map<String, String> stringsEs = {
   'aboutDescription': 'Protégete de las llamadas entrantes no deseadas con listas de números, reglas para países y operadores y horario de silencio.',
   'aboutPrivacy': 'La configuración y las listas se guardan solo en este dispositivo. No se envían datos a ningún servidor.',
   'supportThanks':
-      '¡Gracias por usar Call Guard y ayudar a que el proyecto crezca!',
+      '¡Gracias por usar Call Gate y ayudar a que el proyecto crezca!',
   'supportCoffeeTitle': 'Buy Me a Coffee · Agradecer al desarrollador',
   'supportCoffeeDescription':
       'Pronto habrá aquí un enlace para apoyar el proyecto.',
@@ -158,7 +158,7 @@ const Map<String, String> stringsEs = {
   'notificationsGranted': 'Notificaciones permitidas',
   'notificationsMissing': 'Notificaciones no permitidas',
   'grantNotificationPermission': 'Conceder permiso',
-  'notificationReminderBanner': 'Permite que Call Guard envíe notificaciones para que los recordatorios lleguen a tiempo con la pantalla apagada.',
+  'notificationReminderBanner': 'Permite que Call Gate envíe notificaciones para que los recordatorios lleguen a tiempo con la pantalla apagada.',
   'repeatTitle': 'Repetir',
   'repeatHint': 'Elige cada cuánto se repite el recordatorio',
   'repeatNone': 'Una vez',
@@ -203,8 +203,7 @@ const Map<String, String> stringsEs = {
   'clearJournalMessage': 'Se eliminarán definitivamente todas las entradas.',
   'clearJournalConfirm': 'Vaciar registro',
   'answeringEnabledLabel': 'Activar asistente de devolución',
-  'answeringEnabledDescription':
-      'Rechazar en silencio las llamadas entrantes del escenario elegido.',
+  'answeringEnabledDescription': 'Solo funciona cuando la protección principal (filtrado) está activada en la pantalla de inicio. Rechaza en silencio las llamadas entrantes del escenario elegido.',
   'answeringScenarioTitle': 'Escenario de rechazo',
   'answeringScenarioHint':
       'Elige qué llamadas entrantes rechazadas deben crear un recordatorio.',
@@ -224,8 +223,8 @@ const Map<String, String> stringsEs = {
   'answeringInterval15': '15 min',
   'answeringInterval30': '30 min',
   'answeringInterval60': '1 h',
-  'answeringEmergencyRepeatLabel': 'Paso de emergencia (repetición en 5 min)',
-  'answeringEmergencyRepeatDescription': 'Una llamada repetida del mismo número visible sonará durante el silencio si llega en 5 minutos. Los números bloqueados seguirán bloqueados.',
+  'answeringEmergencyRepeatLabel': 'Paso de emergencia (3.ª llamada en 5 min)',
+  'answeringEmergencyRepeatDescription': 'La tercera llamada del mismo número visible en 5 minutos sonará durante el modo silencio. Los números bloqueados seguirán bloqueados.',
   'emergency_repeat': 'Se permitió la llamada repetida de emergencia',
   'systemRoleLabel': 'Identificador y spam',
   'roleGranted': 'Rol del sistema concedido',
@@ -272,5 +271,7 @@ const Map<String, String> stringsEs = {
   'markReminderDone': 'Marcar como completado',
   'restoreReminder': 'Restaurar recordatorio',
   'delete': 'Eliminar',
-  'prototypeFootnote': 'El filtrado de llamadas entrantes del sistema no está conectado · los datos se guardan localmente',
+  'reminderDoneStatus': 'Completado',
+  'answeringProtectionDisabledWarning': 'La protección principal de la pantalla de inicio está desactivada, por lo que el asistente no interceptará llamadas ahora.',
+  'prototypeFootnote': 'Todos los datos y reglas se guardan exclusivamente de forma local en su dispositivo y no se envían a ningún sitio',
 };

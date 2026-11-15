@@ -7,7 +7,7 @@
     <string name="missed_call_channel_name">Assistant de rappel</string>
     <string name="missed_call_channel_description">Notifications des appels entrants rejetés</string>
     <string name="missed_call_title">Rappeler</string>
-    <string name="missed_call_public_title">Call Guard</string>
+    <string name="missed_call_public_title">Call Gate</string>
     <string name="missed_call_public_text">Appel entrant rejeté</string>
     <string name="missed_call_hidden_title">Appel d’un numéro masqué rejeté</string>
     <string name="missed_call_hidden_text">Touchez pour ouvrir le journal des appels</string>

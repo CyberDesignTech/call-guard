@@ -7,7 +7,7 @@
     <string name="missed_call_channel_name">Asystent oddzwaniania</string>
     <string name="missed_call_channel_description">Powiadomienia o odrzuconych połączeniach przychodzących</string>
     <string name="missed_call_title">Oddzwoń</string>
-    <string name="missed_call_public_title">Call Guard</string>
+    <string name="missed_call_public_title">Call Gate</string>
     <string name="missed_call_public_text">Połączenie przychodzące odrzucone</string>
     <string name="missed_call_hidden_title">Odrzucono połączenie z numeru ukrytego</string>
     <string name="missed_call_hidden_text">Dotknij, aby otworzyć rejestr połączeń</string>

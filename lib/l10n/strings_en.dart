@@ -40,7 +40,7 @@ const Map<String, String> stringsEn = {
   'versionLabel': 'Version',
   'aboutDescription': 'Protect against unwanted incoming calls with number lists, country and operator rules, and quiet hours.',
   'aboutPrivacy': 'Your settings and lists are stored only on this device. No data is sent to a server.',
-  'supportThanks': 'Thanks for using Call Guard and helping the project grow!',
+  'supportThanks': 'Thanks for using Call Gate and helping the project grow!',
   'supportCoffeeTitle': 'Buy Me a Coffee · Thank the developer',
   'supportCoffeeDescription': 'A support link will be available here soon.',
   'supportShareTitle': 'Share the app',
@@ -158,7 +158,7 @@ const Map<String, String> stringsEn = {
   'notificationsGranted': 'Notifications allowed',
   'notificationsMissing': 'Notifications not allowed',
   'grantNotificationPermission': 'Grant permission',
-  'notificationReminderBanner': 'Allow Call Guard to send notifications so reminders arrive on time while the screen is off.',
+  'notificationReminderBanner': 'Allow Call Gate to send notifications so reminders arrive on time while the screen is off.',
   'repeatTitle': 'Repeat',
   'repeatHint': 'Choose how often this reminder repeats',
   'repeatNone': 'Once',
@@ -203,8 +203,7 @@ const Map<String, String> stringsEn = {
   'clearJournalMessage': 'All call log entries will be permanently deleted.',
   'clearJournalConfirm': 'Clear log',
   'answeringEnabledLabel': 'Enable Callback Assistant',
-  'answeringEnabledDescription':
-      'Silently reject incoming calls in the selected scenario.',
+  'answeringEnabledDescription': 'Works only when main protection (filtering) is enabled on the Home screen. Silently rejects incoming calls in the selected scenario.',
   'answeringScenarioTitle': 'Rejection scenario',
   'answeringScenarioHint':
       'Choose which rejected incoming calls should create a call-back event.',
@@ -222,9 +221,8 @@ const Map<String, String> stringsEn = {
   'answeringInterval15': '15 min',
   'answeringInterval30': '30 min',
   'answeringInterval60': '1 hr',
-  'answeringEmergencyRepeatLabel':
-      'Emergency bypass (repeat call within 5 min)',
-  'answeringEmergencyRepeatDescription': 'A repeat call from the same visible number within 5 minutes will ring during silence mode. Blocklisted numbers stay blocked.',
+  'answeringEmergencyRepeatLabel': 'Emergency bypass (3rd call within 5 min)',
+  'answeringEmergencyRepeatDescription': 'A 3rd call from the same visible number within 5 minutes will ring during silence mode. Blocklisted numbers stay blocked.',
   'emergency_repeat': 'Emergency repeat call allowed',
   'systemRoleLabel': 'Caller ID & spam',
   'roleGranted': 'System role granted',
@@ -271,5 +269,7 @@ const Map<String, String> stringsEn = {
   'markReminderDone': 'Mark as done',
   'restoreReminder': 'Restore reminder',
   'delete': 'Delete',
-  'prototypeFootnote': 'System incoming call filtering is not connected · data is stored locally',
+  'reminderDoneStatus': 'Done',
+  'answeringProtectionDisabledWarning': 'Main protection on Home is turned off, so the assistant will not intercept calls right now.',
+  'prototypeFootnote': 'All data and rules are stored strictly locally on your device and are never sent anywhere',
 };

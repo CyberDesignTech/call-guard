@@ -151,43 +151,6 @@ class ReminderCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                IconButton(
-                  tooltip: strings.call(
-                    reminder.isDone ? 'restoreReminder' : 'markReminderDone',
-                  ),
-                  onPressed: onToggleDone,
-                  visualDensity: VisualDensity.compact,
-                  constraints: const BoxConstraints.tightFor(
-                    width: 30,
-                    height: 36,
-                  ),
-                  padding: EdgeInsets.zero,
-                  icon: Icon(
-                    reminder.isDone
-                        ? Icons.check_circle_rounded
-                        : Icons.radio_button_unchecked_rounded,
-                    color: reminder.isDone
-                        ? AppPalette.green
-                        : AppPalette.muted,
-                    size: 18,
-                  ),
-                ),
-                IconButton(
-                  tooltip: strings.call('delete'),
-                  onPressed: onDelete,
-                  visualDensity: VisualDensity.compact,
-                  constraints: const BoxConstraints.tightFor(
-                    width: 30,
-                    height: 36,
-                  ),
-                  padding: EdgeInsets.zero,
-                  icon: Icon(
-                    Icons.delete_outline_rounded,
-                    color: AppPalette.muted,
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: 3),
                 FilledButton.tonalIcon(
                   onPressed: onCall,
                   icon: const Icon(Icons.call_outlined, size: 16),
@@ -202,6 +165,71 @@ class ReminderCard extends StatelessWidget {
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
                     ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Tooltip(
+                  message: strings.call(
+                    reminder.isDone ? 'restoreReminder' : 'markReminderDone',
+                  ),
+                  child: InkWell(
+                    onTap: onToggleDone,
+                    borderRadius: BorderRadius.circular(10),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 6,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            reminder.isDone
+                                ? Icons.check_circle_rounded
+                                : Icons.radio_button_unchecked_rounded,
+                            color: reminder.isDone
+                                ? AppPalette.green
+                                : AppPalette.muted,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            strings.call(
+                              reminder.isDone
+                                  ? 'reminderDoneStatus'
+                                  : 'markReminderDone',
+                            ),
+                            style: TextStyle(
+                              color: reminder.isDone
+                                  ? AppPalette.green
+                                  : AppPalette.muted,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  tooltip: strings.call('delete'),
+                  onPressed: onDelete,
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 30,
+                    height: 36,
+                  ),
+                  padding: EdgeInsets.zero,
+                  icon: Icon(
+                    Icons.delete_outline_rounded,
+                    color: AppPalette.muted,
+                    size: 18,
                   ),
                 ),
               ],
