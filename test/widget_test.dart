@@ -367,6 +367,7 @@ void main() {
     await tester.tap(find.text('Підтримати проєкт'));
     await tester.pumpAndSettle();
 
+    expect(find.text('Підтримати через Monobank'), findsOneWidget);
     expect(find.text('Підтримати на Ko-fi'), findsOneWidget);
     expect(find.text('Поділитися застосунком'), findsOneWidget);
   });
@@ -1039,6 +1040,27 @@ void main() {
     addTearDown(
       () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
     );
+    const screeningChannel = MethodChannel('com.wepr.callguard/screening');
+    final openedUrls = <String>[];
+    messenger.setMockMethodCallHandler(screeningChannel, (call) async {
+      if (call.method == 'openExternalUrl') {
+        openedUrls.add(call.arguments['url'] as String);
+        return true;
+      }
+      if (call.method == 'checkPermissions') {
+        return {
+          'roleAvailable': true,
+          'callScreeningRole': true,
+          'readContacts': true,
+          'notificationsGranted': true,
+        };
+      }
+      if (call.method == 'consumePendingCallJournal') return false;
+      return true;
+    });
+    addTearDown(
+      () => messenger.setMockMethodCallHandler(screeningChannel, null),
+    );
 
     await pumpApp(tester);
     await tester.tap(find.byTooltip('Профіль, мова та тема'));
@@ -1049,7 +1071,7 @@ void main() {
     await tester.tap(aboutMenuItem);
     await tester.pumpAndSettle();
     expect(find.text('Call Gate'), findsOneWidget);
-    expect(find.textContaining('v1.6.3'), findsOneWidget);
+    expect(find.textContaining('v1.6.4'), findsOneWidget);
     expect(find.textContaining('не надсилаються на сервер'), findsOneWidget);
 
     await tester.tap(find.text('Закрити вікно'));
@@ -1058,12 +1080,21 @@ void main() {
     await tester.ensureVisible(supportMenuItem);
     await tester.tap(supportMenuItem);
     await tester.pumpAndSettle();
+    expect(find.text('Підтримати через Monobank'), findsOneWidget);
+    expect(find.text('Підтримати через Monobank'), findsOneWidget);
     expect(find.text('Підтримати на Ko-fi'), findsOneWidget);
     expect(find.text('Поділитися застосунком'), findsOneWidget);
     expect(find.text('Оцінити застосунок'), findsOneWidget);
     expect(find.text('Закрити вікно'), findsOneWidget);
     expect(find.text('Зрозуміло'), findsNothing);
     expect(find.text('Копіювати посилання'), findsNothing);
+
+    await tester.tap(find.text('Підтримати через Monobank'));
+    await tester.pumpAndSettle();
+    expect(
+      openedUrls,
+      contains('https://send.monobank.ua/jar/AhQrx7NK3q'),
+    );
   });
 
   testWidgets('changes the app language and shows country operators', (

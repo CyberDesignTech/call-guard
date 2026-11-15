@@ -41,6 +41,8 @@ const Map<String, String> stringsEn = {
   'aboutDescription': 'Protect against unwanted incoming calls with number lists, country and operator rules, and quiet hours.',
   'aboutPrivacy': 'Your settings and lists are stored only on this device. No data is sent to a server.',
   'supportThanks': 'Thanks for using Call Gate and helping the project grow!',
+  'supportMonobankTitle': 'Support via Monobank',
+  'supportMonobankDescription': 'Open the Monobank jar to support the project.',
   'supportKofiTitle': 'Support on Ko-fi',
   'supportKofiDescription': 'Open the developer support page on Ko-fi.',
   'supportShareTitle': 'Share the app',

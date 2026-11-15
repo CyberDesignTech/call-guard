@@ -42,6 +42,8 @@ const Map<String, String> stringsPl = {
   'aboutPrivacy': 'Ustawienia i listy są przechowywane wyłącznie na tym urządzeniu. Dane nie trafiają na serwer.',
   'supportThanks':
       'Dziękujemy za korzystanie z Call Gate i wsparcie rozwoju projektu!',
+  'supportMonobankTitle': 'Wesprzyj przez Monobank',
+  'supportMonobankDescription': 'Otwórz skarbonkę Monobank, aby wesprzeć projekt.',
   'supportKofiTitle': 'Wesprzyj na Ko-fi',
   'supportKofiDescription': 'Otwórz stronę wsparcia twórcy na Ko-fi.',
   'supportShareTitle': 'Udostępnij aplikację',

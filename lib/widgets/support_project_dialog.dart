@@ -28,6 +28,19 @@ Future<void> showSupportProjectDialog(
             Text(strings.call('supportThanks'), textAlign: TextAlign.center),
             const SizedBox(height: 16),
             _SupportOption(
+              icon: Icons.account_balance_wallet_rounded,
+              title: strings.call('supportMonobankTitle'),
+              description: strings.call('supportMonobankDescription'),
+              color: AppPalette.blue,
+              onTap: () async {
+                await channel.openExternalUrl(
+                  'https://send.monobank.ua/jar/AhQrx7NK3q',
+                );
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
+              },
+            ),
+            const SizedBox(height: 10),
+            _SupportOption(
               icon: Icons.coffee_outlined,
               title: strings.call('supportKofiTitle'),
               description: strings.call('supportKofiDescription'),

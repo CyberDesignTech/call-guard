@@ -42,6 +42,8 @@ const Map<String, String> stringsUk = {
   'aboutPrivacy': 'Ваші налаштування та списки зберігаються лише на цьому пристрої. Дані не надсилаються на сервер.',
   'supportThanks':
       'Дякуємо, що користуєтеся Call Gate і допомагаєте проєкту розвиватися!',
+  'supportMonobankTitle': 'Підтримати через Monobank',
+  'supportMonobankDescription': 'Відкрити банку Monobank для підтримки проєкту.',
   'supportKofiTitle': 'Підтримати на Ko-fi',
   'supportKofiDescription': 'Відкрити сторінку підтримки розробника на Ko-fi.',
   'supportShareTitle': 'Поділитися застосунком',

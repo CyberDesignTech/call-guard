@@ -41,6 +41,8 @@ const Map<String, String> stringsFr = {
   'aboutDescription': 'Protégez-vous des appels entrants indésirables grâce aux listes de numéros, aux règles par pays et opérateur et aux plages silencieuses.',
   'aboutPrivacy': 'Vos réglages et listes sont stockés uniquement sur cet appareil. Aucune donnée n’est envoyée à un serveur.',
   'supportThanks': 'Merci d’utiliser Call Gate et de contribuer au développement du projet !',
+  'supportMonobankTitle': 'Soutenir via Monobank',
+  'supportMonobankDescription': 'Ouvrez la tirelire Monobank pour soutenir le projet.',
   'supportKofiTitle': 'Soutenir sur Ko-fi',
   'supportKofiDescription': 'Ouvrir la page de soutien du développeur sur Ko-fi.',
   'supportShareTitle': 'Partager l’application',
