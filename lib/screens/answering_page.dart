@@ -6,7 +6,6 @@ import '../platform/call_screening_channel.dart';
 import '../theme/app_palette.dart';
 import '../widgets/common/app_panel.dart';
 import '../widgets/common/page_intro.dart';
-import '../widgets/common/prototype_footnote.dart';
 import '../widgets/common/rule_switch.dart';
 import '../widgets/common/section_heading.dart';
 import '../widgets/common/thin_divider.dart';
@@ -337,8 +336,6 @@ class _AnsweringModePageState extends State<AnsweringModePage>
           iconBackground: AppPalette.redPale,
         ),
       ),
-      const SizedBox(height: 16),
-      PrototypeFootnote(label: widget.strings.call('prototypeFootnote')),
     ],
   );
 }

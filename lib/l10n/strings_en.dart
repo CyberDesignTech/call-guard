@@ -271,5 +271,4 @@ const Map<String, String> stringsEn = {
   'delete': 'Delete',
   'reminderDoneStatus': 'Done',
   'answeringProtectionDisabledWarning': 'Main protection on Home is turned off, so the assistant will not intercept calls right now.',
-  'prototypeFootnote': 'All data and rules are stored strictly locally on your device and are never sent anywhere',
 };

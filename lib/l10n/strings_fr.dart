@@ -274,5 +274,4 @@ const Map<String, String> stringsFr = {
   'delete': 'Supprimer',
   'reminderDoneStatus': 'Terminé',
   'answeringProtectionDisabledWarning': 'La protection principale de l’écran d’accueil est désactivée, l’assistant n’interceptera donc pas les appels pour le moment.',
-  'prototypeFootnote': 'Toutes les données et règles sont stockées uniquement en local sur votre appareil et ne sont jamais transmises',
 };

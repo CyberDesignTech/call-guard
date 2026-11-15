@@ -6,7 +6,6 @@ import '../widgets/common/app_panel.dart';
 import '../widgets/common/dark_pill.dart';
 import '../widgets/common/icon_box.dart';
 import '../widgets/common/page_intro.dart';
-import '../widgets/common/prototype_footnote.dart';
 import '../widgets/common/rule_switch.dart';
 import '../widgets/common/section_heading.dart';
 import '../widgets/common/shield_phone_logo.dart';
@@ -295,8 +294,6 @@ class HomePage extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 13),
-        PrototypeFootnote(label: strings.call('prototypeFootnote')),
       ],
     );
   }

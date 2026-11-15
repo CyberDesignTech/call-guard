@@ -10,7 +10,6 @@ import '../theme/app_palette.dart';
 import '../widgets/common/contact_picker.dart';
 import '../widgets/common/entry_card.dart';
 import '../widgets/common/page_intro.dart';
-import '../widgets/common/prototype_footnote.dart';
 import 'country_operators_page.dart';
 
 class ListsPage extends StatefulWidget {
@@ -363,12 +362,6 @@ class ListsPageState extends State<ListsPage>
                   ),
                 ],
               ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 0, 18, 8),
-            child: PrototypeFootnote(
-              label: widget.strings.call('prototypeFootnote'),
             ),
           ),
         ],

@@ -311,24 +311,42 @@ void main() {
     );
   });
 
-  testWidgets('privacy banner confirms local-only storage', (tester) async {
+  testWidgets('bottom info banner is removed from every section', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(390, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await pumpApp(tester);
-    await tester.drag(find.byType(ListView).first, const Offset(0, -3000));
-    await tester.pumpAndSettle();
-
-    const expected =
+    const removedText =
         'Усі дані та правила зберігаються виключно локально на вашому пристрої і нікуди не передаються';
-    expect(
-      AppStrings(AppLanguage.ukrainian).call('prototypeFootnote'),
-      expected,
-    );
-    expect(find.text(expected), findsOneWidget);
-    expect(find.textContaining('системно'), findsNothing);
+
+    Future<void> expectBannerGone() async {
+      final listViews = find.byType(ListView);
+      if (listViews.evaluate().isNotEmpty) {
+        await tester.drag(listViews.first, const Offset(0, -3000));
+        await tester.pump(const Duration(milliseconds: 400));
+      }
+      expect(find.text(removedText), findsNothing);
+    }
+
+    await pumpApp(tester);
+    await expectBannerGone();
+
+    for (final tooltip in [
+      'Списки та фільтри',
+      'Графік режиму тиші',
+      'Помічник передзвону',
+      'Нагадування та Журнал',
+    ]) {
+      await tester.tap(find.byTooltip(tooltip));
+      await finishSectionTransition(tester);
+      await expectBannerGone();
+    }
+
+    await waitForText(tester, 'Олена Коваль');
+    await waitForDatabase(tester);
   });
 
   testWidgets('answering assistant warns when main protection is off', (
@@ -1003,7 +1021,7 @@ void main() {
     await tester.tap(aboutMenuItem);
     await tester.pumpAndSettle();
     expect(find.text('Call Gate'), findsOneWidget);
-    expect(find.textContaining('v1.1.0'), findsOneWidget);
+    expect(find.textContaining('v1.6.0'), findsOneWidget);
     expect(find.textContaining('не надсилаються на сервер'), findsOneWidget);
 
     await tester.tap(find.text('Зрозуміло'));
@@ -1198,6 +1216,7 @@ void main() {
     }
 
     const removedKeys = {
+      'prototypeFootnote',
       'answeringActionRemind30',
       'answeringActionWhitelist',
       'answeringActionSms',

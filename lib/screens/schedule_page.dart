@@ -4,7 +4,6 @@ import '../l10n/app_strings.dart';
 import '../theme/app_palette.dart';
 import '../widgets/common/app_panel.dart';
 import '../widgets/common/page_intro.dart';
-import '../widgets/common/prototype_footnote.dart';
 import '../widgets/common/rule_switch.dart';
 import '../widgets/common/section_heading.dart';
 import '../widgets/common/time_button.dart';
@@ -198,8 +197,6 @@ class SchedulePageState extends State<SchedulePage> {
             iconBackground: AppPalette.greenPale,
           ),
         ),
-        const SizedBox(height: 16),
-        PrototypeFootnote(label: widget.strings.call('prototypeFootnote')),
       ],
     );
   }

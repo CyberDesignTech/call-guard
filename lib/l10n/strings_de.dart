@@ -275,5 +275,4 @@ const Map<String, String> stringsDe = {
   'delete': 'Löschen',
   'reminderDoneStatus': 'Erledigt',
   'answeringProtectionDisabledWarning': 'Der Hauptschutz auf dem Startbildschirm ist ausgeschaltet, daher fängt der Assistent derzeit keine Anrufe ab.',
-  'prototypeFootnote': 'Alle Daten und Regeln werden ausschließlich lokal auf Ihrem Gerät gespeichert und nirgendwohin übertragen',
 };

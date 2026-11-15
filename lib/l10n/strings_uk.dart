@@ -274,5 +274,4 @@ const Map<String, String> stringsUk = {
   'delete': 'Видалити',
   'reminderDoneStatus': 'Виконано',
   'answeringProtectionDisabledWarning': 'Основний захист на «Головній» вимкнено, тому помічник зараз не перехоплюватиме дзвінки.',
-  'prototypeFootnote': 'Усі дані та правила зберігаються виключно локально на вашому пристрої і нікуди не передаються',
 };

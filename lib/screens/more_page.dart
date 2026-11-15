@@ -14,7 +14,6 @@ import '../widgets/common/contact_picker.dart';
 import '../widgets/common/journal_card.dart';
 import '../widgets/common/localized_value.dart';
 import '../widgets/common/page_intro.dart';
-import '../widgets/common/prototype_footnote.dart';
 import '../widgets/common/repeat_fields.dart';
 import '../widgets/common/section_heading.dart';
 import '../widgets/reminder_card.dart';
@@ -695,8 +694,6 @@ class MorePageState extends State<MorePage> with WidgetsBindingObserver {
           ),
           const SizedBox(height: 18),
           if (_segment == 0) ..._reminderContent() else ..._journalContent(),
-          const SizedBox(height: 14),
-          PrototypeFootnote(label: widget.strings.call('prototypeFootnote')),
         ],
       ),
     );

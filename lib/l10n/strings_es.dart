@@ -273,5 +273,4 @@ const Map<String, String> stringsEs = {
   'delete': 'Eliminar',
   'reminderDoneStatus': 'Completado',
   'answeringProtectionDisabledWarning': 'La protección principal de la pantalla de inicio está desactivada, por lo que el asistente no interceptará llamadas ahora.',
-  'prototypeFootnote': 'Todos los datos y reglas se guardan exclusivamente de forma local en su dispositivo y no se envían a ningún sitio',
 };

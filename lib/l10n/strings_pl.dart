@@ -275,5 +275,4 @@ const Map<String, String> stringsPl = {
   'delete': 'Usuń',
   'reminderDoneStatus': 'Wykonane',
   'answeringProtectionDisabledWarning': 'Główna ochrona na ekranie głównym jest wyłączona, więc asystent nie będzie teraz przechwytywać połączeń.',
-  'prototypeFootnote': 'Wszystkie dane i reguły są przechowywane wyłącznie lokalnie na Twoim urządzeniu i nigdzie nie są wysyłane',
 };
