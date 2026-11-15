@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Call Gate — Ваш спокій під контролем</title>
-  <meta name="description" content="Інтелектуальний офлайн-фільтр вхідних дзвінків для Android. Блокуйте спам, налаштовуйте розклад тиші, зберігайте 100% приватності." />
+  <title data-i18n="pageTitle">Call Gate — Ваш спокій під контролем</title>
+  <meta name="description" content="Інтелектуальний офлайн-фільтр вхідних дзвінків для Android." data-i18n-meta="pageDesc" />
   <link rel="icon" type="image/svg+xml" href="assets/images/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -15,7 +15,7 @@
   <header class="navbar">
     <div class="container nav-inner">
       <a class="brand" href="#top">
-        <img src="assets/images/logo.svg" alt="Call Gate logo" />
+        <img src="assets/images/logo.svg" alt="Call Gate" />
         <span>Call Gate</span>
       </a>
       <nav class="nav-links">
@@ -25,10 +25,14 @@
         <a href="#faq" data-i18n="navFaq">FAQ</a>
       </nav>
       <div class="nav-actions">
-        <div class="lang-switch" role="group" aria-label="Language">
-          <button data-lang="uk" class="active">UA</button>
-          <button data-lang="en">EN</button>
-        </div>
+        <select class="lang-select" id="langSelect" aria-label="Language">
+          <option value="uk">UA</option>
+          <option value="en">EN</option>
+          <option value="pl">PL</option>
+          <option value="de">DE</option>
+          <option value="es">ES</option>
+          <option value="fr">FR</option>
+        </select>
         <a class="btn btn-primary btn-sm" href="../release/CallGate-1.6.2.apk" data-i18n="navDownload">Завантажити APK</a>
         <button class="hamburger" id="hamburger" aria-label="Menu">☰</button>
       </div>
@@ -42,24 +46,25 @@
   </header>
 
   <main id="top">
+    <!-- HERO -->
     <section class="hero">
       <div class="container hero-grid">
         <div>
-          <span class="badge" data-i18n="badge">100% Offline • Без реклами • Безкоштовно назавжди</span>
+          <span class="badge"><svg class="icon"><use href="assets/images/icons.svg#i-check"></use></svg> <span data-i18n="badge">100% Offline • Без реклами • Безкоштовно назавжди</span></span>
           <h1 data-i18n-html="heroTitle">Call Gate — <span class="accent">Ваш спокій під контролем</span></h1>
           <p data-i18n="heroSub">Інтелектуальний офлайн-фільтр вхідних дзвінків для Android. Блокуйте спам, налаштовуйте розклад тиші та зберігайте 100% приватності без передачі контактів у хмару.</p>
           <div class="hero-actions">
-            <a class="btn btn-primary" href="../release/CallGate-1.6.2.apk" data-i18n="heroDownload">Завантажити APK</a>
-            <a class="btn btn-ghost" href="#demo" data-i18n="heroSim">Спробувати симулятор</a>
+            <a class="btn btn-primary" href="../release/CallGate-1.6.2.apk"><svg class="icon"><use href="assets/images/icons.svg#i-download"></use></svg> <span data-i18n="heroDownload">Завантажити APK</span></a>
+            <a class="btn btn-ghost" href="#demo"><svg class="icon"><use href="assets/images/icons.svg#i-phone"></use></svg> <span data-i18n="heroSim">Спробувати симулятор</span></a>
           </div>
           <div class="hero-meta" data-i18n="heroMeta">v1.6.2 • Android 10+ • 19 MB</div>
         </div>
         <div class="phone-wrap">
           <div class="phone">
-            <div class="phone-screen">
-              <div class="notch"></div>
-              <div class="status"><span>9:41</span><span>●●● WiFi</span></div>
-              <div class="phone-header"><img src="assets/images/logo.svg" alt="" /> Call Gate</div>
+            <div class="notch"></div>
+            <div class="status"><span>9:41</span><span>●●● WiFi</span></div>
+            <div class="phone-topbar"><img src="assets/images/logo.svg" alt="" /> Call Gate</div>
+            <div class="phone-body">
               <div class="toggle-row">
                 <div>
                   <div style="font-weight:600;font-size:14px" data-i18n="phoneProtection">Захист</div>
@@ -75,13 +80,14 @@
               <div class="call-item"><span class="num">+380 99 111 22 33</span><span class="tag tag-rejected" data-i18n="tagSpam">Спам</span></div>
               <div class="call-item"><span class="num">+44 20 7946 0958</span><span class="tag tag-rejected" data-i18n="tagForeign">Закордон</span></div>
               <div class="section-label" data-i18n="phoneMissed">Пропущені</div>
-              <div class="call-item"><span class="num">Мама</span><span class="tag tag-missed" data-i18n="tagCallback">Передзвонити</span></div>
+              <div class="call-item"><span class="num" data-i18n="phoneMom">Мама</span><span class="tag tag-missed" data-i18n="tagCallback">Передзвонити</span></div>
             </div>
           </div>
         </div>
       </div>
     </section>
 
+    <!-- FEATURES -->
     <section id="features">
       <div class="container">
         <div class="section-head">
@@ -90,32 +96,32 @@
         </div>
         <div class="features">
           <div class="card">
-            <div class="icon">🔒</div>
+            <div class="iconbox"><svg><use href="assets/images/icons.svg#i-lock"></use></svg></div>
             <h3 data-i18n="f1t">100% локальна приватність</h3>
             <p data-i18n="f1d">Жодних хмарних баз, збору адресної книги чи аналітики. Усі правила живуть лише на вашому пристрої.</p>
           </div>
           <div class="card">
-            <div class="icon">🌙</div>
+            <div class="iconbox"><svg><use href="assets/images/icons.svg#i-moon"></use></svg></div>
             <h3 data-i18n="f2t">Розумний розклад тиші</h3>
             <p data-i18n="f2d">Автоматичне ввімкнення тиші вночі, у вихідні або під час відпочинку.</p>
           </div>
           <div class="card">
-            <div class="icon">🚨</div>
+            <div class="iconbox"><svg><use href="assets/images/icons.svg#i-siren"></use></svg></div>
             <h3 data-i18n="f3t">Екстрений прорив (3-й дзвінок за 5 хв)</h3>
             <p data-i18n="f3d">Відсіює подвійні автодозвони спамерів, але пропускає близьких у справді терміновій ситуації.</p>
           </div>
           <div class="card">
-            <div class="icon">🌍</div>
+            <div class="iconbox"><svg><use href="assets/images/icons.svg#i-globe"></use></svg></div>
             <h3 data-i18n="f4t">Фільтр країн та операторів</h3>
             <p data-i18n="f4d">Блокування небажаних міжнародних префіксів та мобільних кодів одним перемикачем.</p>
           </div>
           <div class="card">
-            <div class="icon">📞</div>
+            <div class="iconbox"><svg><use href="assets/images/icons.svg#i-phone"></use></svg></div>
             <h3 data-i18n="f5t">Помічник передзвону та нагадування</h3>
             <p data-i18n="f5d">Тихе відхилення викликів за сценарієм і зручні нагадування передзвонити пізніше.</p>
           </div>
           <div class="card">
-            <div class="icon">💚</div>
+            <div class="iconbox"><svg><use href="assets/images/icons.svg#i-heart"></use></svg></div>
             <h3 data-i18n="f6t">Безкоштовно і без реклами назавжди</h3>
             <p data-i18n="f6d">Жодних прихованих підписок, банерів і нав'язливих платних функцій.</p>
           </div>
@@ -123,6 +129,7 @@
       </div>
     </section>
 
+    <!-- DEMO -->
     <section id="demo">
       <div class="container">
         <div class="section-head">
@@ -152,6 +159,7 @@
       </div>
     </section>
 
+    <!-- HOW -->
     <section id="how">
       <div class="container">
         <div class="section-head">
@@ -177,15 +185,78 @@
       </div>
     </section>
 
-    <section id="privacy" style="background:rgba(16,185,129,0.04)">
+    <!-- PRODUCT TOUR -->
+    <section id="tour">
       <div class="container">
         <div class="section-head">
-          <h2 data-i18n="privacyTitle">Приватність понад усе</h2>
-          <p data-i18n="privacySub">Call Gate не надсилає ваші контакти, журнали дзвінків чи правила на сервер. Усе працює офлайн, прямо на пристрої.</p>
+          <h2 data-i18n="tourTitle">Повний огляд можливостей Call Gate</h2>
+          <p data-i18n="tourSub">Живі сценарії з життя, а не сухий список функцій.</p>
+        </div>
+        <div class="tour">
+          <div class="tour-card">
+            <div class="iconbox"><svg><use href="assets/images/icons.svg#i-list"></use></svg></div>
+            <div>
+              <h3 data-i18n="t1t">Багаторівневий контроль вхідних</h3>
+              <p data-i18n="t1d">Білий і чорний списки, фільтр невідомих контактів та прихованих номерів — ви вирішуєте, хто може додзвонитися.</p>
+            </div>
+          </div>
+          <div class="tour-card">
+            <div class="iconbox"><svg><use href="assets/images/icons.svg#i-globe"></use></svg></div>
+            <div>
+              <h3 data-i18n="t2t">Гео- та операторський щит</h3>
+              <p data-i18n="t2d">Миттєве блокування небажаних міжнародних префіксів і кодів операторів одним перемикачем.</p>
+            </div>
+          </div>
+          <div class="tour-card">
+            <div class="iconbox"><svg><use href="assets/images/icons.svg#i-moon"></use></svg></div>
+            <div>
+              <h3 data-i18n="t3t">Інтелектуальний розклад тиші + Екстрений прорив</h3>
+              <p data-i18n="t3d">Спокій уночі та у вихідні, але 3-й дзвінок із того самого номера за 5 хвилин гарантовано проривається крізь тишу.</p>
+            </div>
+          </div>
+          <div class="tour-card">
+            <div class="iconbox"><svg><use href="assets/images/icons.svg#i-phone"></use></svg></div>
+            <div>
+              <h3 data-i18n="t4t">Помічник передзвону та нагадування</h3>
+              <p data-i18n="t4d">Тихе відхилення виклику за обраним сценарієм із нагадуванням передзвонити у зручний час.</p>
+            </div>
+          </div>
+          <div class="tour-card">
+            <div class="iconbox"><svg><use href="assets/images/icons.svg#i-backup"></use></svg></div>
+            <div>
+              <h3 data-i18n="t5t">Симулятор правил і локальний бекап</h3>
+              <p data-i18n="t5d">Перевірка будь-якого номера перед реальним дзвінком та експорт/імпорт налаштувань у файл без хмари.</p>
+            </div>
+          </div>
+          <div class="tour-card">
+            <div class="iconbox"><svg><use href="assets/images/icons.svg#i-translate"></use></svg></div>
+            <div>
+              <h3 data-i18n="t6t">Інтерфейс 6 мовами світу</h3>
+              <p data-i18n="t6d">Повна адаптація інтерфейсу українською, англійською, польською, німецькою, іспанською та французькою мовами.</p>
+            </div>
+          </div>
         </div>
       </div>
     </section>
 
+    <!-- PRIVACY -->
+    <section id="privacy">
+      <div class="container">
+        <div class="privacy-box">
+          <svg style="width:48px;height:48px;margin:0 auto 12px;color:var(--accent)"><use href="assets/images/icons.svg#i-privacy"></use></svg>
+          <h2 data-i18n="privacyTitle">Приватність понад усе</h2>
+          <p data-i18n="privacySub">Call Gate працює як системний CallScreeningService і не має дозволу на інтернет. Ваші контакти, журнали дзвінків і правила ніколи не залишають пристрій.</p>
+          <div class="privacy-points">
+            <div class="privacy-point"><svg class="icon"><use href="assets/images/icons.svg#i-lock"></use></svg> <span data-i18n="pp1">Жодного доступу до мережі</span></div>
+            <div class="privacy-point"><svg class="icon"><use href="assets/images/icons.svg#i-shield"></use></svg> <span data-i18n="pp2">Жодного збору адресної книги</span></div>
+            <div class="privacy-point"><svg class="icon"><use href="assets/images/icons.svg#i-backup"></use></svg> <span data-i18n="pp3">Бекап лише у локальний файл</span></div>
+            <div class="privacy-point"><svg class="icon"><use href="assets/images/icons.svg#i-heart"></use></svg> <span data-i18n="pp4">Без реклами і підписок</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ -->
     <section id="faq">
       <div class="container">
         <div class="section-head">
@@ -208,6 +279,10 @@
             <button class="faq-q"><span data-i18n="q4">На яких версіях Android працює застосунок?</span><span class="chev">▾</span></button>
             <div class="faq-a" data-i18n="a4">Android 10 і новіші (API 29+).</div>
           </div>
+          <div class="faq-item">
+            <button class="faq-q"><span data-i18n="q5">Як зробити резервну копію налаштувань?</span><span class="chev">▾</span></button>
+            <div class="faq-a" data-i18n="a5">Експортуйте правила у файл через меню налаштувань і збережіть його локально. Відновлення — імпортом того ж файлу.</div>
+          </div>
         </div>
       </div>
     </section>
@@ -221,7 +296,7 @@
       </div>
       <div class="footer-links">
         <a href="https://github.com/CyberDesignTech/call-guard" target="_blank" rel="noopener">GitHub</a>
-        <button class="btn btn-ghost btn-sm" id="shareBtn" data-i18n="shareBtn">Поділитися сторінкою</button>
+        <button class="btn btn-ghost btn-sm" id="shareBtn"><svg class="icon"><use href="assets/images/icons.svg#i-share"></use></svg> <span data-i18n="shareBtn">Поділитися сторінкою</span></button>
       </div>
     </div>
   </footer>

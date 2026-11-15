@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="i-shield" viewBox="0 0 24 24">
+    <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" fill="none" stroke="#4263EB" stroke-width="1.8" stroke-linejoin="round"/>
+    <path d="M9 12l2 2 4-4" fill="none" stroke="#15966A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24">
+    <rect x="5" y="11" width="14" height="10" rx="3" fill="none" stroke="#4263EB" stroke-width="1.8"/>
+    <path d="M8 11V8a4 4 0 018 0v3" fill="none" stroke="#15966A" stroke-width="1.8" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24">
+    <path d="M21 13a9 9 0 11-10-10 7 7 0 0010 10z" fill="none" stroke="#4263EB" stroke-width="1.8" stroke-linejoin="round"/>
+    <circle cx="17" cy="7" r="1" fill="#15966A"/>
+  </symbol>
+  <symbol id="i-siren" viewBox="0 0 24 24">
+    <path d="M12 3v3M5.6 5.6l2.1 2.1M3 12h3M18.4 5.6l-2.1 2.1M21 12h-3" stroke="#15966A" stroke-width="1.6" stroke-linecap="round"/>
+    <path d="M7 18l1-6a4 4 0 018 0l1 6H7z" fill="none" stroke="#4263EB" stroke-width="1.8" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="9" fill="none" stroke="#4263EB" stroke-width="1.8"/>
+    <path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18" fill="none" stroke="#15966A" stroke-width="1.6"/>
+  </symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24">
+    <path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z" fill="none" stroke="#4263EB" stroke-width="1.8" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24">
+    <path d="M12 20s-7-4.5-9-9a5 5 0 019-3 5 5 0 019 3c-2 4.5-9 9-9 9z" fill="none" stroke="#4263EB" stroke-width="1.8" stroke-linejoin="round"/>
+    <path d="M12 11v4M10 13h4" stroke="#15966A" stroke-width="1.6" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="i-check" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="9" fill="none" stroke="#4263EB" stroke-width="1.8"/>
+    <path d="M8 12l3 3 5-6" fill="none" stroke="#15966A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="i-download" viewBox="0 0 24 24">
+    <path d="M12 4v11M8 11l4 4 4-4" fill="none" stroke="#4263EB" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M5 19h14" stroke="#15966A" stroke-width="1.8" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="i-schedule" viewBox="0 0 24 24">
+    <rect x="4" y="5" width="16" height="15" rx="3" fill="none" stroke="#4263EB" stroke-width="1.8"/>
+    <path d="M4 9h16M8 3v4M16 3v4" stroke="#15966A" stroke-width="1.6" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="i-list" viewBox="0 0 24 24">
+    <path d="M9 6h11M9 12h11M9 18h11" stroke="#4263EB" stroke-width="1.8" stroke-linecap="round"/>
+    <circle cx="5" cy="6" r="1.2" fill="#15966A"/>
+    <circle cx="5" cy="12" r="1.2" fill="#15966A"/>
+    <circle cx="5" cy="18" r="1.2" fill="#15966A"/>
+  </symbol>
+  <symbol id="i-hidden" viewBox="0 0 24 24">
+    <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" fill="none" stroke="#4263EB" stroke-width="1.8"/>
+    <path d="M4 4l16 16" stroke="#D95757" stroke-width="1.8" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="i-backup" viewBox="0 0 24 24">
+    <path d="M12 4v9M8 9l4 4 4-4" fill="none" stroke="#4263EB" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M5 17v2a1 1 0 001 1h12a1 1 0 001-1v-2" fill="none" stroke="#15966A" stroke-width="1.8" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="i-translate" viewBox="0 0 24 24">
+    <path d="M4 5h10M9 5v2M6 7c1 4 4 7 8 8M14 7c-1 4-4 7-8 8" fill="none" stroke="#4263EB" stroke-width="1.6" stroke-linecap="round"/>
+    <path d="M15 12l5 9M20 12l-5 9" stroke="#15966A" stroke-width="1.6" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="i-privacy" viewBox="0 0 24 24">
+    <path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7l8-4z" fill="none" stroke="#4263EB" stroke-width="1.8" stroke-linejoin="round"/>
+    <circle cx="12" cy="12" r="2.5" fill="none" stroke="#15966A" stroke-width="1.6"/>
+  </symbol>
+  <symbol id="i-share" viewBox="0 0 24 24">
+    <circle cx="18" cy="5" r="2.5" fill="none" stroke="#15966A" stroke-width="1.8"/>
+    <circle cx="6" cy="12" r="2.5" fill="none" stroke="#4263EB" stroke-width="1.8"/>
+    <circle cx="18" cy="19" r="2.5" fill="none" stroke="#15966A" stroke-width="1.8"/>
+    <path d="M8.3 10.8l7.4-4.6M8.3 13.2l7.4 4.6" stroke="#4263EB" stroke-width="1.6"/>
+  </symbol>
+  <symbol id="i-faq" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="9" fill="none" stroke="#4263EB" stroke-width="1.8"/>
+    <path d="M9.5 9.5a2.5 2.5 0 014.5 1.5c0 1.5-2 2-2 3.5" fill="none" stroke="#15966A" stroke-width="1.6" stroke-linecap="round"/>
+    <circle cx="12" cy="17.5" r="1" fill="#15966A"/>
+  </symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24">
+    <path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="#4263EB" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+</svg>
