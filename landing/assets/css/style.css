@@ -32,7 +32,7 @@ a { color: inherit; text-decoration: none; }
 img, svg { max-width: 100%; display: block; }
 .container { width: 100%; max-width: 1180px; margin: 0 auto; padding: 0 20px; }
 
-.icon { width: 22px; height: 22px; display: inline-block; vertical-align: middle; }
+.icon { width: 24px; height: 24px; display: inline-block; vertical-align: middle; }
 
 /* Navbar */
 .navbar {
@@ -149,7 +149,8 @@ section { padding: 70px 0; }
   box-shadow: var(--shadow);
 }
 .card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); border-color: var(--accent-light); }
-.card .iconbox { width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; margin-bottom: 14px; background: rgba(66,99,235,0.08); color: var(--accent); }
+.card .iconbox { width: 48px; height: 48px; border-radius: 12px; display: grid; place-items: center; margin-bottom: 14px; background: #EFF6FF; border: 1px solid #DBEAFE; color: var(--accent); }
+.card .iconbox svg { width: 24px; height: 24px; display: block; }
 .card h3 { margin: 0 0 8px; font-size: 17px; }
 .card p { color: var(--muted); font-size: 14px; margin: 0; }
 
@@ -200,8 +201,8 @@ section { padding: 70px 0; }
   background: var(--card); border: 1px solid var(--card-border); border-radius: 20px;
   padding: 26px; box-shadow: var(--shadow); display: flex; gap: 16px;
 }
-.tour-card .iconbox { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; background: rgba(66,99,235,0.08); color: var(--accent); flex-shrink: 0; }
-.tour-card .iconbox svg { width: 26px; height: 26px; }
+.tour-card .iconbox { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; background: #EFF6FF; border: 1px solid #DBEAFE; color: var(--accent); flex-shrink: 0; }
+.tour-card .iconbox svg { width: 26px; height: 26px; display: block; }
 .tour-card h3 { margin: 0 0 6px; font-size: 18px; }
 .tour-card p { color: var(--muted); font-size: 14px; margin: 0; }
 
