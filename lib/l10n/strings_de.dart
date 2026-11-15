@@ -275,4 +275,6 @@ const Map<String, String> stringsDe = {
   'delete': 'Löschen',
   'reminderDoneStatus': 'Erledigt',
   'answeringProtectionDisabledWarning': 'Der Hauptschutz auf dem Startbildschirm ist ausgeschaltet, daher fängt der Assistent derzeit keine Anrufe ab.',
+  'freeForeverMessage': 'Call Gate ist völlig kostenlos, ohne Werbung oder versteckte Gebühren, und wird es immer bleiben.',
+  'freeForeverSupportLink': 'Projekt unterstützen',
 };

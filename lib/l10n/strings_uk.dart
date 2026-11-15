@@ -274,4 +274,6 @@ const Map<String, String> stringsUk = {
   'delete': 'Видалити',
   'reminderDoneStatus': 'Виконано',
   'answeringProtectionDisabledWarning': 'Основний захист на «Головній» вимкнено, тому помічник зараз не перехоплюватиме дзвінки.',
+  'freeForeverMessage': 'Call Gate працює повністю безкоштовно, без реклами та прихованих платежів і завжди залишатиметься таким.',
+  'freeForeverSupportLink': 'Підтримати проєкт',
 };

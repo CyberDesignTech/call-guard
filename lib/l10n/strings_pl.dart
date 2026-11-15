@@ -275,4 +275,6 @@ const Map<String, String> stringsPl = {
   'delete': 'Usuń',
   'reminderDoneStatus': 'Wykonane',
   'answeringProtectionDisabledWarning': 'Główna ochrona na ekranie głównym jest wyłączona, więc asystent nie będzie teraz przechwytywać połączeń.',
+  'freeForeverMessage': 'Call Gate jest całkowicie darmowy, bez reklam i ukrytych opłat, i taki pozostanie na zawsze.',
+  'freeForeverSupportLink': 'Wesprzyj projekt',
 };

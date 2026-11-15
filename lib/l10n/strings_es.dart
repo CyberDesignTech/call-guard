@@ -273,4 +273,6 @@ const Map<String, String> stringsEs = {
   'delete': 'Eliminar',
   'reminderDoneStatus': 'Completado',
   'answeringProtectionDisabledWarning': 'La protección principal de la pantalla de inicio está desactivada, por lo que el asistente no interceptará llamadas ahora.',
+  'freeForeverMessage': 'Call Gate es completamente gratuito, sin anuncios ni pagos ocultos, y siempre seguirá siéndolo.',
+  'freeForeverSupportLink': 'Apoyar el proyecto',
 };

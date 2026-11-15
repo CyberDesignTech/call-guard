@@ -9,6 +9,7 @@ import '../models/call_log_entry.dart';
 import '../models/reminder.dart';
 import '../platform/call_screening_channel.dart';
 import '../theme/app_palette.dart';
+import '../widgets/common/app_info_footnote.dart';
 import '../widgets/common/empty_state.dart';
 import '../widgets/common/contact_picker.dart';
 import '../widgets/common/journal_card.dart';
@@ -24,6 +25,7 @@ class MorePage extends StatefulWidget {
     required this.onStub,
     required this.strings,
     required this.isActive,
+    required this.onSupport,
     this.journalOpenRequest = 0,
   });
 
@@ -31,6 +33,7 @@ class MorePage extends StatefulWidget {
   final VoidCallback onStub;
   final AppStrings strings;
   final bool isActive;
+  final VoidCallback onSupport;
   final int journalOpenRequest;
 
   @override
@@ -694,6 +697,12 @@ class MorePageState extends State<MorePage> with WidgetsBindingObserver {
           ),
           const SizedBox(height: 18),
           if (_segment == 0) ..._reminderContent() else ..._journalContent(),
+          const SizedBox(height: 14),
+          AppInfoFootnote(
+            message: widget.strings.call('freeForeverMessage'),
+            linkLabel: widget.strings.call('freeForeverSupportLink'),
+            onSupport: widget.onSupport,
+          ),
         ],
       ),
     );

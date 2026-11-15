@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../l10n/app_strings.dart';
 import '../theme/app_palette.dart';
 import 'common/icon_box.dart';
 import 'common/shield_phone_logo.dart';
+import 'support_project_dialog.dart';
 
 class ProfileSettingsSheet extends StatefulWidget {
   const ProfileSettingsSheet({
@@ -39,7 +39,7 @@ class ProfileSettingsSheetState extends State<ProfileSettingsSheet> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              '${widget.strings.call('versionLabel')}  v1.6.0',
+              '${widget.strings.call('versionLabel')}  v1.6.1',
               style: TextStyle(
                 color: AppPalette.accent(AppPalette.blue),
                 fontWeight: FontWeight.w800,
@@ -82,70 +82,6 @@ class ProfileSettingsSheetState extends State<ProfileSettingsSheet> {
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
             child: Text(widget.strings.call('closeLabel')),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _copyProjectLink(BuildContext dialogContext) async {
-    await Clipboard.setData(
-      const ClipboardData(
-        text: 'https://github.com/CyberDesignTech/call-guard',
-      ),
-    );
-    if (!mounted) return;
-    Navigator.pop(dialogContext);
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(content: Text(widget.strings.call('linkCopied'))),
-      );
-  }
-
-  void _showSupport() {
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        icon: Icon(
-          Icons.favorite_rounded,
-          color: AppPalette.accent(AppPalette.red),
-        ),
-        title: Text(widget.strings.call('supportProject')),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                widget.strings.call('supportThanks'),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              _SupportOption(
-                icon: Icons.coffee_outlined,
-                title: widget.strings.call('supportCoffeeTitle'),
-                description: widget.strings.call('supportCoffeeDescription'),
-                color: AppPalette.amber,
-              ),
-              const SizedBox(height: 10),
-              _SupportOption(
-                icon: Icons.share_outlined,
-                title: widget.strings.call('supportShareTitle'),
-                description: widget.strings.call('supportShareDescription'),
-                color: AppPalette.blue,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text(widget.strings.call('closeLabel')),
-          ),
-          FilledButton.icon(
-            onPressed: () => _copyProjectLink(dialogContext),
-            icon: const Icon(Icons.copy_rounded, size: 17),
-            label: Text(widget.strings.call('copyLink')),
           ),
         ],
       ),
@@ -314,7 +250,7 @@ class ProfileSettingsSheetState extends State<ProfileSettingsSheet> {
                   ),
                 ),
                 trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: _showSupport,
+                onTap: () => showSupportProjectDialog(context, widget.strings),
               ),
             ],
           ),
@@ -322,53 +258,4 @@ class ProfileSettingsSheetState extends State<ProfileSettingsSheet> {
       ),
     );
   }
-}
-
-class _SupportOption extends StatelessWidget {
-  const _SupportOption({
-    required this.icon,
-    required this.title,
-    required this.description,
-    required this.color,
-  });
-
-  final IconData icon;
-  final String title;
-  final String description;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(13),
-    decoration: BoxDecoration(
-      color: AppPalette.surface,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: AppPalette.line),
-    ),
-    child: Row(
-      children: [
-        IconBox(
-          icon: icon,
-          color: color,
-          background: AppPalette.accentSurface(color),
-          size: 39,
-        ),
-        const SizedBox(width: 11),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
-              const SizedBox(height: 3),
-              Text(
-                description,
-                style: TextStyle(color: AppPalette.muted, fontSize: 11),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
 }

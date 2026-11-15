@@ -271,4 +271,6 @@ const Map<String, String> stringsEn = {
   'delete': 'Delete',
   'reminderDoneStatus': 'Done',
   'answeringProtectionDisabledWarning': 'Main protection on Home is turned off, so the assistant will not intercept calls right now.',
+  'freeForeverMessage': 'Call Gate is completely free, with no ads or hidden fees, and will always remain so.',
+  'freeForeverSupportLink': 'Support the project',
 };

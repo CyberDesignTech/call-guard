@@ -5,6 +5,7 @@ import '../l10n/app_strings.dart';
 import '../platform/call_screening_channel.dart';
 import '../theme/app_palette.dart';
 import '../widgets/common/app_panel.dart';
+import '../widgets/common/app_info_footnote.dart';
 import '../widgets/common/page_intro.dart';
 import '../widgets/common/rule_switch.dart';
 import '../widgets/common/section_heading.dart';
@@ -26,6 +27,7 @@ class AnsweringModePage extends StatefulWidget {
     required this.onAutoRemindMinutesChanged,
     required this.emergencyRepeat,
     required this.onEmergencyRepeatChanged,
+    required this.onSupport,
   });
 
   final AppStrings strings;
@@ -42,6 +44,7 @@ class AnsweringModePage extends StatefulWidget {
   final ValueChanged<int> onAutoRemindMinutesChanged;
   final bool emergencyRepeat;
   final ValueChanged<bool> onEmergencyRepeatChanged;
+  final VoidCallback onSupport;
 
   @override
   State<AnsweringModePage> createState() => _AnsweringModePageState();
@@ -335,6 +338,12 @@ class _AnsweringModePageState extends State<AnsweringModePage>
           iconColor: AppPalette.red,
           iconBackground: AppPalette.redPale,
         ),
+      ),
+      const SizedBox(height: 16),
+      AppInfoFootnote(
+        message: widget.strings.call('freeForeverMessage'),
+        linkLabel: widget.strings.call('freeForeverSupportLink'),
+        onSupport: widget.onSupport,
       ),
     ],
   );

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../l10n/app_strings.dart';
 import '../theme/app_palette.dart';
 import '../widgets/common/app_panel.dart';
+import '../widgets/common/app_info_footnote.dart';
 import '../widgets/common/dark_pill.dart';
 import '../widgets/common/icon_box.dart';
 import '../widgets/common/page_intro.dart';
@@ -28,6 +29,7 @@ class HomePage extends StatelessWidget {
     required this.onManualSilenceChanged,
     required this.onOpenSchedule,
     required this.onTest,
+    required this.onSupport,
   });
 
   final AppStrings strings;
@@ -44,6 +46,7 @@ class HomePage extends StatelessWidget {
   final ValueChanged<bool> onManualSilenceChanged;
   final VoidCallback onOpenSchedule;
   final VoidCallback onTest;
+  final VoidCallback onSupport;
 
   @override
   Widget build(BuildContext context) {
@@ -293,6 +296,12 @@ class HomePage extends StatelessWidget {
               fontSize: 12,
             ),
           ),
+        ),
+        const SizedBox(height: 13),
+        AppInfoFootnote(
+          message: strings.call('freeForeverMessage'),
+          linkLabel: strings.call('freeForeverSupportLink'),
+          onSupport: onSupport,
         ),
       ],
     );

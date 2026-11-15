@@ -11,6 +11,7 @@ import '../screens/schedule_page.dart';
 import '../widgets/common/shield_phone_logo.dart';
 import '../widgets/profile_settings_sheet.dart';
 import '../widgets/simulate_call_dialog.dart';
+import '../widgets/support_project_dialog.dart';
 
 enum AppSection { home, lists, schedule, answering, more }
 
@@ -162,6 +163,10 @@ class CallGuardShellState extends State<CallGuardShell> {
     );
   }
 
+  void _openSupportDialog() {
+    showSupportProjectDialog(context, widget.strings);
+  }
+
   void _openProfileMenu() {
     showModalBottomSheet<void>(
       context: context,
@@ -262,12 +267,14 @@ class CallGuardShellState extends State<CallGuardShell> {
             onManualSilenceChanged: widget.onManualSilenceChanged,
             onOpenSchedule: () => _selectSection(AppSection.schedule),
             onTest: _openTestDialog,
+            onSupport: _openSupportDialog,
           ),
           ListsPage(
             database: widget.database,
             onStub: _showStub,
             strings: widget.strings,
             isActive: _section == AppSection.lists,
+            onSupport: _openSupportDialog,
             onEdgeSwipe: (direction) => _selectSection(
               AppSection.values[AppSection.lists.index + direction],
             ),
@@ -284,6 +291,7 @@ class CallGuardShellState extends State<CallGuardShell> {
             onEndTimeChanged: widget.onSilenceEndChanged,
             selectedDays: widget.silenceWeekdays,
             onSelectedDaysChanged: widget.onSilenceWeekdaysChanged,
+            onSupport: _openSupportDialog,
           ),
           AnsweringModePage(
             strings: widget.strings,
@@ -302,12 +310,14 @@ class CallGuardShellState extends State<CallGuardShell> {
                 widget.onAnsweringAutoRemindMinutesChanged,
             emergencyRepeat: widget.answeringEmergencyRepeat,
             onEmergencyRepeatChanged: widget.onAnsweringEmergencyRepeatChanged,
+            onSupport: _openSupportDialog,
           ),
           MorePage(
             database: widget.database,
             onStub: _showStub,
             strings: widget.strings,
             isActive: _section == AppSection.more,
+            onSupport: _openSupportDialog,
             journalOpenRequest: widget.openCallJournalRequest,
           ),
         ],

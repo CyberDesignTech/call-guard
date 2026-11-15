@@ -311,28 +311,28 @@ void main() {
     );
   });
 
-  testWidgets('bottom info banner is removed from every section', (
-    tester,
-  ) async {
+  testWidgets('bottom info banner appears on every section', (tester) async {
     tester.view.physicalSize = const Size(390, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    const removedText =
-        'Усі дані та правила зберігаються виключно локально на вашому пристрої і нікуди не передаються';
+    const message =
+        'Call Gate працює повністю безкоштовно, без реклами та прихованих платежів і завжди залишатиметься таким.';
+    const link = 'Підтримати проєкт';
 
-    Future<void> expectBannerGone() async {
+    Future<void> expectBannerVisible() async {
       final listViews = find.byType(ListView);
       if (listViews.evaluate().isNotEmpty) {
         await tester.drag(listViews.first, const Offset(0, -3000));
         await tester.pump(const Duration(milliseconds: 400));
       }
-      expect(find.text(removedText), findsNothing);
+      expect(find.text(message).hitTestable(), findsOneWidget);
+      expect(find.text(link).hitTestable(), findsOneWidget);
     }
 
     await pumpApp(tester);
-    await expectBannerGone();
+    await expectBannerVisible();
 
     for (final tooltip in [
       'Списки та фільтри',
@@ -342,11 +342,32 @@ void main() {
     ]) {
       await tester.tap(find.byTooltip(tooltip));
       await finishSectionTransition(tester);
-      await expectBannerGone();
+      await expectBannerVisible();
     }
 
     await waitForText(tester, 'Олена Коваль');
     await waitForDatabase(tester);
+  });
+
+  testWidgets('support link in the bottom banner opens the support dialog', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await pumpApp(tester);
+    await tester.drag(find.byType(ListView).first, const Offset(0, -3000));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.text('Підтримати проєкт'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Buy Me a Coffee · Подякувати розробнику'),
+      findsOneWidget,
+    );
+    expect(find.text('Поділитися застосунком'), findsOneWidget);
   });
 
   testWidgets('answering assistant warns when main protection is off', (
@@ -1021,7 +1042,7 @@ void main() {
     await tester.tap(aboutMenuItem);
     await tester.pumpAndSettle();
     expect(find.text('Call Gate'), findsOneWidget);
-    expect(find.textContaining('v1.6.0'), findsOneWidget);
+    expect(find.textContaining('v1.6.1'), findsOneWidget);
     expect(find.textContaining('не надсилаються на сервер'), findsOneWidget);
 
     await tester.tap(find.text('Зрозуміло'));
