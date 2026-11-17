@@ -195,7 +195,13 @@ class SystemCallPermissionsCardState extends State<SystemCallPermissionsCard>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
               const SizedBox(height: 2),
               Text(
                 _loading
@@ -205,7 +211,7 @@ class SystemCallPermissionsCardState extends State<SystemCallPermissionsCard>
                     : unavailable
                     ? widget.strings.call('roleUnavailable')
                     : widget.strings.call(missingLabel ?? 'roleMissing'),
-                style: TextStyle(color: AppPalette.muted, fontSize: 10),
+                style: TextStyle(color: AppPalette.muted, fontSize: 11),
               ),
             ],
           ),
@@ -241,7 +247,7 @@ class SystemCallPermissionsCardState extends State<SystemCallPermissionsCard>
         children: [
           Text(
             widget.strings.call('screeningStatusTitle'),
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 12),
           _permissionRow(

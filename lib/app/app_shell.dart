@@ -184,13 +184,6 @@ class CallGuardShellState extends State<CallGuardShell> {
 
   @override
   Widget build(BuildContext context) {
-    final sectionTitles = [
-      widget.strings.homeTitle,
-      widget.strings.listsScreenTitle,
-      widget.strings.scheduleTitle,
-      widget.strings.answerTitle,
-      widget.strings.moreTitle,
-    ];
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 18,
@@ -213,14 +206,14 @@ class CallGuardShellState extends State<CallGuardShell> {
                     ),
                   ),
                   Text(
-                    sectionTitles[_section.index].toUpperCase(),
+                    widget.strings.call('appSlogan'),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: AppPalette.muted,
                       fontSize: 9,
                       fontWeight: FontWeight.w700,
-                      letterSpacing: 1.05,
+                      letterSpacing: 0.1,
                     ),
                   ),
                 ],
@@ -253,6 +246,8 @@ class CallGuardShellState extends State<CallGuardShell> {
         },
         children: [
           HomePage(
+            database: widget.database,
+            isActive: _section == AppSection.home,
             strings: widget.strings,
             protectionEnabled: widget.protectionEnabled,
             onProtectionChanged: widget.onProtectionChanged,
@@ -262,10 +257,8 @@ class CallGuardShellState extends State<CallGuardShell> {
             onBlockNonContactsChanged: widget.onBlockNonContactsChanged,
             blockInternational: widget.blockInternational,
             onBlockInternationalChanged: widget.onBlockInternationalChanged,
-            automaticSilence: widget.automaticSilence,
             manualSilenceEnabled: widget.manualSilenceEnabled,
             onManualSilenceChanged: widget.onManualSilenceChanged,
-            onOpenSchedule: () => _selectSection(AppSection.schedule),
             onTest: _openTestDialog,
             onSupport: _openSupportDialog,
           ),

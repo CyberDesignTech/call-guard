@@ -47,11 +47,12 @@ class CallRuleEngine(context: Context) {
         }
     }
 
-    fun recordCallLog(phoneNumber: String, reason: String) {
+    fun recordCallLog(phoneNumber: String, reason: String, contactName: String? = null) {
         try {
             CallGuardDatabase.withDatabase(appContext) { database ->
                 val values = ContentValues().apply {
                     put(DbContract.CallLogs.PHONE, phoneNumber.ifBlank { PhoneNumbers.HIDDEN_NUMBER })
+                    put(DbContract.CallLogs.CONTACT_NAME, contactName)
                     put(DbContract.CallLogs.REASON, reason)
                     put(DbContract.CallLogs.TIMESTAMP, System.currentTimeMillis())
                 }

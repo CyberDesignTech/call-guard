@@ -12,6 +12,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 object CallGuardDatabase {
     private val repeatColumnsChecked = AtomicBoolean(false)
+    private val callLogContactNameChecked = AtomicBoolean(false)
 
     @Volatile
     private var instance: SQLiteDatabase? = null
@@ -56,7 +57,9 @@ object CallGuardDatabase {
         ).apply {
             rawQuery("PRAGMA busy_timeout = ${DbContract.BUSY_TIMEOUT_MS}", null).use { }
             ensureRepeatColumns(this)
+            ensureCallLogContactNameColumn(this)
             ensureCallbackSettings(this)
+            ensureFixedLineOperators(this)
         }
     }
 
@@ -121,6 +124,70 @@ object CallGuardDatabase {
             )
         }
     }
+
+    private fun ensureCallLogContactNameColumn(database: SQLiteDatabase) {
+        if (!callLogContactNameChecked.compareAndSet(false, true)) return
+        try {
+            val columns = mutableSetOf<String>()
+            database.rawQuery(
+                "PRAGMA table_info(${DbContract.CallLogs.TABLE})",
+                null,
+            ).use { cursor ->
+                val nameColumn = cursor.getColumnIndexOrThrow("name")
+                while (cursor.moveToNext()) columns.add(cursor.getString(nameColumn))
+            }
+            if (columns.isNotEmpty() && DbContract.CallLogs.CONTACT_NAME !in columns) {
+                database.execSQL(
+                    "ALTER TABLE ${DbContract.CallLogs.TABLE} ADD COLUMN " +
+                        "${DbContract.CallLogs.CONTACT_NAME} TEXT",
+                )
+            }
+        } catch (error: Exception) {
+            callLogContactNameChecked.set(false)
+            throw error
+        }
+    }
+
+    private fun ensureFixedLineOperators(database: SQLiteDatabase) {
+        val defaults = listOf(
+            FixedLineOperator("UA", "@operatorUkrtelecom", "44"),
+            FixedLineOperator("PL", "@operatorWarsawLandline", "22"),
+            FixedLineOperator("DE", "@operatorBerlinLandline", "30"),
+            FixedLineOperator("GB", "@operatorLondonLandline", "20"),
+            FixedLineOperator("US-CA", "@operatorNewYorkLandline", "212"),
+        )
+        defaults.forEach { operator ->
+            val countryExists = database.rawQuery(
+                "SELECT 1 FROM ${DbContract.CountryRules.TABLE} " +
+                    "WHERE ${DbContract.CountryRules.ISO_CODE} = ? LIMIT 1",
+                arrayOf(operator.countryIso),
+            ).use { it.moveToFirst() }
+            if (!countryExists) return@forEach
+            val exists = database.rawQuery(
+                "SELECT 1 FROM ${DbContract.OperatorRules.TABLE} " +
+                    "WHERE ${DbContract.OperatorRules.OPERATOR_NAME} = ? LIMIT 1",
+                arrayOf(operator.name),
+            ).use { it.moveToFirst() }
+            if (!exists) {
+                database.insert(
+                    DbContract.OperatorRules.TABLE,
+                    null,
+                    android.content.ContentValues().apply {
+                        put(DbContract.OperatorRules.COUNTRY_ISO, operator.countryIso)
+                        put(DbContract.OperatorRules.OPERATOR_NAME, operator.name)
+                        put(DbContract.OperatorRules.PREFIXES, operator.prefix)
+                        put(DbContract.OperatorRules.ACTION, "neutral")
+                    },
+                )
+            }
+        }
+    }
+
+    private data class FixedLineOperator(
+        val countryIso: String,
+        val name: String,
+        val prefix: String,
+    )
 
     private val callbackSettingDefaults = mapOf(
         DbContract.SettingKeys.ANSWERING_AUTO_REMIND to "false",

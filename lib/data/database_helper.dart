@@ -27,18 +27,22 @@ class DatabaseHelper {
         _databasePath ?? path.join(await getDatabasesPath(), 'call_guard.db');
     final database = await openDatabase(
       databasePath,
-      version: 4,
+      version: 5,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: (db, oldVersion, newVersion) async {
         await _ensureReminderRepeatColumns(db);
+        await _ensureCallLogContactNameColumn(db);
         if (oldVersion < 3) await _createIndexes(db);
         await _ensureCallbackSettings(db);
+        await _ensureFixedLineOperators(db);
       },
       onOpen: (db) async {
         await _ensureReminderRepeatColumns(db);
+        await _ensureCallLogContactNameColumn(db);
         await _ensureCallbackSettings(db);
         await _normalizeLegacyCallLogReasons(db);
+        await _ensureFixedLineOperators(db);
       },
     );
     _openedDatabase = database;
@@ -102,6 +106,7 @@ class DatabaseHelper {
       CREATE TABLE call_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         phone TEXT NOT NULL,
+        contact_name TEXT,
         reason TEXT NOT NULL,
         timestamp INTEGER NOT NULL
       )
@@ -176,12 +181,17 @@ class DatabaseHelper {
       _operatorSeed('UA', 'operatorKyivstar', '67,68,96,97,98'),
       _operatorSeed('UA', 'operatorVodafoneUA', '50,66,95,99'),
       _operatorSeed('UA', 'operatorLifecell', '63,73,93'),
+      _operatorSeed('UA', 'operatorUkrtelecom', '44'),
       _operatorSeed('PL', 'operatorOrange', '50,51,53,57,78,79'),
       _operatorSeed('PL', 'operatorPlay', '45,53,72,73,79,88'),
+      _operatorSeed('PL', 'operatorWarsawLandline', '22'),
       _operatorSeed('DE', 'operatorTelekom', '151,160,170,171,175'),
       _operatorSeed('DE', 'operatorVodafoneDE', '152,162,172,173,174'),
+      _operatorSeed('DE', 'operatorBerlinLandline', '30'),
       _operatorSeed('GB', 'operatorVodafoneUK', '74,75,77,78,79'),
       _operatorSeed('GB', 'operatorEE', '79,75,77'),
+      _operatorSeed('GB', 'operatorLondonLandline', '20'),
+      _operatorSeed('US-CA', 'operatorNewYorkLandline', '212'),
     ];
     for (final operator in operators) {
       batch.insert('operator_rules', operator);
@@ -286,6 +296,10 @@ class DatabaseHelper {
   }
 
   Future<void> _ensureReminderRepeatColumns(DatabaseExecutor db) async {
+    final tableExists = (await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'call_reminders'",
+    )).isNotEmpty;
+    if (!tableExists) return;
     final columns = (await db.rawQuery('PRAGMA table_info(call_reminders)'))
         .map((column) => column['name'] as String?)
         .whereType<String>()
@@ -312,6 +326,55 @@ class DatabaseHelper {
     }
   }
 
+  Future<void> _ensureCallLogContactNameColumn(DatabaseExecutor db) async {
+    final tableExists = (await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'call_logs'",
+    )).isNotEmpty;
+    if (!tableExists) return;
+    final columns = (await db.rawQuery('PRAGMA table_info(call_logs)'))
+        .map((column) => column['name'] as String?)
+        .whereType<String>()
+        .toSet();
+    if (!columns.contains('contact_name')) {
+      await db.execute('ALTER TABLE call_logs ADD COLUMN contact_name TEXT');
+    }
+  }
+
+  Future<void> _ensureFixedLineOperators(DatabaseExecutor db) async {
+    const fixedLineOperators = <String, (String, String)>{
+      'operatorUkrtelecom': ('UA', '44'),
+      'operatorWarsawLandline': ('PL', '22'),
+      'operatorBerlinLandline': ('DE', '30'),
+      'operatorLondonLandline': ('GB', '20'),
+      'operatorNewYorkLandline': ('US-CA', '212'),
+    };
+    final tableExists = (await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'operator_rules'",
+    )).isNotEmpty;
+    if (!tableExists) return;
+    final existing = (await db.query(
+      'operator_rules',
+      columns: ['operator_name'],
+    )).map((row) => row['operator_name'] as String).toSet();
+    final countries = (await db.query(
+      'country_rules',
+      columns: ['iso_code'],
+    )).map((row) => row['iso_code'] as String).toSet();
+    for (final entry in fixedLineOperators.entries) {
+      final storedName = '@${entry.key}';
+      if (existing.contains(storedName) ||
+          !countries.contains(entry.value.$1)) {
+        continue;
+      }
+      await db.insert('operator_rules', {
+        'country_iso': entry.value.$1,
+        'operator_name': storedName,
+        'prefixes': entry.value.$2,
+        'action': 'neutral',
+      });
+    }
+  }
+
   Future<void> _ensureCallbackSettings(DatabaseExecutor db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS app_settings (
@@ -328,10 +391,9 @@ class DatabaseHelper {
   }
 
   Future<void> _normalizeLegacyCallLogReasons(DatabaseExecutor db) async {
-    final hasCallLogs =
-        (await db.rawQuery(
-          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'call_logs'",
-        )).isNotEmpty;
+    final hasCallLogs = (await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'call_logs'",
+    )).isNotEmpty;
     if (!hasCallLogs) return;
     const legacyReasons = <String, String>{
       'reasonCountry': 'country_block',
@@ -533,6 +595,26 @@ class DatabaseHelper {
       (await _database).delete('call_logs', where: 'id = ?', whereArgs: [id]);
 
   Future<int> clearCallLogs() async => (await _database).delete('call_logs');
+
+  Future<int> updateCallLogContactName(int id, String contactName) async =>
+      (await _database).update(
+        'call_logs',
+        {'contact_name': contactName},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+
+  Future<int> insertCallLog({
+    required String phone,
+    String? contactName,
+    required String reason,
+    required int timestamp,
+  }) async => (await _database).insert('call_logs', {
+    'phone': phone,
+    'contact_name': contactName,
+    'reason': reason,
+    'timestamp': timestamp,
+  });
 
   /// Exposes created index names so tests can verify schema and migrations.
   Future<Set<String>> getIndexNamesForTesting() async {

@@ -176,6 +176,7 @@ class MorePageState extends State<MorePage> with WidgetsBindingObserver {
   CallLogEntry _logFromRow(Map<String, Object?> row) => CallLogEntry(
     id: row['id'] as int,
     phone: row['phone'] as String,
+    contactName: row['contact_name'] as String? ?? '',
     reason: row['reason'] as String,
     timestamp: row['timestamp'] as int,
   );
@@ -854,6 +855,7 @@ class MorePageState extends State<MorePage> with WidgetsBindingObserver {
           child: JournalCard(
             strings: widget.strings,
             phone: localizedValue(widget.strings, entry.phone),
+            contactName: entry.contactName,
             caption: _dateTimeLabel(entry.timestamp),
             reason: localizedValue(widget.strings, entry.reason),
             tint: tint,

@@ -38,13 +38,13 @@ class RuleSwitch extends StatelessWidget {
         title,
         style: TextStyle(
           color: AppPalette.ink,
-          fontSize: 12,
+          fontSize: 13,
           fontWeight: FontWeight.w800,
         ),
       ),
       subtitle: Text(
         subtitle,
-        style: TextStyle(color: AppPalette.muted, fontSize: 10),
+        style: TextStyle(color: AppPalette.muted, fontSize: 11),
       ),
       activeTrackColor: AppPalette.green,
       dense: true,

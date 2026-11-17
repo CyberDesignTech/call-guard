@@ -32,6 +32,7 @@ object DbContract {
         const val TABLE = "operator_rules"
         const val ID = "id"
         const val COUNTRY_ISO = "country_iso"
+        const val OPERATOR_NAME = "operator_name"
         const val PREFIXES = "prefixes"
         const val ACTION = "action"
     }
@@ -53,6 +54,7 @@ object DbContract {
     object CallLogs {
         const val TABLE = "call_logs"
         const val PHONE = "phone"
+        const val CONTACT_NAME = "contact_name"
         const val REASON = "reason"
         const val TIMESTAMP = "timestamp"
     }

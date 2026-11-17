@@ -36,6 +36,31 @@ object ContactLookup {
             .getOrNull()
     }
 
+    /** Returns the contact's display name when contact access is granted. */
+    fun lookupName(context: Context, lookupNumber: String): String? {
+        if (lookupNumber.isBlank() || !hasPermission(context)) return null
+        val lookupUri = Uri.withAppendedPath(
+            ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+            Uri.encode(lookupNumber),
+        )
+        return runCatching {
+            context.contentResolver.query(
+                lookupUri,
+                arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME),
+                null,
+                null,
+                null,
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    cursor.getString(0)?.trim()?.takeIf(String::isNotEmpty)
+                } else {
+                    null
+                }
+            }
+        }.onFailure { Log.w(TAG, "Could not resolve a contact display name", it) }
+            .getOrNull()
+    }
+
     /** Screening semantics: an unknown lookup result keeps the call allowed. */
     fun isInContacts(context: Context, lookupNumber: String): Boolean {
         if (lookupNumber.isBlank()) return false

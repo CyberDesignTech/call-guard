@@ -56,7 +56,11 @@ class CallGuardScreeningService : CallScreeningService() {
                     Log.e(TAG, "Could not process callback-assistant notification", it)
                 }
                 // The service owns rejection logging so every blocked call is recorded once.
-                ruleEngine.recordCallLog(verdict.phoneNumber, verdict.reason)
+                ruleEngine.recordCallLog(
+                    verdict.phoneNumber,
+                    verdict.reason,
+                    ContactLookup.lookupName(appContext, phoneNumber),
+                )
             }
             val response = CallResponse.Builder().apply {
                 if (!verdict.allowed) {

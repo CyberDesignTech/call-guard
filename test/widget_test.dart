@@ -16,6 +16,8 @@ import 'package:call_guard/l10n/strings_fr.dart';
 import 'package:call_guard/l10n/strings_pl.dart';
 import 'package:call_guard/l10n/strings_uk.dart';
 import 'package:call_guard/platform/call_screening_channel.dart';
+import 'package:call_guard/widgets/common/app_panel.dart';
+import 'package:call_guard/widgets/common/journal_card.dart';
 
 late DatabaseHelper _testDatabase;
 
@@ -66,12 +68,20 @@ void main() {
     }
   }
 
+  Finder homeScrollable() => find
+      .descendant(
+        of: find.byType(ListView).first,
+        matching: find.byType(Scrollable),
+      )
+      .first;
+
   test('SQLite schema seeds settings, countries and operators', () async {
     final settings = await _testDatabase.getSettings();
     final countries = await _testDatabase.getCountries();
     expect(settings['locale'], 'ukrainian');
     expect(countries, hasLength(5));
-    expect(await _testDatabase.getOperators('UA'), hasLength(3));
+    expect(await _testDatabase.getOperators('UA'), hasLength(4));
+    expect((await _testDatabase.getCallLogs()).first, contains('contact_name'));
     expect(await _testDatabase.getPhoneRules('white'), hasLength(2));
     expect(
       await _testDatabase.getIndexNamesForTesting(),
@@ -97,6 +107,21 @@ void main() {
     expect(saved['answering_auto_remind'], 'true');
     expect(saved['answering_auto_remind_minutes'], '15');
     expect(saved['answering_emergency_repeat'], 'true');
+  });
+
+  test('fixed-line operator prefixes are seeded and can be blocked', () async {
+    final operators = await _testDatabase.getOperators('UA');
+    final ukrtelecom = operators.singleWhere(
+      (row) => row['operator_name'] == '@operatorUkrtelecom',
+    );
+    expect(ukrtelecom['prefixes'], '44');
+    expect(ukrtelecom['action'], 'neutral');
+
+    await _testDatabase.updateOperatorAction(ukrtelecom['id'] as int, 'block');
+    final saved = (await _testDatabase.getOperators('UA'))
+        .singleWhere((row) => row['operator_name'] == '@operatorUkrtelecom');
+    expect(saved['prefixes'], '44');
+    expect(saved['action'], 'block');
   });
 
   test('legacy reminder tables migrate and persist repeat rules', () async {
@@ -173,6 +198,50 @@ void main() {
     );
     expect(updated['repeat_type'], 'weekly');
     expect(updated['repeat_interval'], 1);
+    await migrated.close();
+  });
+
+  test('legacy call logs migrate the saved contact name column', () async {
+    const databasePath = 'test/call_guard_legacy_call_logs_test.db';
+    final databaseFile = File(databasePath);
+    if (databaseFile.existsSync()) databaseFile.deleteSync();
+    addTearDown(() async {
+      for (final file in [
+        databaseFile,
+        File('$databasePath-shm'),
+        File('$databasePath-wal'),
+      ]) {
+        if (await file.exists()) await file.delete();
+      }
+    });
+
+    final legacyDatabase = await sqflite.openDatabase(
+      databasePath,
+      version: 4,
+      onCreate: (db, version) async {
+        await db.execute('''
+          CREATE TABLE call_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            phone TEXT NOT NULL,
+            reason TEXT NOT NULL,
+            timestamp INTEGER NOT NULL
+          )
+        ''');
+        await db.insert('call_logs', {
+          'phone': '+380441234567',
+          'reason': 'operator_block',
+          'timestamp': 1234,
+        });
+      },
+    );
+    await legacyDatabase.close();
+
+    final migrated = DatabaseHelper.forTesting(databasePath: databasePath);
+    await migrated.initialize();
+    final logs = await migrated.getCallLogs();
+    expect(logs.single['phone'], '+380441234567');
+    expect(logs.single.containsKey('contact_name'), isTrue);
+    expect(logs.single['contact_name'], isNull);
     await migrated.close();
   });
 
@@ -279,9 +348,102 @@ void main() {
     expect(find.text('Захист активний'), findsOneWidget);
     expect(find.text('CALL GATE'), findsNWidgets(2));
     expect(find.byType(ShieldPhoneLogo), findsNWidgets(2));
-    await tester.drag(find.byType(ListView).first, const Offset(0, -700));
-    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Швидкі правила'),
+      250,
+      scrollable: homeScrollable(),
+    );
     expect(find.text('Швидкі правила'), findsOneWidget);
+  });
+
+  testWidgets(
+    'home groups manual silence under quick rules and has no standard card',
+    (tester) async {
+      await pumpApp(tester);
+      expect(find.text('Стандартний режим'), findsNothing);
+      expect(find.text('Розумний фільтр вхідних дзвінків'), findsOneWidget);
+
+      final manualSilence = find.text('Режим тиші вручну');
+      await tester.scrollUntilVisible(
+        manualSilence,
+        250,
+        scrollable: homeScrollable(),
+      );
+      final quickRulesCard = find
+          .ancestor(of: manualSilence, matching: find.byType(AppPanel))
+          .first;
+      expect(
+        find.descendant(
+          of: quickRulesCard,
+          matching: find.text('Приховані номери'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.ancestor(of: manualSilence, matching: find.byType(AppPanel)),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('journal card shows the contact name and copies its number', (
+    tester,
+  ) async {
+    final strings = AppStrings(AppLanguage.ukrainian);
+    String? copiedText;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 390,
+              child: JournalCard(
+                strings: strings,
+                phone: '+380 44 123 45 67',
+                contactName: 'Тестовий контакт',
+                caption: '2026-11-17 · 12:30',
+                reason: strings.call('operator_block'),
+                tint: Colors.deepOrange,
+                pale: const Color(0xFFFFEEE5),
+                icon: Icons.cell_tower_rounded,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(find.text('Тестовий контакт'), findsOneWidget);
+    expect(find.text('+380 44 123 45 67'), findsOneWidget);
+
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') {
+        copiedText =
+            (call.arguments as Map<Object?, Object?>)['text'] as String;
+      }
+      return null;
+    });
+    addTearDown(
+      () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
+    );
+    await tester.tap(find.byTooltip('Скопіювати номер'));
+    await tester.pumpAndSettle();
+    expect(copiedText, '+380 44 123 45 67');
+    expect(find.text('Номер скопійовано'), findsOneWidget);
+  });
+
+  testWidgets('Scenarios navigation uses the new title and short tab label', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    expect(find.text('Розумний фільтр вхідних дзвінків'), findsOneWidget);
+    await tester.tap(find.byTooltip('Сценарії та нагадування'));
+    await finishSectionTransition(tester);
+    await waitForText(tester, 'Сценарії та нагадування');
+
+    expect(find.text('Сценарії та нагадування'), findsOneWidget);
+    expect(find.text('Сценарії'), findsOneWidget);
   });
 
   testWidgets('lists header is left aligned like the other sections', (
@@ -309,6 +471,7 @@ void main() {
           .dx,
       closeTo(18, 0.5),
     );
+    await waitForDatabase(tester);
   });
 
   testWidgets('bottom info banner appears only on the Home section', (
@@ -323,28 +486,25 @@ void main() {
         'Call Gate працює повністю безкоштовно, без реклами та прихованих платежів і завжди залишатиметься таким.';
     const link = 'Підтримати проєкт';
 
-    Future<void> scrollToBottom() async {
-      final listViews = find.byType(ListView);
-      if (listViews.evaluate().isNotEmpty) {
-        await tester.drag(listViews.first, const Offset(0, -3000));
-        await tester.pump(const Duration(milliseconds: 400));
-      }
-    }
-
     await pumpApp(tester);
-    await scrollToBottom();
+    await tester.scrollUntilVisible(
+      find.text(message),
+      250,
+      scrollable: homeScrollable(),
+    );
+    await tester.ensureVisible(find.text(link));
+    await tester.pumpAndSettle();
     expect(find.text(message).hitTestable(), findsOneWidget);
     expect(find.text(link).hitTestable(), findsOneWidget);
 
     for (final tooltip in [
       'Списки та фільтри',
       'Графік режиму тиші',
-      'Помічник передзвону',
+      'Сценарії та нагадування',
       'Нагадування та Журнал',
     ]) {
       await tester.tap(find.byTooltip(tooltip));
       await finishSectionTransition(tester);
-      await scrollToBottom();
       expect(find.text(message).hitTestable(), findsNothing);
       expect(find.text(link).hitTestable(), findsNothing);
     }
@@ -362,8 +522,13 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await pumpApp(tester);
-    await tester.drag(find.byType(ListView).first, const Offset(0, -3000));
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.scrollUntilVisible(
+      find.text('Підтримати проєкт'),
+      250,
+      scrollable: homeScrollable(),
+    );
+    await tester.ensureVisible(find.text('Підтримати проєкт'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Підтримати проєкт'));
     await tester.pumpAndSettle();
 
@@ -384,7 +549,7 @@ void main() {
       () => _testDatabase.setSetting('protection_enabled', false),
     );
     await pumpApp(tester);
-    await tester.tap(find.byTooltip('Помічник передзвону'));
+    await tester.tap(find.byTooltip('Сценарії та нагадування'));
     await finishSectionTransition(tester);
 
     const warning =
@@ -468,6 +633,47 @@ void main() {
           reason: '${language.label}: $key placeholders differ',
         );
       }
+    }
+  });
+
+  test('all languages contain the requested slogan and scenarios labels', () {
+    final expected = <AppLanguage, (String, String, String)>{
+      AppLanguage.ukrainian: (
+        'Розумний фільтр вхідних дзвінків',
+        'Сценарії та нагадування',
+        'Сценарії',
+      ),
+      AppLanguage.english: (
+        'Smart incoming call filter',
+        'Scenarios & Reminders',
+        'Scenarios',
+      ),
+      AppLanguage.polish: (
+        'Inteligentny filtr połączeń przychodzących',
+        'Scenariusze i przypomnienia',
+        'Scenariusze',
+      ),
+      AppLanguage.german: (
+        'Intelligenter Filter für eingehende Anrufe',
+        'Szenarien & Erinnerungen',
+        'Szenarien',
+      ),
+      AppLanguage.spanish: (
+        'Filtro inteligente de llamadas entrantes',
+        'Escenarios y recordatorios',
+        'Escenarios',
+      ),
+      AppLanguage.french: (
+        "Filtre intelligent d'appels entrants",
+        'Scénarios et rappels',
+        'Scénarios',
+      ),
+    };
+    for (final entry in expected.entries) {
+      final strings = AppStrings(entry.key);
+      expect(strings.call('appSlogan'), entry.value.$1);
+      expect(strings.answerTitle, entry.value.$2);
+      expect(strings.answerNav, entry.value.$3);
     }
   });
 
@@ -920,11 +1126,11 @@ void main() {
     tester,
   ) async {
     await pumpApp(tester);
-    await tester.tap(find.byTooltip('Помічник передзвону'));
+    await tester.tap(find.byTooltip('Сценарії та нагадування'));
     await finishSectionTransition(tester);
     await tester.pumpAndSettle();
 
-    expect(find.text('Увімкнути помічник передзвону'), findsOneWidget);
+    expect(find.text('Увімкнути сценарії відхилення дзвінків'), findsOneWidget);
     expect(find.text('У режимі тиші'), findsOneWidget);
     expect(find.text('Усі невідомі номери'), findsOneWidget);
     expect(find.text('Записувати повідомлення'), findsNothing);
@@ -953,12 +1159,12 @@ void main() {
     addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
 
     await pumpApp(tester);
-    await tester.tap(find.byTooltip('Помічник передзвону'));
+    await tester.tap(find.byTooltip('Сценарії та нагадування'));
     await finishSectionTransition(tester);
-    await waitForText(tester, 'Помічник передзвону');
+    await waitForText(tester, 'Сценарії та нагадування');
 
-    expect(find.text('Передзвін'), findsOneWidget);
-    expect(find.text('Помічник передзвону'), findsOneWidget);
+    expect(find.text('Сценарії'), findsOneWidget);
+    expect(find.text('Сценарії та нагадування'), findsOneWidget);
     await tester.tap(find.text('Усі невідомі номери'));
     await waitForText(
       tester,
@@ -994,7 +1200,7 @@ void main() {
     addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
 
     await pumpApp(tester);
-    await tester.tap(find.byTooltip('Помічник передзвону'));
+    await tester.tap(find.byTooltip('Сценарії та нагадування'));
     await finishSectionTransition(tester);
 
     final autoRemindLabel = find.text('Автоматично нагадувати передзвонити');
@@ -1071,7 +1277,7 @@ void main() {
     await tester.tap(aboutMenuItem);
     await tester.pumpAndSettle();
     expect(find.text('Call Gate'), findsOneWidget);
-    expect(find.textContaining('v1.6.4'), findsOneWidget);
+    expect(find.textContaining('v1.8.0'), findsOneWidget);
     expect(find.textContaining('не надсилаються на сервер'), findsOneWidget);
 
     await tester.tap(find.text('Закрити вікно'));
@@ -1091,10 +1297,7 @@ void main() {
 
     await tester.tap(find.text('Підтримати через Monobank'));
     await tester.pumpAndSettle();
-    expect(
-      openedUrls,
-      contains('https://send.monobank.ua/jar/AhQrx7NK3q'),
-    );
+    expect(openedUrls, contains('https://send.monobank.ua/jar/AhQrx7NK3q'));
   });
 
   testWidgets('changes the app language and shows country operators', (
@@ -1142,6 +1345,8 @@ void main() {
 
     expect(find.text('Київстар'), findsOneWidget);
     expect(find.text('Vodafone UA'), findsOneWidget);
+    expect(find.text('Укртелеком / Київ (044)'), findsOneWidget);
+    expect(find.text('+380 44'), findsOneWidget);
     expect(find.text('+380 67'), findsOneWidget);
   });
 
