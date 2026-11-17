@@ -17,6 +17,7 @@ object DbContract {
         const val LABEL = "label"
         const val LIST_TYPE = "list_type"
         const val CREATED_AT = "created_at"
+        const val EXPIRES_AT = "expires_at"
         const val WHITE = "white"
         const val BLACK = "black"
     }

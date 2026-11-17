@@ -13,6 +13,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 object CallGuardDatabase {
     private val repeatColumnsChecked = AtomicBoolean(false)
     private val callLogContactNameChecked = AtomicBoolean(false)
+    private val phoneRuleExpiresAtChecked = AtomicBoolean(false)
 
     @Volatile
     private var instance: SQLiteDatabase? = null
@@ -58,6 +59,7 @@ object CallGuardDatabase {
             rawQuery("PRAGMA busy_timeout = ${DbContract.BUSY_TIMEOUT_MS}", null).use { }
             ensureRepeatColumns(this)
             ensureCallLogContactNameColumn(this)
+            ensurePhoneRuleExpiresAtColumn(this)
             ensureCallbackSettings(this)
             ensureFixedLineOperators(this)
         }
@@ -144,6 +146,29 @@ object CallGuardDatabase {
             }
         } catch (error: Exception) {
             callLogContactNameChecked.set(false)
+            throw error
+        }
+    }
+
+    private fun ensurePhoneRuleExpiresAtColumn(database: SQLiteDatabase) {
+        if (!phoneRuleExpiresAtChecked.compareAndSet(false, true)) return
+        try {
+            val columns = mutableSetOf<String>()
+            database.rawQuery(
+                "PRAGMA table_info(${DbContract.PhoneRules.TABLE})",
+                null,
+            ).use { cursor ->
+                val nameColumn = cursor.getColumnIndexOrThrow("name")
+                while (cursor.moveToNext()) columns.add(cursor.getString(nameColumn))
+            }
+            if (columns.isNotEmpty() && DbContract.PhoneRules.EXPIRES_AT !in columns) {
+                database.execSQL(
+                    "ALTER TABLE ${DbContract.PhoneRules.TABLE} ADD COLUMN " +
+                        "${DbContract.PhoneRules.EXPIRES_AT} INTEGER",
+                )
+            }
+        } catch (error: Exception) {
+            phoneRuleExpiresAtChecked.set(false)
             throw error
         }
     }

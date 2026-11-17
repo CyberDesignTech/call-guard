@@ -148,6 +148,7 @@ class ListsPageState extends State<ListsPage>
       badge: '',
       badgeKey: isWhite ? 'allowed' : 'blocked',
       listType: listType,
+      expiresAt: row['expires_at'] as int?,
       icon: isWhite ? Icons.person_outline : Icons.block_rounded,
       tint: isWhite ? AppPalette.green : AppPalette.red,
       pale: isWhite ? AppPalette.greenPale : AppPalette.redPale,
@@ -262,6 +263,21 @@ class ListsPageState extends State<ListsPage>
     if (id == null) return;
     await widget.database.deletePhoneRule(id);
     await _reloadRules();
+  }
+
+  Future<void> _makePermanent(ListEntry entry) async {
+    final id = entry.id;
+    if (id == null) return;
+    await widget.database.makePhoneRulePermanent(id);
+    await _reloadRules();
+  }
+
+  String _expiryLabel(int expiresAt) {
+    final date = DateTime.fromMillisecondsSinceEpoch(expiresAt);
+    final time =
+        '${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')} '
+        '${TimeOfDay.fromDateTime(date).format(context)}';
+    return widget.strings.call('temporaryExpiresAt').replaceAll('{time}', time);
   }
 
   @override
@@ -406,6 +422,12 @@ class ListsPageState extends State<ListsPage>
           entry: entry,
           strings: widget.strings,
           onDelete: () => _deleteEntry(entry),
+          expiryLabel: entry.expiresAt == null
+              ? null
+              : _expiryLabel(entry.expiresAt!),
+          onMakePermanent: entry.expiresAt == null
+              ? null
+              : () => _makePermanent(entry),
         );
       },
     );

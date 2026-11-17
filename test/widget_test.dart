@@ -124,6 +124,47 @@ void main() {
     expect(saved['action'], 'block');
   });
 
+  test(
+    'expired phone rules are removed while active and permanent rules remain',
+    () async {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final activeId = await _testDatabase.insertPhoneRule(
+        phone: '+380 44 777 00 01',
+        label: 'Temporary allow',
+        listType: 'white',
+        expiresAt: now + const Duration(hours: 1).inMilliseconds,
+      );
+      final expiredId = await _testDatabase.insertPhoneRule(
+        phone: '+380 44 777 00 02',
+        label: 'Expired block',
+        listType: 'black',
+        expiresAt: now - const Duration(minutes: 1).inMilliseconds,
+      );
+      final permanentId = await _testDatabase.insertPhoneRule(
+        phone: '+380 44 777 00 03',
+        label: 'Permanent',
+        listType: 'white',
+      );
+
+      final whiteRules = await _testDatabase.getPhoneRules('white');
+      final activeTemporaries = await _testDatabase
+          .getActiveTemporaryPhoneRules();
+      final blackRules = await _testDatabase.getPhoneRules('black');
+      expect(whiteRules.any((row) => row['id'] == activeId), isTrue);
+      expect(
+        whiteRules.singleWhere((row) => row['id'] == permanentId)['expires_at'],
+        isNull,
+      );
+      expect(activeTemporaries.single['id'], activeId);
+      expect(blackRules.any((row) => row['id'] == expiredId), isFalse);
+
+      await _testDatabase.makePhoneRulePermanent(activeId);
+      final nowPermanent = (await _testDatabase.getPhoneRules('white'))
+          .singleWhere((row) => row['id'] == activeId);
+      expect(nowPermanent['expires_at'], isNull);
+    },
+  );
+
   test('legacy reminder tables migrate and persist repeat rules', () async {
     final databasePath = File('test/call_guard_legacy_reminders_test.db')
         .absolute
@@ -244,6 +285,92 @@ void main() {
     expect(logs.single['contact_name'], isNull);
     await migrated.close();
   });
+
+  test(
+    'legacy phone rules migrate expires_at without losing permanent entries',
+    () async {
+      const databasePath = 'test/call_guard_legacy_phone_rules_test.db';
+      final databaseFile = File(databasePath);
+      if (databaseFile.existsSync()) databaseFile.deleteSync();
+      addTearDown(() async {
+        for (final file in [
+          databaseFile,
+          File('$databasePath-shm'),
+          File('$databasePath-wal'),
+        ]) {
+          if (await file.exists()) await file.delete();
+        }
+      });
+
+      final legacyDatabase = await sqflite.openDatabase(
+        databasePath,
+        version: 5,
+        onCreate: (db, version) async {
+          await db.execute('''
+          CREATE TABLE phone_rules (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            phone TEXT NOT NULL,
+            label TEXT,
+            list_type TEXT NOT NULL,
+            created_at INTEGER
+          )
+        ''');
+          await db.insert('phone_rules', {
+            'phone': '+380 44 123 45 67',
+            'label': 'Legacy permanent',
+            'list_type': 'white',
+            'created_at': 4567,
+          });
+        },
+      );
+      await legacyDatabase.close();
+
+      final migrated = DatabaseHelper.forTesting(databasePath: databasePath);
+      await migrated.initialize();
+      final rules = await migrated.getPhoneRules('white');
+      expect(rules.single['phone'], '+380 44 123 45 67');
+      expect(rules.single['label'], 'Legacy permanent');
+      expect(rules.single['expires_at'], isNull);
+      await migrated.close();
+    },
+  );
+
+  test(
+    'active temporary rules are retained and expired ones are purged',
+    () async {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final activeId = await _testDatabase.insertPhoneRule(
+        phone: '+380 44 123 00 01',
+        label: 'Active temp',
+        listType: 'white',
+        expiresAt: now + const Duration(hours: 1).inMilliseconds,
+      );
+      final expiredId = await _testDatabase.insertPhoneRule(
+        phone: '+380 44 123 00 02',
+        label: 'Expired temp',
+        listType: 'black',
+        expiresAt: now - const Duration(minutes: 1).inMilliseconds,
+      );
+      final permanentId = await _testDatabase.insertPhoneRule(
+        phone: '+380 44 123 00 03',
+        label: 'Permanent',
+        listType: 'white',
+      );
+
+      final temporary = await _testDatabase.getActiveTemporaryPhoneRules();
+      expect(temporary.map((row) => row['id']), [activeId]);
+      expect(
+        (await _testDatabase.getPhoneRules('black'))
+            .any((row) => row['id'] == expiredId),
+        isFalse,
+      );
+      expect(
+        (await _testDatabase.getPhoneRules('white'))
+            .singleWhere((row) => row['id'] == permanentId)['expires_at'],
+        isNull,
+      );
+    },
+  );
 
   test(
     'can edit a reminder time and delete or clear call log entries',
@@ -372,6 +499,8 @@ void main() {
       await pumpApp(tester);
       expect(find.text('Стандартний режим'), findsNothing);
       expect(find.text('Розумний фільтр вхідних дзвінків'), findsOneWidget);
+      expect(find.text('Журнал блокувань'), findsNothing);
+      expect(find.text('Останні блокування'), findsNothing);
 
       final manualSilence = find.text('Режим тиші вручну');
       await tester.scrollUntilVisible(
@@ -393,8 +522,101 @@ void main() {
         find.ancestor(of: manualSilence, matching: find.byType(AppPanel)),
         findsOneWidget,
       );
+      await tester.scrollUntilVisible(
+        find.text('Тимчасові правила'),
+        220,
+        scrollable: homeScrollable(),
+      );
+      expect(
+        find.text(
+          'Пропустити або заблокувати номер на 1 год, добу чи обраний час',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Додати'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'Home opens the temporary-rule dialog with action and duration choices',
+    (tester) async {
+      await pumpApp(tester);
+      await tester.scrollUntilVisible(
+        find.text('Тимчасові правила'),
+        220,
+        scrollable: homeScrollable(),
+      );
+      final temporaryCard = find
+          .ancestor(
+            of: find.text('Тимчасові правила'),
+            matching: find.byType(AppPanel),
+          )
+          .first;
+      await tester.tap(
+        find.descendant(of: temporaryCard, matching: find.text('Додати')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Тимчасове правило'), findsOneWidget);
+      expect(find.text('Із контактів'), findsOneWidget);
+      expect(find.text('Із журналу'), findsOneWidget);
+      final oneHour = tester.widget<ChoiceChip>(
+        find
+            .ancestor(of: find.text('1 год'), matching: find.byType(ChoiceChip))
+            .first,
+      );
+      expect(oneHour.selected, isTrue);
+      await tester.tap(find.text('Відхиляти (у Чорний список)'));
+      await tester.pump();
+      final actionGroup = tester.widget<SegmentedButton<String>>(
+        find
+            .ancestor(
+              of: find.text('Відхиляти (у Чорний список)'),
+              matching: find.byType(SegmentedButton<String>),
+            )
+            .first,
+      );
+      expect(actionGroup.selected, {'black'});
+
+      await tester.tap(find.text('24 год'));
+      await tester.pump();
+      final oneDay = tester.widget<ChoiceChip>(
+        find
+            .ancestor(
+              of: find.text('24 год'),
+              matching: find.byType(ChoiceChip),
+            )
+            .first,
+      );
+      expect(oneDay.selected, isTrue);
+    },
+  );
+
+  testWidgets('Home shows active temporary rules with action and time left', (
+    tester,
+  ) async {
+    await tester.runAsync(
+      () => _testDatabase.insertPhoneRule(
+        phone: '+380 44 555 12 34',
+        label: 'Temporary work contact',
+        listType: 'white',
+        expiresAt: DateTime.now()
+            .add(const Duration(hours: 1))
+            .millisecondsSinceEpoch,
+      ),
+    );
+    await pumpApp(tester);
+    await waitForDatabase(tester);
+    await tester.scrollUntilVisible(
+      find.text('Temporary work contact'),
+      220,
+      scrollable: homeScrollable(),
+    );
+    expect(find.text('Temporary work contact'), findsOneWidget);
+    expect(find.text('+380 44 555 12 34'), findsOneWidget);
+    expect(find.textContaining('Дозволено · ще'), findsOneWidget);
+    expect(find.byTooltip('Скасувати тимчасове правило'), findsOneWidget);
+  });
 
   testWidgets('journal card shows the contact name and copies its number', (
     tester,
@@ -682,6 +904,53 @@ void main() {
     );
     await tester.tap(find.text('Скасувати'));
     await tester.pump(const Duration(milliseconds: 400));
+  });
+
+  testWidgets('lists show temporary expiry and allow making a rule permanent', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.runAsync(() async {
+      await _testDatabase.insertPhoneRule(
+        phone: '+380 44 555 12 34',
+        label: 'Temporary work',
+        listType: 'white',
+        expiresAt: DateTime.now()
+            .add(const Duration(hours: 2))
+            .millisecondsSinceEpoch,
+      );
+    });
+    await pumpApp(tester);
+    await tester.tap(find.byTooltip('Списки та фільтри'));
+    await finishSectionTransition(tester);
+    await waitForText(tester, 'Temporary work');
+    expect(find.text('Temporary work'), findsOneWidget);
+    final temporaryEntry = find
+        .ancestor(
+          of: find.text('Temporary work'),
+          matching: find.byType(AppPanel),
+        )
+        .first;
+    expect(
+      find.descendant(
+        of: temporaryEntry,
+        matching: find.byIcon(Icons.hourglass_bottom_rounded),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: temporaryEntry, matching: find.textContaining('до ')),
+      findsOneWidget,
+    );
+    expect(find.byTooltip('Дії з тимчасовим правилом'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Дії з тимчасовим правилом'));
+    await tester.pump(const Duration(milliseconds: 350));
+    await waitForText(tester, 'Зробити постійним');
+    expect(find.text('Зробити постійним'), findsOneWidget);
   });
 
   testWidgets('lists header is left aligned like the other sections', (
@@ -1171,6 +1440,7 @@ void main() {
             'readContacts': true,
           };
         }
+        if (call.method == 'lookupContactName') return 'Ada Lovelace';
         return null;
       });
       addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
@@ -1181,6 +1451,7 @@ void main() {
       final contact = await bridge.pickContact();
       expect(contact?.name, 'Ada Lovelace');
       expect(contact?.phone, '+441234567890');
+      expect(await bridge.lookupContactName('+441234567890'), 'Ada Lovelace');
     },
   );
 
@@ -1582,7 +1853,7 @@ void main() {
     await tester.tap(aboutMenuItem);
     await tester.pumpAndSettle();
     expect(find.text('Call Gate'), findsOneWidget);
-    expect(find.textContaining('v1.8.1'), findsOneWidget);
+    expect(find.textContaining('v1.8.2'), findsOneWidget);
     expect(find.textContaining('не надсилаються на сервер'), findsOneWidget);
 
     await tester.tap(find.text('Закрити вікно'));

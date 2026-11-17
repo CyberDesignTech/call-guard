@@ -12,11 +12,15 @@ class EntryCard extends StatelessWidget {
     required this.entry,
     required this.strings,
     required this.onDelete,
+    this.expiryLabel,
+    this.onMakePermanent,
   });
 
   final ListEntry entry;
   final AppStrings strings;
   final VoidCallback onDelete;
+  final String? expiryLabel;
+  final VoidCallback? onMakePermanent;
 
   @override
   Widget build(BuildContext context) {
@@ -50,6 +54,32 @@ class EntryCard extends StatelessWidget {
                     entry.subtitle,
                     style: TextStyle(color: AppPalette.muted, fontSize: 11),
                   ),
+                  if (expiryLabel != null) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.hourglass_bottom_rounded,
+                          size: 13,
+                          color: AppPalette.muted,
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            expiryLabel!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: AppPalette.muted,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -61,6 +91,25 @@ class EntryCard extends StatelessWidget {
               color: entry.tint,
               background: entry.pale,
             ),
+            if (onMakePermanent != null)
+              PopupMenuButton<String>(
+                tooltip: strings.call('temporaryRuleMenu'),
+                onSelected: (value) {
+                  if (value == 'permanent') onMakePermanent!();
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: 'permanent',
+                    child: Text(strings.call('makePermanent')),
+                  ),
+                ],
+                icon: Icon(Icons.more_vert_rounded, color: AppPalette.muted),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 32,
+                  height: 36,
+                ),
+              ),
             const SizedBox(width: 3),
             IconButton(
               tooltip: strings.call('delete'),

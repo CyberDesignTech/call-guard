@@ -81,6 +81,7 @@ class MainActivity : FlutterActivity() {
             BridgeContract.Methods.OPEN_DEFAULT_APPS_SETTINGS -> openDefaultAppsSettings(result)
             BridgeContract.Methods.REQUEST_CONTACTS_PERMISSION -> requestContactsPermission(result)
             BridgeContract.Methods.PICK_CONTACT -> pickContact(result)
+            BridgeContract.Methods.LOOKUP_CONTACT_NAME -> lookupContactName(call, result)
             BridgeContract.Methods.REQUEST_NOTIFICATION_PERMISSION ->
                 requestNotificationPermission(result)
             BridgeContract.Methods.OPEN_NOTIFICATION_SETTINGS -> openNotificationSettings(result)
@@ -182,6 +183,18 @@ class MainActivity : FlutterActivity() {
         } catch (error: Exception) {
             pendingContactPickerResult = null
             result.error("CONTACT_PICKER_UNAVAILABLE", error.message, null)
+        }
+    }
+
+    private fun lookupContactName(call: MethodCall, result: MethodChannel.Result) {
+        val phoneNumber = call.argument<String>(BridgeContract.Arguments.PHONE_NUMBER)
+        if (phoneNumber.isNullOrBlank()) {
+            result.error("INVALID_ARGUMENT", "phoneNumber is required", null)
+            return
+        }
+        simulationExecutor.execute {
+            val name = ContactLookup.lookupName(applicationContext, phoneNumber)
+            runOnUiThread { result.success(name) }
         }
     }
 

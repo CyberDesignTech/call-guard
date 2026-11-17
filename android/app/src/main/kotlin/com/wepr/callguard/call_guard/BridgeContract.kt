@@ -10,6 +10,7 @@ object BridgeContract {
         const val OPEN_DEFAULT_APPS_SETTINGS = "openDefaultAppsSettings"
         const val REQUEST_CONTACTS_PERMISSION = "requestContactsPermission"
         const val PICK_CONTACT = "pickContact"
+        const val LOOKUP_CONTACT_NAME = "lookupContactName"
         const val REQUEST_NOTIFICATION_PERMISSION = "requestNotificationPermission"
         const val OPEN_NOTIFICATION_SETTINGS = "openNotificationSettings"
         const val SCHEDULE_REMINDER = "scheduleReminder"

@@ -1,21 +1,23 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../data/database_helper.dart';
 import '../l10n/app_strings.dart';
-import '../models/call_log_entry.dart';
+import '../platform/call_screening_channel.dart';
 import '../theme/app_palette.dart';
 import '../widgets/common/app_panel.dart';
 import '../widgets/common/app_info_footnote.dart';
 import '../widgets/common/dark_pill.dart';
-import '../widgets/common/empty_state.dart';
-import '../widgets/common/journal_card.dart';
+import '../widgets/common/contact_picker.dart';
+import '../widgets/common/icon_box.dart';
 import '../widgets/common/localized_value.dart';
 import '../widgets/common/page_intro.dart';
 import '../widgets/common/rule_switch.dart';
 import '../widgets/common/section_heading.dart';
 import '../widgets/common/shield_phone_logo.dart';
+import '../widgets/common/tag.dart';
 import '../widgets/common/thin_divider.dart';
 import '../widgets/system_call_permissions_card.dart';
 
@@ -59,67 +61,566 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
-  List<CallLogEntry> _logs = [];
+  final _screeningChannel = CallScreeningChannel();
+  List<Map<String, Object?>> _temporaryRules = [];
+  Timer? _temporaryRulesTimer;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    unawaited(_reloadLogs());
+    unawaited(_reloadTemporaryRules());
+    _temporaryRulesTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (widget.isActive &&
+          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+        unawaited(_reloadTemporaryRules());
+      }
+    });
   }
 
   @override
   void didUpdateWidget(covariant HomePage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!oldWidget.isActive && widget.isActive) unawaited(_reloadLogs());
+    if (!oldWidget.isActive && widget.isActive) {
+      unawaited(_reloadTemporaryRules());
+    }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && widget.isActive) {
-      unawaited(_reloadLogs());
+      unawaited(_reloadTemporaryRules());
     }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _temporaryRulesTimer?.cancel();
     super.dispose();
   }
 
-  Future<void> _reloadLogs() async {
-    final rows = await widget.database.getCallLogs();
+  Future<void> _reloadTemporaryRules() async {
+    final rows = await widget.database.getActiveTemporaryPhoneRules();
+    var contactsGranted = false;
+    if (rows.any(
+      (row) =>
+          (row['label'] as String? ?? '').isEmpty ||
+          row['label'] == '@newNumber',
+    )) {
+      try {
+        contactsGranted =
+            (await _screeningChannel.checkPermissions()).readContacts;
+      } on PlatformException {
+        // Contact names are an optional enhancement for local temporary rules.
+      } on MissingPluginException {
+        // Temporary rules remain available outside Android.
+      }
+    }
+    final rules = <Map<String, Object?>>[];
+    for (final row in rows) {
+      var contactName = '';
+      final label = row['label'] as String? ?? '';
+      if (contactsGranted && (label.isEmpty || label == '@newNumber')) {
+        try {
+          contactName =
+              await _screeningChannel.lookupContactName(
+                row['phone'] as String,
+              ) ??
+              '';
+        } on PlatformException {
+          // Keep displaying the number if the contact provider is unavailable.
+        } on MissingPluginException {
+          // Contact resolution is only implemented by the Android bridge.
+        }
+      }
+      rules.add({...row, 'resolved_contact_name': contactName});
+    }
     if (!mounted) return;
-    setState(() => _logs = rows.take(3).map(CallLogEntry.fromRow).toList());
+    setState(() => _temporaryRules = rules);
   }
 
-  String _dateTimeLabel(int timestamp) {
-    final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
-    final time = TimeOfDay.fromDateTime(date).format(context);
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} · $time';
+  String _remainingTime(int expiresAt) {
+    final remaining = Duration(
+      milliseconds: expiresAt - DateTime.now().millisecondsSinceEpoch,
+    );
+    final days = remaining.inDays;
+    final hours = remaining.inHours % 24;
+    final minutes = remaining.inMinutes % 60;
+    final labels = <String>[];
+    if (days > 0) {
+      labels.add('$days ${widget.strings.call('durationDaysShort')}');
+    }
+    if (hours > 0 || days > 0) {
+      labels.add('$hours ${widget.strings.call('durationHoursShort')}');
+    }
+    if (days == 0 && minutes > 0) {
+      labels.add('$minutes ${widget.strings.call('durationMinutesShort')}');
+    }
+    if (labels.isEmpty)
+      labels.add('1 ${widget.strings.call('durationMinutesShort')}');
+    return labels.join(' ');
   }
 
-  Color _reasonTint(String reason) => switch (reason) {
-    'silent_schedule' => const Color(0xFF7663D9),
-    'hidden_number' => AppPalette.amber,
-    'country_block' || 'international_block' || 'blacklist' => AppPalette.red,
-    'operator_block' ||
-    'not_in_contacts' ||
-    'allowlist_only' => const Color(0xFFE07A2E),
-    _ => AppPalette.blue,
-  };
+  String _dateTimeLabel(DateTime date) =>
+      '${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')} ${TimeOfDay.fromDateTime(date).format(context)}';
 
-  IconData _reasonIcon(String reason) => switch (reason) {
-    'silent_schedule' => Icons.notifications_off_outlined,
-    'hidden_number' => Icons.visibility_off_outlined,
-    'country_block' => Icons.public_rounded,
-    'international_block' => Icons.language_rounded,
-    'operator_block' => Icons.cell_tower_rounded,
-    'not_in_contacts' => Icons.person_off_outlined,
-    'allowlist_only' => Icons.playlist_add_check_rounded,
-    'blacklist' => Icons.block_rounded,
-    _ => Icons.check_circle_outline_rounded,
-  };
+  Future<_TemporaryRuleContact?> _chooseFromJournal(
+    BuildContext dialogContext,
+  ) async {
+    final logs = (await widget.database.getCallLogs())
+        .where((row) => !(row['phone'] as String).startsWith('@'))
+        .toList();
+    if (!dialogContext.mounted) return null;
+    return showDialog<_TemporaryRuleContact>(
+      context: dialogContext,
+      builder: (context) => AlertDialog(
+        title: Text(widget.strings.call('temporaryFromJournal')),
+        content: SizedBox(
+          width: 380,
+          height: 320,
+          child: logs.isEmpty
+              ? Center(child: Text(widget.strings.call('noLogs')))
+              : ListView.separated(
+                  itemCount: logs.length,
+                  separatorBuilder: (_, _) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final row = logs[index];
+                    final phone = row['phone'] as String;
+                    final name = row['contact_name'] as String? ?? '';
+                    return ListTile(
+                      title: Text(name.isEmpty ? phone : name),
+                      subtitle: name.isEmpty ? null : Text(phone),
+                      onTap: () => Navigator.pop(
+                        context,
+                        _TemporaryRuleContact(phone: phone, name: name),
+                      ),
+                    );
+                  },
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(widget.strings.call('cancel')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _addTemporaryRule() async {
+    final phoneController = TextEditingController();
+    final nameController = TextEditingController();
+    var listType = 'white';
+    var selectedPeriod = 'oneHour';
+    var expiresAt = DateTime.now().add(const Duration(hours: 1));
+    final now = DateTime.now();
+
+    Future<void> selectCustomExpiry(
+      BuildContext dialogContext,
+      StateSetter setDialogState,
+    ) async {
+      final date = await showDatePicker(
+        context: dialogContext,
+        initialDate: DateTime.now().add(const Duration(hours: 1)),
+        firstDate: DateTime(now.year, now.month, now.day),
+        lastDate: DateTime(now.year + 5),
+      );
+      if (date == null || !dialogContext.mounted) return;
+      final time = await showTimePicker(
+        context: dialogContext,
+        initialTime: TimeOfDay.fromDateTime(
+          DateTime.now().add(const Duration(hours: 1)),
+        ),
+      );
+      if (time == null || !dialogContext.mounted) return;
+      final selected = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        time.hour,
+        time.minute,
+      );
+      if (!selected.isAfter(DateTime.now())) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(widget.strings.call('temporaryDateMustBeFuture')),
+            ),
+          );
+        return;
+      }
+      setDialogState(() {
+        selectedPeriod = 'custom';
+        expiresAt = selected;
+      });
+    }
+
+    final draft = await showDialog<_TemporaryRuleDraft>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          icon: const Icon(Icons.hourglass_bottom_rounded),
+          title: Text(widget.strings.call('temporaryRuleDialogTitle')),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  controller: phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    labelText: widget.strings.call('phoneNumber'),
+                    hintText: widget.strings.call('phoneNumberHint'),
+                    prefixIcon: const Icon(Icons.phone_outlined),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final contact = await pickContactFromPhoneBook(
+                            context: dialogContext,
+                            strings: widget.strings,
+                            channel: _screeningChannel,
+                          );
+                          if (contact == null || !dialogContext.mounted) return;
+                          phoneController.text = contact.phone ?? '';
+                          nameController.text = contact.name ?? '';
+                        },
+                        icon: const Icon(Icons.contacts_outlined, size: 16),
+                        label: Text(
+                          widget.strings.call('temporaryFromContacts'),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final selection = await _chooseFromJournal(
+                            dialogContext,
+                          );
+                          if (selection == null || !dialogContext.mounted)
+                            return;
+                          phoneController.text = selection.phone;
+                          nameController.text = selection.name;
+                        },
+                        icon: const Icon(Icons.receipt_long_outlined, size: 16),
+                        label: Text(
+                          widget.strings.call('temporaryFromJournal'),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: nameController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: InputDecoration(
+                    labelText: widget.strings.call('optionalName'),
+                    prefixIcon: const Icon(Icons.person_outline_rounded),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  widget.strings.call('temporaryActionLabel'),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 7),
+                SegmentedButton<String>(
+                  showSelectedIcon: false,
+                  segments: [
+                    ButtonSegment(
+                      value: 'white',
+                      label: Text(widget.strings.call('temporaryAllowAction')),
+                    ),
+                    ButtonSegment(
+                      value: 'black',
+                      label: Text(widget.strings.call('temporaryBlockAction')),
+                    ),
+                  ],
+                  selected: {listType},
+                  onSelectionChanged: (selected) {
+                    if (selected.isNotEmpty) {
+                      setDialogState(() => listType = selected.first);
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  widget.strings.call('temporaryPeriodLabel'),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 7),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    _periodChip(
+                      context: context,
+                      label: widget.strings.call('temporaryOneHour'),
+                      period: 'oneHour',
+                      duration: const Duration(hours: 1),
+                      selectedPeriod: selectedPeriod,
+                      onSelect: (period, duration) => setDialogState(() {
+                        selectedPeriod = period;
+                        expiresAt = DateTime.now().add(duration);
+                      }),
+                    ),
+                    _periodChip(
+                      context: context,
+                      label: widget.strings.call('temporaryThreeHours'),
+                      period: 'threeHours',
+                      duration: const Duration(hours: 3),
+                      selectedPeriod: selectedPeriod,
+                      onSelect: (period, duration) => setDialogState(() {
+                        selectedPeriod = period;
+                        expiresAt = DateTime.now().add(duration);
+                      }),
+                    ),
+                    _periodChip(
+                      context: context,
+                      label: widget.strings.call('temporary24Hours'),
+                      period: 'oneDay',
+                      duration: const Duration(hours: 24),
+                      selectedPeriod: selectedPeriod,
+                      onSelect: (period, duration) => setDialogState(() {
+                        selectedPeriod = period;
+                        expiresAt = DateTime.now().add(duration);
+                      }),
+                    ),
+                    _periodChip(
+                      context: context,
+                      label: widget.strings.call('temporarySevenDays'),
+                      period: 'sevenDays',
+                      duration: const Duration(days: 7),
+                      selectedPeriod: selectedPeriod,
+                      onSelect: (period, duration) => setDialogState(() {
+                        selectedPeriod = period;
+                        expiresAt = DateTime.now().add(duration);
+                      }),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                OutlinedButton.icon(
+                  onPressed: () =>
+                      selectCustomExpiry(dialogContext, setDialogState),
+                  icon: const Icon(Icons.event_outlined, size: 17),
+                  label: Text(
+                    selectedPeriod == 'custom'
+                        ? widget.strings
+                              .call('temporaryUntil')
+                              .replaceAll('{time}', _dateTimeLabel(expiresAt))
+                        : widget.strings.call('temporaryChooseDateTime'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(widget.strings.call('cancel')),
+            ),
+            FilledButton(
+              onPressed: () {
+                final phone = phoneController.text.trim();
+                if (phone.isEmpty) return;
+                Navigator.pop(
+                  dialogContext,
+                  _TemporaryRuleDraft(
+                    phone: phone,
+                    name: nameController.text.trim(),
+                    listType: listType,
+                    expiresAt: expiresAt.millisecondsSinceEpoch,
+                  ),
+                );
+              },
+              child: Text(widget.strings.call('add')),
+            ),
+          ],
+        ),
+      ),
+    );
+    phoneController.dispose();
+    nameController.dispose();
+    if (draft == null || !mounted) return;
+    if (draft.expiresAt <= DateTime.now().millisecondsSinceEpoch) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(widget.strings.call('temporaryDateMustBeFuture')),
+          ),
+        );
+      return;
+    }
+    await widget.database.insertPhoneRule(
+      phone: draft.phone,
+      label: draft.name.isEmpty ? '@newNumber' : draft.name,
+      listType: draft.listType,
+      expiresAt: draft.expiresAt,
+    );
+    await _reloadTemporaryRules();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text(widget.strings.call('temporaryRuleAdded'))),
+      );
+  }
+
+  Widget _periodChip({
+    required BuildContext context,
+    required String label,
+    required String period,
+    required Duration duration,
+    required String selectedPeriod,
+    required void Function(String, Duration) onSelect,
+  }) => ChoiceChip(
+    label: Text(label),
+    selected: selectedPeriod == period,
+    onSelected: (_) => onSelect(period, duration),
+    showCheckmark: false,
+  );
+
+  Widget _temporaryRulesCard() {
+    final rules = _temporaryRules;
+    return AppPanel(
+      child: Padding(
+        padding: const EdgeInsets.all(15),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                IconBox(
+                  icon: Icons.hourglass_bottom_rounded,
+                  color: const Color(0xFF7663D9),
+                  background: AppPalette.accentSurface(const Color(0xFF7663D9)),
+                ),
+                const SizedBox(width: 11),
+                Expanded(
+                  child: Text(
+                    widget.strings.call('temporaryRulesTitle'),
+                    style: TextStyle(
+                      color: AppPalette.ink,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            if (rules.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 9),
+                child: Text(
+                  widget.strings.call('temporaryRulesDescription'),
+                  style: TextStyle(color: AppPalette.muted, fontSize: 11),
+                ),
+              )
+            else
+              ...rules.indexed.map((indexedRule) {
+                final index = indexedRule.$1;
+                final rule = indexedRule.$2;
+                final white = rule['list_type'] == 'white';
+                final color = white ? AppPalette.green : AppPalette.red;
+                final label = rule['label'] as String? ?? '';
+                final resolvedName =
+                    rule['resolved_contact_name'] as String? ?? '';
+                final title = label.isNotEmpty && label != '@newNumber'
+                    ? localizedValue(widget.strings, label)
+                    : resolvedName.isNotEmpty
+                    ? resolvedName
+                    : rule['phone'] as String;
+                final expiresAt = rule['expires_at'] as int;
+                return Padding(
+                  padding: EdgeInsets.only(
+                    bottom: index == rules.length - 1 ? 8 : 9,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: AppPalette.ink,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: widget.strings.call('cancelTemporaryRule'),
+                            onPressed: () => _removeTemporaryRule(rule),
+                            visualDensity: VisualDensity.compact,
+                            constraints: const BoxConstraints.tightFor(
+                              width: 32,
+                              height: 32,
+                            ),
+                            padding: EdgeInsets.zero,
+                            icon: const Icon(Icons.close_rounded, size: 18),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        rule['phone'] as String,
+                        style: TextStyle(color: AppPalette.muted, fontSize: 10),
+                      ),
+                      const SizedBox(height: 5),
+                      Tag(
+                        label:
+                            '${widget.strings.call(white ? 'allowed' : 'blocked')} · '
+                            '${widget.strings.call('temporaryRemaining').replaceAll('{time}', _remainingTime(expiresAt))}',
+                        color: color,
+                        background: AppPalette.accentSurface(color),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: FilledButton.icon(
+                onPressed: _addTemporaryRule,
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: Text(widget.strings.call('temporaryAdd')),
+                style: FilledButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  textStyle: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _removeTemporaryRule(Map<String, Object?> rule) async {
+    final id = rule['id'] as int?;
+    if (id == null) return;
+    await widget.database.deletePhoneRule(id);
+    await _reloadTemporaryRules();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -301,30 +802,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           ),
         ),
         const SizedBox(height: 22),
-        SectionHeading(
-          title: widget.strings.call('journalSegment'),
-          subtitle: widget.strings.call('journalDemoHint'),
-        ),
-        const SizedBox(height: 11),
-        if (_logs.isEmpty)
-          AppPanel(child: EmptyState(label: widget.strings.call('noLogs')))
-        else
-          ..._logs.map((entry) {
-            final tint = _reasonTint(entry.reason);
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: JournalCard(
-                strings: widget.strings,
-                phone: localizedValue(widget.strings, entry.phone),
-                contactName: entry.contactName,
-                caption: _dateTimeLabel(entry.timestamp),
-                reason: localizedValue(widget.strings, entry.reason),
-                tint: tint,
-                pale: AppPalette.accentSurface(tint),
-                icon: _reasonIcon(entry.reason),
-              ),
-            );
-          }),
+        _temporaryRulesCard(),
         const SizedBox(height: 6),
         OutlinedButton.icon(
           onPressed: widget.onTest,
@@ -352,4 +830,25 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       ],
     );
   }
+}
+
+class _TemporaryRuleDraft {
+  const _TemporaryRuleDraft({
+    required this.phone,
+    required this.name,
+    required this.listType,
+    required this.expiresAt,
+  });
+
+  final String phone;
+  final String name;
+  final String listType;
+  final int expiresAt;
+}
+
+class _TemporaryRuleContact {
+  const _TemporaryRuleContact({required this.phone, required this.name});
+
+  final String phone;
+  final String name;
 }

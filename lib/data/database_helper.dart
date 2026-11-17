@@ -27,12 +27,13 @@ class DatabaseHelper {
         _databasePath ?? path.join(await getDatabasesPath(), 'call_guard.db');
     final database = await openDatabase(
       databasePath,
-      version: 5,
+      version: 6,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: (db, oldVersion, newVersion) async {
         await _ensureReminderRepeatColumns(db);
         await _ensureCallLogContactNameColumn(db);
+        await _ensurePhoneRuleExpiresAtColumn(db);
         if (oldVersion < 3) await _createIndexes(db);
         await _ensureCallbackSettings(db);
         await _ensureFixedLineOperators(db);
@@ -40,6 +41,7 @@ class DatabaseHelper {
       onOpen: (db) async {
         await _ensureReminderRepeatColumns(db);
         await _ensureCallLogContactNameColumn(db);
+        await _ensurePhoneRuleExpiresAtColumn(db);
         await _ensureCallbackSettings(db);
         await _normalizeLegacyCallLogReasons(db);
         await _ensureFixedLineOperators(db);
@@ -66,7 +68,8 @@ class DatabaseHelper {
         phone TEXT NOT NULL,
         label TEXT,
         list_type TEXT NOT NULL,
-        created_at INTEGER
+        created_at INTEGER,
+        expires_at INTEGER
       )
     ''');
     await db.execute('''
@@ -340,6 +343,20 @@ class DatabaseHelper {
     }
   }
 
+  Future<void> _ensurePhoneRuleExpiresAtColumn(DatabaseExecutor db) async {
+    final tableExists = (await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'phone_rules'",
+    )).isNotEmpty;
+    if (!tableExists) return;
+    final columns = (await db.rawQuery('PRAGMA table_info(phone_rules)'))
+        .map((column) => column['name'] as String?)
+        .whereType<String>()
+        .toSet();
+    if (!columns.contains('expires_at')) {
+      await db.execute('ALTER TABLE phone_rules ADD COLUMN expires_at INTEGER');
+    }
+  }
+
   Future<void> _ensureFixedLineOperators(DatabaseExecutor db) async {
     const fixedLineOperators = <String, (String, String)>{
       'operatorUkrtelecom': ('UA', '44'),
@@ -437,24 +454,58 @@ class DatabaseHelper {
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
-  Future<List<Map<String, Object?>>> getPhoneRules(String listType) async =>
-      (await _database).query(
+  Future<List<Map<String, Object?>>> getPhoneRules(String listType) async {
+    final database = await _database;
+    await _purgeExpiredPhoneRules(database);
+    return database.query(
+      'phone_rules',
+      where: 'list_type = ?',
+      whereArgs: [listType],
+      orderBy: 'id DESC',
+    );
+  }
+
+  Future<List<Map<String, Object?>>> getActiveTemporaryPhoneRules() async {
+    final database = await _database;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await _purgeExpiredPhoneRules(database, now: now);
+    return database.query(
+      'phone_rules',
+      where: 'expires_at IS NOT NULL AND expires_at > ?',
+      whereArgs: [now],
+      orderBy: 'expires_at ASC',
+    );
+  }
+
+  Future<int> _purgeExpiredPhoneRules(DatabaseExecutor database, {int? now}) =>
+      database.delete(
         'phone_rules',
-        where: 'list_type = ?',
-        whereArgs: [listType],
-        orderBy: 'id DESC',
+        where: 'expires_at IS NOT NULL AND expires_at <= ?',
+        whereArgs: [now ?? DateTime.now().millisecondsSinceEpoch],
       );
+
+  Future<int> purgeExpiredPhoneRules() async =>
+      _purgeExpiredPhoneRules(await _database);
 
   Future<int> insertPhoneRule({
     required String phone,
     required String? label,
     required String listType,
+    int? expiresAt,
   }) async => (await _database).insert('phone_rules', {
     'phone': phone,
     'label': label,
     'list_type': listType,
     'created_at': DateTime.now().millisecondsSinceEpoch,
+    'expires_at': expiresAt,
   });
+
+  Future<int> makePhoneRulePermanent(int id) async => (await _database).update(
+    'phone_rules',
+    {'expires_at': null},
+    where: 'id = ?',
+    whereArgs: [id],
+  );
 
   Future<int> deletePhoneRule(int id) async =>
       (await _database).delete('phone_rules', where: 'id = ?', whereArgs: [id]);

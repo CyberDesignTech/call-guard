@@ -68,6 +68,7 @@ class CallRuleEngine(context: Context) {
         rawPhone: String,
         settings: Map<String, String>,
     ): CallRuleVerdict {
+        purgeExpiredPhoneRules(database)
         if (!settings.bool(DbContract.SettingKeys.PROTECTION_ENABLED, true)) {
             return verdict(true, "protection_disabled", rawPhone)
         }
@@ -216,10 +217,13 @@ class CallRuleEngine(context: Context) {
         rawPhone: String,
         canonicalPhone: String,
     ): Boolean {
+        val now = System.currentTimeMillis()
         database.rawQuery(
             "SELECT ${DbContract.PhoneRules.PHONE} FROM ${DbContract.PhoneRules.TABLE} " +
-                "WHERE ${DbContract.PhoneRules.LIST_TYPE} = ?",
-            arrayOf(listType),
+                "WHERE ${DbContract.PhoneRules.LIST_TYPE} = ? AND " +
+                "(${DbContract.PhoneRules.EXPIRES_AT} IS NULL OR " +
+                "${DbContract.PhoneRules.EXPIRES_AT} > ?)",
+            arrayOf(listType, now.toString()),
         ).use { cursor ->
             val phoneColumn = cursor.getColumnIndexOrThrow(DbContract.PhoneRules.PHONE)
             while (cursor.moveToNext()) {
@@ -228,6 +232,15 @@ class CallRuleEngine(context: Context) {
             }
         }
         return false
+    }
+
+    private fun purgeExpiredPhoneRules(database: SQLiteDatabase) {
+        database.delete(
+            DbContract.PhoneRules.TABLE,
+            "${DbContract.PhoneRules.EXPIRES_AT} IS NOT NULL AND " +
+                "${DbContract.PhoneRules.EXPIRES_AT} <= ?",
+            arrayOf(System.currentTimeMillis().toString()),
+        )
     }
 
     /**

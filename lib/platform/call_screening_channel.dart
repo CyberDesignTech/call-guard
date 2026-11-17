@@ -89,6 +89,9 @@ class CallScreeningChannel {
     return values == null ? null : ContactPickerResult.fromMap(values);
   }
 
+  Future<String?> lookupContactName(String phoneNumber) async => _channel
+      .invokeMethod<String>('lookupContactName', {'phoneNumber': phoneNumber});
+
   Future<CallScreeningPermissions> requestContactsPermission() async =>
       CallScreeningPermissions.fromMap(
         await _channel.invokeMapMethod<String, Object?>(
@@ -139,9 +142,7 @@ class CallScreeningChannel {
   }
 
   Future<bool> openExternalUrl(String url) async {
-    return await _channel.invokeMethod<bool>('openExternalUrl', {
-          'url': url,
-        }) ??
+    return await _channel.invokeMethod<bool>('openExternalUrl', {'url': url}) ??
         false;
   }
 
