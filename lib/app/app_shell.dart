@@ -267,12 +267,14 @@ class CallGuardShellState extends State<CallGuardShell> {
             onStub: _showStub,
             strings: widget.strings,
             isActive: _section == AppSection.lists,
+            protectionEnabled: widget.protectionEnabled,
             onEdgeSwipe: (direction) => _selectSection(
               AppSection.values[AppSection.lists.index + direction],
             ),
           ),
           SchedulePage(
             strings: widget.strings,
+            protectionEnabled: widget.protectionEnabled,
             automaticSilence: widget.automaticSilence,
             onAutomaticSilenceChanged: widget.onAutomaticSilenceChanged,
             allowOnlyWhitelist: widget.allowOnlyWhitelist,

@@ -65,9 +65,9 @@ const Map<String, String> stringsEs = {
   'closeLabel': 'Cerrar ventana',
   'homeEyebrow': 'TU TRANQUILIDAD, PROTEGIDA',
   'quickHiddenTitle': 'Números ocultos',
-  'quickHiddenSubtitle': 'Números desconocidos o privados',
+  'quickHiddenSubtitle': 'Rechazar números desconocidos / privados',
   'quickNonContactsTitle': 'Fuera de contactos',
-  'quickNonContactsSubtitle': 'Números fuera de tu agenda',
+  'quickNonContactsSubtitle': 'Rechazar números fuera de la agenda',
   'quickInternationalTitle': 'Llamadas entrantes internacionales',
   'quickInternationalSubtitle':
       'Excepto llamadas entrantes de países permitidos',
@@ -215,7 +215,7 @@ const Map<String, String> stringsEs = {
   'clearJournalTitle': '¿Vaciar el registro de bloqueos?',
   'clearJournalMessage': 'Se eliminarán definitivamente todas las entradas.',
   'clearJournalConfirm': 'Vaciar registro',
-  'answeringEnabledLabel': 'Activar escenarios de rechazo de llamadas',
+  'answeringEnabledLabel': 'Activar escenarios y recordatorios',
   'answeringEnabledDescription': 'Solo funciona cuando la protección principal (filtrado) está activada en la pantalla de inicio. Rechaza en silencio las llamadas entrantes del escenario elegido.',
   'answeringScenarioTitle': 'Escenario de rechazo',
   'answeringScenarioHint':
@@ -288,6 +288,9 @@ const Map<String, String> stringsEs = {
   'delete': 'Eliminar',
   'reminderDoneStatus': 'Completado',
   'answeringProtectionDisabledWarning': 'La protección principal de la pantalla de inicio está desactivada, por lo que el asistente no interceptará llamadas ahora.',
-  'freeForeverMessage': 'Call Gate es completamente gratuito, sin anuncios ni pagos ocultos, y siempre seguirá siéndolo.',
+  'scheduleProtectionDisabledWarning': 'La protección principal en Inicio está desactivada: el horario de silencio no se aplica actualmente.',
+  'scheduleProtectionDisabledShort': 'No se aplica sin protección principal',
+  'listsProtectionDisabledWarning': 'La protección principal en Inicio está desactivada: las listas y filtros no se aplican actualmente a las llamadas entrantes.',
+  'freeForeverMessage': 'CallGate funciona completamente de forma local en tu dispositivo, sin acceso a internet ni recopilación de datos personales. La aplicación es totalmente gratuita, sin anuncios ni pagos ocultos, y siempre seguirá siéndolo.',
   'freeForeverSupportLink': 'Apoyar el proyecto',
 };

@@ -10,6 +10,7 @@ import '../theme/app_palette.dart';
 import '../widgets/common/contact_picker.dart';
 import '../widgets/common/entry_card.dart';
 import '../widgets/common/page_intro.dart';
+import '../widgets/common/protection_warning.dart';
 import 'country_operators_page.dart';
 
 class ListsPage extends StatefulWidget {
@@ -18,6 +19,7 @@ class ListsPage extends StatefulWidget {
     required this.onStub,
     required this.strings,
     required this.isActive,
+    required this.protectionEnabled,
     this.onEdgeSwipe,
   });
 
@@ -25,6 +27,7 @@ class ListsPage extends StatefulWidget {
   final VoidCallback onStub;
   final AppStrings strings;
   final bool isActive;
+  final bool protectionEnabled;
   final ValueChanged<int>? onEdgeSwipe;
 
   @override
@@ -62,7 +65,9 @@ class ListsPageState extends State<ListsPage>
     super.didUpdateWidget(oldWidget);
     if (!oldWidget.isActive && widget.isActive) {
       unawaited(_reloadRules());
-      unawaited(_countryPageKey.currentState?.refresh() ?? Future<void>.value());
+      unawaited(
+        _countryPageKey.currentState?.refresh() ?? Future<void>.value(),
+      );
     }
   }
 
@@ -80,7 +85,9 @@ class ListsPageState extends State<ListsPage>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && widget.isActive) {
       unawaited(_reloadRules());
-      unawaited(_countryPageKey.currentState?.refresh() ?? Future<void>.value());
+      unawaited(
+        _countryPageKey.currentState?.refresh() ?? Future<void>.value(),
+      );
     }
   }
 
@@ -271,6 +278,13 @@ class ListsPageState extends State<ListsPage>
       ),
       body: Column(
         children: [
+          if (!widget.protectionEnabled)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 8, 18, 0),
+              child: ProtectionWarning(
+                message: widget.strings.call('listsProtectionDisabledWarning'),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 8, 18, 14),
             child: SizedBox(

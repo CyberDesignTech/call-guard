@@ -66,9 +66,9 @@ const Map<String, String> stringsFr = {
   'closeLabel': 'Fermer la fenêtre',
   'homeEyebrow': 'VOTRE TRANQUILLITÉ EST PROTÉGÉE',
   'quickHiddenTitle': 'Numéros masqués',
-  'quickHiddenSubtitle': 'Numéros inconnus / privés',
+  'quickHiddenSubtitle': 'Rejeter les numéros inconnus / privés',
   'quickNonContactsTitle': 'Hors des contacts',
-  'quickNonContactsSubtitle': 'Numéros absents du répertoire',
+  'quickNonContactsSubtitle': "Rejeter les numéros hors du carnet d'adresses",
   'quickInternationalTitle': 'Appels entrants internationaux',
   'quickInternationalSubtitle':
       'Sauf les appels entrants provenant des pays autorisés',
@@ -218,7 +218,7 @@ const Map<String, String> stringsFr = {
   'clearJournalTitle': 'Effacer le journal des blocages ?',
   'clearJournalMessage': 'Toutes les entrées seront définitivement supprimées.',
   'clearJournalConfirm': 'Effacer le journal',
-  'answeringEnabledLabel': 'Activer les scénarios de rejet d’appels',
+  'answeringEnabledLabel': 'Activer les scénarios et rappels',
   'answeringEnabledDescription': 'Fonctionne uniquement lorsque la protection principale (filtrage) est activée sur l’écran d’accueil. Rejette silencieusement les appels entrants du scénario choisi.',
   'answeringScenarioTitle': 'Scénario de rejet',
   'answeringScenarioHint':
@@ -290,6 +290,9 @@ const Map<String, String> stringsFr = {
   'delete': 'Supprimer',
   'reminderDoneStatus': 'Terminé',
   'answeringProtectionDisabledWarning': 'La protection principale de l’écran d’accueil est désactivée, l’assistant n’interceptera donc pas les appels pour le moment.',
-  'freeForeverMessage': 'Call Gate est entièrement gratuit, sans publicité ni frais cachés, et le restera toujours.',
+  'scheduleProtectionDisabledWarning': 'La protection principale sur l’écran d’accueil est désactivée — le planning silencieux n’est pas appliqué actuellement.',
+  'scheduleProtectionDisabledShort': 'Inactif sans protection principale',
+  'listsProtectionDisabledWarning': "La protection principale sur l'écran d'accueil est désactivée — les listes et filtres ne s'appliquent pas actuellement aux appels entrants.",
+  'freeForeverMessage': "CallGate fonctionne entièrement en local sur votre appareil, sans accès à Internet ni collecte de données personnelles. L'application est entièrement gratuite, sans publicité ni frais cachés — et le restera toujours.",
   'freeForeverSupportLink': 'Soutenir le projet',
 };

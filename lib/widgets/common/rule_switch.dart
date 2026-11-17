@@ -10,6 +10,7 @@ class RuleSwitch extends StatelessWidget {
     required this.subtitle,
     required this.value,
     required this.onChanged,
+    this.onDisabledTap,
     this.iconColor = AppPalette.blue,
     this.iconBackground,
   });
@@ -18,13 +19,14 @@ class RuleSwitch extends StatelessWidget {
   final String title;
   final String subtitle;
   final bool value;
-  final ValueChanged<bool> onChanged;
+  final ValueChanged<bool>? onChanged;
+  final VoidCallback? onDisabledTap;
   final Color iconColor;
   final Color? iconBackground;
 
   @override
   Widget build(BuildContext context) {
-    return SwitchListTile(
+    final tile = SwitchListTile(
       value: value,
       onChanged: onChanged,
       contentPadding: const EdgeInsets.symmetric(horizontal: 13, vertical: 3),
@@ -48,6 +50,14 @@ class RuleSwitch extends StatelessWidget {
       ),
       activeTrackColor: AppPalette.green,
       dense: true,
+    );
+    if (onChanged != null) return tile;
+    final dimmedTile = Opacity(opacity: 0.45, child: tile);
+    if (onDisabledTap == null) return dimmedTile;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onDisabledTap,
+      child: dimmedTile,
     );
   }
 }

@@ -354,6 +354,16 @@ void main() {
       scrollable: homeScrollable(),
     );
     expect(find.text('Швидкі правила'), findsOneWidget);
+    expect(find.text('Відхиляти невідомі / приватні номери'), findsOneWidget);
+    expect(find.text('Відхиляти номери поза адресною книгою'), findsOneWidget);
+    const privacyMessage =
+        'CallGate працює повністю локально на вашому пристрої, без доступу до інтернету та збору особистих даних. Застосунок є повністю безкоштовним, без реклами й прихованих платежів — і завжди залишатиметься таким.';
+    await tester.scrollUntilVisible(
+      find.text(privacyMessage),
+      250,
+      scrollable: homeScrollable(),
+    );
+    expect(find.text(privacyMessage), findsOneWidget);
   });
 
   testWidgets(
@@ -446,6 +456,234 @@ void main() {
     expect(find.text('Сценарії'), findsOneWidget);
   });
 
+  testWidgets(
+    'scenarios are locked and the warning highlights when main protection is off',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.runAsync(
+        () => _testDatabase.setSetting('protection_enabled', false),
+      );
+      await pumpApp(tester);
+      await tester.tap(find.byTooltip('Сценарії та нагадування'));
+      await finishSectionTransition(tester);
+
+      const warning =
+          'Основний захист на «Головній» вимкнено, тому помічник зараз не перехоплюватиме дзвінки.';
+      expect(find.text(warning), findsOneWidget);
+      const toggleTitle = 'Увімкнути сценарії та нагадування';
+      final toggle = find
+          .ancestor(
+            of: find.text(toggleTitle),
+            matching: find.byType(SwitchListTile),
+          )
+          .first;
+      expect(tester.widget<SwitchListTile>(toggle).onChanged, isNull);
+      final toggleOpacity = find
+          .ancestor(of: toggle, matching: find.byType(Opacity))
+          .first;
+      expect(
+        tester.widget<Opacity>(toggleOpacity).opacity,
+        closeTo(0.45, 0.01),
+      );
+
+      final scenarioHeading = find.text('Сценарій відхилення');
+      final scenarioBlock = find
+          .ancestor(of: scenarioHeading, matching: find.byType(AbsorbPointer))
+          .first;
+      expect(tester.widget<AbsorbPointer>(scenarioBlock).absorbing, isTrue);
+      final scenarioOpacity = find
+          .ancestor(of: scenarioHeading, matching: find.byType(Opacity))
+          .first;
+      expect(
+        tester.widget<Opacity>(scenarioOpacity).opacity,
+        closeTo(0.45, 0.01),
+      );
+
+      await tester.tap(find.text(toggleTitle));
+      await tester.pump(const Duration(milliseconds: 240));
+      final warningContainer = tester.widget<AnimatedContainer>(
+        find.byKey(const ValueKey('scenarios-protection-warning')),
+      );
+      final decoration = warningContainer.decoration! as BoxDecoration;
+      expect(decoration.border!.top.width, 2);
+      final savedAfterDisabledTap = await tester.runAsync(
+        _testDatabase.getSettings,
+      );
+      expect(savedAfterDisabledTap?['answering_enabled'], 'false');
+
+      final settings = await tester.runAsync(_testDatabase.getSettings);
+      expect(settings?['answering_scenario'], 'quiet_mode');
+    },
+  );
+
+  testWidgets('scenario settings unlock only after enabling the module', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    await tester.tap(find.byTooltip('Сценарії та нагадування'));
+    await finishSectionTransition(tester);
+
+    const toggleTitle = 'Увімкнути сценарії та нагадування';
+    final toggle = find
+        .ancestor(
+          of: find.text(toggleTitle),
+          matching: find.byType(SwitchListTile),
+        )
+        .first;
+    expect(tester.widget<SwitchListTile>(toggle).onChanged, isNotNull);
+    var scenarioBlock = find
+        .ancestor(
+          of: find.text('Сценарій відхилення'),
+          matching: find.byType(AbsorbPointer),
+        )
+        .first;
+    expect(tester.widget<AbsorbPointer>(scenarioBlock).absorbing, isTrue);
+    var scenarioOpacity = find
+        .ancestor(
+          of: find.text('Сценарій відхилення'),
+          matching: find.byType(Opacity),
+        )
+        .first;
+    expect(
+      tester.widget<Opacity>(scenarioOpacity).opacity,
+      closeTo(0.45, 0.01),
+    );
+
+    await tester.tap(find.text(toggleTitle));
+    await tester.pump();
+    scenarioBlock = find
+        .ancestor(
+          of: find.text('Сценарій відхилення'),
+          matching: find.byType(AbsorbPointer),
+        )
+        .first;
+    expect(tester.widget<AbsorbPointer>(scenarioBlock).absorbing, isFalse);
+    scenarioOpacity = find
+        .ancestor(
+          of: find.text('Сценарій відхилення'),
+          matching: find.byType(Opacity),
+        )
+        .first;
+    expect(tester.widget<Opacity>(scenarioOpacity).opacity, 1);
+    await waitForDatabase(tester);
+  });
+
+  testWidgets('schedule warns and locks settings when main protection is off', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.runAsync(
+      () => _testDatabase.setSetting('protection_enabled', false),
+    );
+    await pumpApp(tester);
+    await tester.tap(find.byTooltip('Графік режиму тиші'));
+    await finishSectionTransition(tester);
+
+    const warning =
+        'Основний захист на «Головній» вимкнено — графік режиму тиші зараз не застосовується.';
+    expect(find.text(warning), findsOneWidget);
+    const toggleTitle = 'Активувати за розкладом';
+    final toggle = find
+        .ancestor(
+          of: find.text(toggleTitle),
+          matching: find.byType(SwitchListTile),
+        )
+        .first;
+    expect(tester.widget<SwitchListTile>(toggle).onChanged, isNull);
+    final toggleOpacity = find
+        .ancestor(of: toggle, matching: find.byType(Opacity))
+        .first;
+    expect(tester.widget<Opacity>(toggleOpacity).opacity, closeTo(0.45, 0.01));
+
+    final settingsHeading = find.text('Часовий інтервал');
+    final settingsBlock = find
+        .ancestor(of: settingsHeading, matching: find.byType(AbsorbPointer))
+        .first;
+    expect(tester.widget<AbsorbPointer>(settingsBlock).absorbing, isTrue);
+    final settingsOpacity = find
+        .ancestor(of: settingsHeading, matching: find.byType(Opacity))
+        .first;
+    expect(
+      tester.widget<Opacity>(settingsOpacity).opacity,
+      closeTo(0.45, 0.01),
+    );
+    await tester.ensureVisible(find.text(toggleTitle));
+    await tester.tap(find.text(toggleTitle));
+    await tester.pump(const Duration(milliseconds: 240));
+    final warningContainer = tester.widget<AnimatedContainer>(
+      find.byKey(const ValueKey('schedule-protection-warning')),
+    );
+    final decoration = warningContainer.decoration! as BoxDecoration;
+    expect(decoration.border!.top.width, 2);
+  });
+
+  testWidgets('schedule settings stay locked until its schedule switch is on', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    await tester.tap(find.byTooltip('Графік режиму тиші'));
+    await finishSectionTransition(tester);
+
+    final settingsHeading = find.text('Часовий інтервал');
+    var settingsBlock = find
+        .ancestor(of: settingsHeading, matching: find.byType(AbsorbPointer))
+        .first;
+    expect(tester.widget<AbsorbPointer>(settingsBlock).absorbing, isTrue);
+    final settingsOpacity = find
+        .ancestor(of: settingsHeading, matching: find.byType(Opacity))
+        .first;
+    expect(
+      tester.widget<Opacity>(settingsOpacity).opacity,
+      closeTo(0.45, 0.01),
+    );
+    const toggleTitle = 'Активувати за розкладом';
+    await tester.tap(find.text(toggleTitle));
+    await tester.pump();
+    settingsBlock = find
+        .ancestor(of: settingsHeading, matching: find.byType(AbsorbPointer))
+        .first;
+    expect(tester.widget<AbsorbPointer>(settingsBlock).absorbing, isFalse);
+    expect(tester.widget<Opacity>(settingsOpacity).opacity, 1);
+    await waitForDatabase(tester);
+  });
+
+  testWidgets('lists warning does not prevent editing phone lists', (
+    tester,
+  ) async {
+    await tester.runAsync(
+      () => _testDatabase.setSetting('protection_enabled', false),
+    );
+    await pumpApp(tester);
+    await tester.tap(find.byTooltip('Списки та фільтри'));
+    await finishSectionTransition(tester);
+    await waitForDatabase(tester);
+
+    const warning =
+        'Основний захист на головній вимкнено — списки та фільтри зараз не застосовуються до вхідних дзвінків.';
+    await waitForText(tester, warning);
+    expect(find.text(warning), findsOneWidget);
+    await tester.tap(find.byTooltip('Додати номер'));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byType(TextField), findsNWidgets(2));
+    await tester.enterText(find.byType(TextField).first, '+380 44 123 45 67');
+    expect(
+      tester.widget<TextField>(find.byType(TextField).first).controller!.text,
+      '+380 44 123 45 67',
+    );
+    expect(
+      tester.widget<FilledButton>(find.byType(FilledButton).last).onPressed,
+      isNotNull,
+    );
+    await tester.tap(find.text('Скасувати'));
+    await tester.pump(const Duration(milliseconds: 400));
+  });
+
   testWidgets('lists header is left aligned like the other sections', (
     tester,
   ) async {
@@ -483,7 +721,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     const message =
-        'Call Gate працює повністю безкоштовно, без реклами та прихованих платежів і завжди залишатиметься таким.';
+        'CallGate працює повністю локально на вашому пристрої, без доступу до інтернету та збору особистих даних. Застосунок є повністю безкоштовним, без реклами й прихованих платежів — і завжди залишатиметься таким.';
     const link = 'Підтримати проєкт';
 
     await pumpApp(tester);
@@ -674,6 +912,65 @@ void main() {
       expect(strings.call('appSlogan'), entry.value.$1);
       expect(strings.answerTitle, entry.value.$2);
       expect(strings.answerNav, entry.value.$3);
+    }
+  });
+
+  test('privacy banner and quick-rule copy are localized consistently', () {
+    final expected = <AppLanguage, Map<String, String>>{
+      AppLanguage.ukrainian: {
+        'freeForeverMessage': 'CallGate працює повністю локально на вашому пристрої, без доступу до інтернету та збору особистих даних. Застосунок є повністю безкоштовним, без реклами й прихованих платежів — і завжди залишатиметься таким.',
+        'quickHiddenSubtitle': 'Відхиляти невідомі / приватні номери',
+        'quickNonContactsSubtitle': 'Відхиляти номери поза адресною книгою',
+        'listsProtectionDisabledWarning': 'Основний захист на головній вимкнено — списки та фільтри зараз не застосовуються до вхідних дзвінків.',
+        'answeringEnabledLabel': 'Увімкнути сценарії та нагадування',
+      },
+      AppLanguage.english: {
+        'freeForeverMessage': 'CallGate runs completely locally on your device, with no internet access and no collection of personal data. The app is completely free, with no ads or hidden fees — and will always remain so.',
+        'quickHiddenSubtitle': 'Reject unknown / private numbers',
+        'quickNonContactsSubtitle': 'Reject numbers outside your address book',
+        'listsProtectionDisabledWarning': 'Main protection on Home is off — lists and filters are currently not applied to incoming calls.',
+        'answeringEnabledLabel': 'Enable Scenarios & Reminders',
+      },
+      AppLanguage.polish: {
+        'freeForeverMessage': 'CallGate działa w pełni lokalnie na Twoim urządzeniu, bez dostępu do internetu i gromadzenia danych osobowych. Aplikacja jest całkowicie darmowa, bez reklam i ukrytych opłat — i taka pozostanie na zawsze.',
+        'quickHiddenSubtitle': 'Odrzucaj nieznane / prywatne numery',
+        'quickNonContactsSubtitle': 'Odrzucaj numery spoza książki adresowej',
+        'listsProtectionDisabledWarning': 'Główna ochrona na ekranie głównym jest wyłączona — listy i filtry nie są obecnie stosowane do połączeń przychodzących.',
+        'answeringEnabledLabel': 'Włącz scenariusze i przypomnienia',
+      },
+      AppLanguage.german: {
+        'freeForeverMessage': 'CallGate arbeitet vollständig lokal auf Ihrem Gerät, ohne Internetzugang und ohne Erhebung personenbezogener Daten. Die App ist völlig kostenlos, ohne Werbung oder versteckte Gebühren – und wird es immer bleiben.',
+        'quickHiddenSubtitle': 'Unbekannte / unterdrückte Nummern abweisen',
+        'quickNonContactsSubtitle':
+            'Nummern außerhalb des Adressbuchs abweisen',
+        'listsProtectionDisabledWarning': 'Der Hauptschutz auf der Startseite ist deaktiviert – Listen und Filter werden derzeit nicht auf eingehende Anrufe angewendet.',
+        'answeringEnabledLabel': 'Szenarien & Erinnerungen aktivieren',
+      },
+      AppLanguage.spanish: {
+        'freeForeverMessage': 'CallGate funciona completamente de forma local en tu dispositivo, sin acceso a internet ni recopilación de datos personales. La aplicación es totalmente gratuita, sin anuncios ni pagos ocultos, y siempre seguirá siéndolo.',
+        'quickHiddenSubtitle': 'Rechazar números desconocidos / privados',
+        'quickNonContactsSubtitle': 'Rechazar números fuera de la agenda',
+        'listsProtectionDisabledWarning': 'La protección principal en Inicio está desactivada: las listas y filtros no se aplican actualmente a las llamadas entrantes.',
+        'answeringEnabledLabel': 'Activar escenarios y recordatorios',
+      },
+      AppLanguage.french: {
+        'freeForeverMessage': "CallGate fonctionne entièrement en local sur votre appareil, sans accès à Internet ni collecte de données personnelles. L'application est entièrement gratuite, sans publicité ni frais cachés — et le restera toujours.",
+        'quickHiddenSubtitle': 'Rejeter les numéros inconnus / privés',
+        'quickNonContactsSubtitle':
+            "Rejeter les numéros hors du carnet d'adresses",
+        'listsProtectionDisabledWarning': "La protection principale sur l'écran d'accueil est désactivée — les listes et filtres ne s'appliquent pas actuellement aux appels entrants.",
+        'answeringEnabledLabel': 'Activer les scénarios et rappels',
+      },
+    };
+    for (final entry in expected.entries) {
+      final strings = AppStrings(entry.key);
+      for (final translation in entry.value.entries) {
+        expect(
+          strings.call(translation.key),
+          translation.value,
+          reason: '${entry.key.label}: ${translation.key}',
+        );
+      }
     }
   });
 
@@ -1130,7 +1427,7 @@ void main() {
     await finishSectionTransition(tester);
     await tester.pumpAndSettle();
 
-    expect(find.text('Увімкнути сценарії відхилення дзвінків'), findsOneWidget);
+    expect(find.text('Увімкнути сценарії та нагадування'), findsOneWidget);
     expect(find.text('У режимі тиші'), findsOneWidget);
     expect(find.text('Усі невідомі номери'), findsOneWidget);
     expect(find.text('Записувати повідомлення'), findsNothing);
@@ -1140,6 +1437,11 @@ void main() {
   testWidgets('callback assistant explains missing contacts permission', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     const channel = MethodChannel('com.wepr.callguard/screening');
     final messenger =
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
@@ -1158,6 +1460,10 @@ void main() {
     });
     addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
 
+    await tester.runAsync(() async {
+      await _testDatabase.setSetting('answering_enabled', true);
+      await _testDatabase.setSetting('answering_scenario', 'unknown_numbers');
+    });
     await pumpApp(tester);
     await tester.tap(find.byTooltip('Сценарії та нагадування'));
     await finishSectionTransition(tester);
@@ -1165,7 +1471,6 @@ void main() {
 
     expect(find.text('Сценарії'), findsOneWidget);
     expect(find.text('Сценарії та нагадування'), findsOneWidget);
-    await tester.tap(find.text('Усі невідомі номери'));
     await waitForText(
       tester,
       'Доступ до контактів потрібен, щоб відрізнити збережені номери від невідомих.',
@@ -1277,7 +1582,7 @@ void main() {
     await tester.tap(aboutMenuItem);
     await tester.pumpAndSettle();
     expect(find.text('Call Gate'), findsOneWidget);
-    expect(find.textContaining('v1.8.0'), findsOneWidget);
+    expect(find.textContaining('v1.8.1'), findsOneWidget);
     expect(find.textContaining('не надсилаються на сервер'), findsOneWidget);
 
     await tester.tap(find.text('Закрити вікно'));

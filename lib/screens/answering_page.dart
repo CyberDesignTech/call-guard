@@ -6,6 +6,7 @@ import '../platform/call_screening_channel.dart';
 import '../theme/app_palette.dart';
 import '../widgets/common/app_panel.dart';
 import '../widgets/common/page_intro.dart';
+import '../widgets/common/protection_warning.dart';
 import '../widgets/common/rule_switch.dart';
 import '../widgets/common/section_heading.dart';
 import '../widgets/common/thin_divider.dart';
@@ -52,6 +53,10 @@ class _AnsweringModePageState extends State<AnsweringModePage>
   final _screeningChannel = CallScreeningChannel();
   bool _contactsGranted = false;
   bool _notificationsGranted = false;
+  final _protectionWarningKey = GlobalKey<ProtectionWarningState>();
+
+  bool get _scenarioSettingsEnabled =>
+      widget.protectionEnabled && widget.enabled;
 
   @override
   void initState() {
@@ -154,33 +159,6 @@ class _AnsweringModePageState extends State<AnsweringModePage>
     ),
   );
 
-  Widget _statusWarning(String message) => Container(
-    margin: const EdgeInsets.only(bottom: 10),
-    padding: const EdgeInsets.all(13),
-    decoration: BoxDecoration(
-      color: AppPalette.amberPale,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: AppPalette.amber.withValues(alpha: 0.35)),
-    ),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(
-          Icons.shield_outlined,
-          size: 19,
-          color: AppPalette.accent(AppPalette.amber),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            message,
-            style: TextStyle(color: AppPalette.ink, fontSize: 12),
-          ),
-        ),
-      ],
-    ),
-  );
-
   @override
   Widget build(BuildContext context) => ListView(
     padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
@@ -192,8 +170,10 @@ class _AnsweringModePageState extends State<AnsweringModePage>
       ),
       if (!widget.protectionEnabled) ...[
         const SizedBox(height: 12),
-        _statusWarning(
-          widget.strings.call('answeringProtectionDisabledWarning'),
+        ProtectionWarning(
+          key: _protectionWarningKey,
+          containerKey: const ValueKey('scenarios-protection-warning'),
+          message: widget.strings.call('answeringProtectionDisabledWarning'),
         ),
       ],
       if (widget.localNotification && !_notificationsGranted) ...[
@@ -221,37 +201,59 @@ class _AnsweringModePageState extends State<AnsweringModePage>
           title: widget.strings.call('answeringEnabledLabel'),
           subtitle: widget.strings.call('answeringEnabledDescription'),
           value: widget.enabled,
-          onChanged: widget.onEnabledChanged,
+          onChanged: widget.protectionEnabled ? widget.onEnabledChanged : null,
+          onDisabledTap: widget.protectionEnabled
+              ? null
+              : () => _protectionWarningKey.currentState?.highlight(),
         ),
       ),
       const SizedBox(height: 21),
-      SectionHeading(
-        title: widget.strings.call('answeringScenarioTitle'),
-        subtitle: widget.strings.call('answeringScenarioHint'),
-      ),
-      const SizedBox(height: 10),
-      AppPanel(
-        child: RadioGroup<String>(
-          groupValue: widget.scenario,
-          onChanged: (value) {
-            if (value != null) widget.onScenarioChanged(value);
-          },
+      Opacity(
+        opacity: _scenarioSettingsEnabled ? 1 : 0.45,
+        child: AbsorbPointer(
+          absorbing: !_scenarioSettingsEnabled,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              RadioListTile<String>(
-                value: 'quiet_mode',
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                title: Text(widget.strings.call('answeringQuietScenario')),
-                secondary: const Icon(Icons.notifications_off_outlined),
-                dense: true,
+              SectionHeading(
+                title: widget.strings.call('answeringScenarioTitle'),
+                subtitle: widget.strings.call('answeringScenarioHint'),
               ),
-              const ThinDivider(),
-              RadioListTile<String>(
-                value: 'unknown_numbers',
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                title: Text(widget.strings.call('answeringUnknownScenario')),
-                secondary: const Icon(Icons.person_search_outlined),
-                dense: true,
+              const SizedBox(height: 10),
+              AppPanel(
+                child: RadioGroup<String>(
+                  groupValue: widget.scenario,
+                  onChanged: (value) {
+                    if (value != null) widget.onScenarioChanged(value);
+                  },
+                  child: Column(
+                    children: [
+                      RadioListTile<String>(
+                        value: 'quiet_mode',
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                        ),
+                        title: Text(
+                          widget.strings.call('answeringQuietScenario'),
+                        ),
+                        secondary: const Icon(Icons.notifications_off_outlined),
+                        dense: true,
+                      ),
+                      const ThinDivider(),
+                      RadioListTile<String>(
+                        value: 'unknown_numbers',
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                        ),
+                        title: Text(
+                          widget.strings.call('answeringUnknownScenario'),
+                        ),
+                        secondary: const Icon(Icons.person_search_outlined),
+                        dense: true,
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
