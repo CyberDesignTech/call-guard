@@ -10,6 +10,7 @@ import '../theme/app_palette.dart';
 import '../widgets/common/app_panel.dart';
 import '../widgets/common/app_info_footnote.dart';
 import '../widgets/common/dark_pill.dart';
+import '../widgets/common/call_log_picker_sheet.dart';
 import '../widgets/common/contact_picker.dart';
 import '../widgets/common/icon_box.dart';
 import '../widgets/common/localized_value.dart';
@@ -165,50 +166,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   String _dateTimeLabel(DateTime date) =>
       '${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')} ${TimeOfDay.fromDateTime(date).format(context)}';
 
-  Future<_TemporaryRuleContact?> _chooseFromJournal(
-    BuildContext dialogContext,
-  ) async {
-    final logs = (await widget.database.getCallLogs())
-        .where((row) => !(row['phone'] as String).startsWith('@'))
-        .toList();
-    if (!dialogContext.mounted) return null;
-    return showDialog<_TemporaryRuleContact>(
-      context: dialogContext,
-      builder: (context) => AlertDialog(
-        title: Text(widget.strings.call('temporaryFromJournal')),
-        content: SizedBox(
-          width: 380,
-          height: 320,
-          child: logs.isEmpty
-              ? Center(child: Text(widget.strings.call('noLogs')))
-              : ListView.separated(
-                  itemCount: logs.length,
-                  separatorBuilder: (_, _) => const Divider(height: 1),
-                  itemBuilder: (context, index) {
-                    final row = logs[index];
-                    final phone = row['phone'] as String;
-                    final name = row['contact_name'] as String? ?? '';
-                    return ListTile(
-                      title: Text(name.isEmpty ? phone : name),
-                      subtitle: name.isEmpty ? null : Text(phone),
-                      onTap: () => Navigator.pop(
-                        context,
-                        _TemporaryRuleContact(phone: phone, name: name),
-                      ),
-                    );
-                  },
-                ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(widget.strings.call('cancel')),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _addTemporaryRule() async {
     final phoneController = TextEditingController();
     final nameController = TextEditingController();
@@ -279,45 +236,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final contact = await pickContactFromPhoneBook(
-                            context: dialogContext,
-                            strings: widget.strings,
-                            channel: _screeningChannel,
-                          );
-                          if (contact == null || !dialogContext.mounted) return;
-                          phoneController.text = contact.phone ?? '';
-                          nameController.text = contact.name ?? '';
-                        },
-                        icon: const Icon(Icons.contacts_outlined, size: 16),
-                        label: Text(
-                          widget.strings.call('temporaryFromContacts'),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final selection = await _chooseFromJournal(
-                            dialogContext,
-                          );
-                          if (selection == null || !dialogContext.mounted)
-                            return;
-                          phoneController.text = selection.phone;
-                          nameController.text = selection.name;
-                        },
-                        icon: const Icon(Icons.receipt_long_outlined, size: 16),
-                        label: Text(
-                          widget.strings.call('temporaryFromJournal'),
-                        ),
-                      ),
-                    ),
-                  ],
+                _numberSourceButtons(
+                  dialogContext: dialogContext,
+                  phoneController: phoneController,
+                  nameController: nameController,
                 ),
                 const SizedBox(height: 8),
                 TextField(
@@ -492,44 +414,134 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     showCheckmark: false,
   );
 
+  Widget _numberSourceButtons({
+    required BuildContext dialogContext,
+    required TextEditingController phoneController,
+    required TextEditingController nameController,
+  }) => Row(
+    children: [
+      Expanded(
+        child: OutlinedButton.icon(
+          onPressed: () async {
+            final contact = await pickContactFromPhoneBook(
+              context: dialogContext,
+              strings: widget.strings,
+              channel: _screeningChannel,
+            );
+            if (contact == null || !dialogContext.mounted) return;
+            phoneController.text = contact.phone ?? '';
+            nameController.text = contact.name ?? '';
+          },
+          icon: const Icon(Icons.contacts_outlined, size: 16),
+          label: Text(
+            widget.strings.call('temporaryFromContacts'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          style: OutlinedButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+          ),
+        ),
+      ),
+      const SizedBox(width: 8),
+      Expanded(
+        child: OutlinedButton.icon(
+          onPressed: () async {
+            final selection = await showCallLogPickerSheet(
+              context: dialogContext,
+              strings: widget.strings,
+              channel: _screeningChannel,
+            );
+            if (selection == null || !dialogContext.mounted) return;
+            phoneController.text = selection.number;
+            nameController.text = selection.name;
+          },
+          icon: const Icon(Icons.history_rounded, size: 16),
+          label: Text(
+            widget.strings.call('callHistoryPicker'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          style: OutlinedButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+          ),
+        ),
+      ),
+    ],
+  );
+
   Widget _temporaryRulesCard() {
     final rules = _temporaryRules;
+    const accent = Color(0xFF7663D9);
     return AppPanel(
+      color: Color.alphaBlend(
+        accent.withValues(alpha: 0.07),
+        AppPalette.surface,
+      ),
+      borderColor: AppPalette.accent(accent).withValues(alpha: 0.28),
       child: Padding(
         padding: const EdgeInsets.all(15),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 IconBox(
                   icon: Icons.hourglass_bottom_rounded,
-                  color: const Color(0xFF7663D9),
-                  background: AppPalette.accentSurface(const Color(0xFF7663D9)),
+                  color: accent,
+                  background: AppPalette.accentSurface(accent),
                 ),
                 const SizedBox(width: 11),
                 Expanded(
-                  child: Text(
-                    widget.strings.call('temporaryRulesTitle'),
-                    style: TextStyle(
-                      color: AppPalette.ink,
-                      fontSize: 14,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        widget.strings.call('temporaryRulesTitle'),
+                        style: TextStyle(
+                          color: AppPalette.ink,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      if (rules.isEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          widget.strings.call('temporaryRulesDescription'),
+                          style: TextStyle(
+                            color: AppPalette.muted,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  onPressed: _addTemporaryRule,
+                  icon: const Icon(Icons.add_rounded, size: 17),
+                  label: Text(widget.strings.call('temporaryAdd')),
+                  style: FilledButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
+                    textStyle: const TextStyle(
                       fontWeight: FontWeight.w800,
+                      fontSize: 11,
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            if (rules.isEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 9),
-                child: Text(
-                  widget.strings.call('temporaryRulesDescription'),
-                  style: TextStyle(color: AppPalette.muted, fontSize: 11),
-                ),
-              )
-            else
+            if (rules.isNotEmpty) ...[
+              const SizedBox(height: 10),
               ...rules.indexed.map((indexedRule) {
                 final index = indexedRule.$1;
                 final rule = indexedRule.$2;
@@ -594,21 +606,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   ),
                 );
               }),
-            Align(
-              alignment: AlignmentDirectional.centerEnd,
-              child: FilledButton.icon(
-                onPressed: _addTemporaryRule,
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: Text(widget.strings.call('temporaryAdd')),
-                style: FilledButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                  textStyle: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ),
+            ],
           ],
         ),
       ),
@@ -844,11 +842,4 @@ class _TemporaryRuleDraft {
   final String name;
   final String listType;
   final int expiresAt;
-}
-
-class _TemporaryRuleContact {
-  const _TemporaryRuleContact({required this.phone, required this.name});
-
-  final String phone;
-  final String name;
 }

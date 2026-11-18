@@ -21,6 +21,8 @@ object BridgeContract {
         const val CONSUME_PENDING_CALL_JOURNAL = "consumePendingCallJournal"
         const val OPEN_CALL_JOURNAL = "openCallJournal"
         const val OPEN_EXTERNAL_URL = "openExternalUrl"
+        const val GET_RECENT_CALL_LOG = "getRecentCallLog"
+        const val OPEN_CALL_LOG_SETTINGS = "openCallLogSettings"
     }
 
     object Arguments {
@@ -28,6 +30,7 @@ object BridgeContract {
         const val REMIND_AT = "remindAt"
         const val PHONE_NUMBER = "phoneNumber"
         const val URL = "url"
+        const val LIMIT = "limit"
     }
 
     object ResultKeys {
@@ -41,6 +44,12 @@ object BridgeContract {
         const val CALL_SCREENING_ROLE = "callScreeningRole"
         const val READ_CONTACTS = "readContacts"
         const val NOTIFICATIONS_GRANTED = "notificationsGranted"
+        const val PERMISSION_GRANTED = "permissionGranted"
+        const val PERMANENTLY_DENIED = "permanentlyDenied"
+        const val CALLS = "calls"
+        const val NUMBER = "number"
+        const val TYPE = "type"
+        const val TIMESTAMP = "timestamp"
     }
 
     object Verdicts {

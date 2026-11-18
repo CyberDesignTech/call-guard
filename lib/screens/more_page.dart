@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../data/database_helper.dart';
 import '../l10n/app_strings.dart';
 import '../models/call_log_entry.dart';
+import '../models/recent_call_log_entry.dart';
 import '../models/reminder.dart';
 import '../platform/call_screening_channel.dart';
 import '../theme/app_palette.dart';
@@ -388,28 +389,92 @@ class MorePageState extends State<MorePage> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _addLogPhone(String phone) async {
-    if (phone.startsWith('@')) {
-      widget.onStub();
-      return;
-    }
-    final existingRules = await widget.database.getPhoneRules('white');
-    final normalized = phone.trim();
-    final alreadyAllowed = existingRules.any(
-      (row) => (row['phone'] as String? ?? '').trim() == normalized,
+  bool _isBlockedReason(String reason) => const {
+    'silent_schedule',
+    'hidden_number',
+    'country_block',
+    'international_block',
+    'blacklist',
+    'operator_block',
+    'non_contacts',
+    'not_in_contacts',
+    'allowlist_only',
+  }.contains(reason);
+
+  Future<void> _quickAddFromLog(CallLogEntry entry) async {
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(widget.strings.call('quickAddTitle')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Text(
+                entry.phone,
+                style: TextStyle(color: AppPalette.muted),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.person_add_alt_1_outlined),
+              title: Text(widget.strings.call('quickAddAllowlist')),
+              onTap: () => Navigator.pop(dialogContext, 'permanent'),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.hourglass_bottom_rounded),
+              title: Text(widget.strings.call('quickAddTemporaryHour')),
+              onTap: () => Navigator.pop(dialogContext, 'hour'),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.hourglass_bottom_rounded),
+              title: Text(widget.strings.call('quickAddTemporaryDay')),
+              onTap: () => Navigator.pop(dialogContext, 'day'),
+            ),
+          ],
+        ),
+      ),
     );
-    if (!alreadyAllowed) {
+    if (choice == null || !mounted) return;
+
+    final number = normalizePhoneNumber(entry.phone);
+    if (number.isEmpty) return;
+    final expiresAt = switch (choice) {
+      'hour' =>
+        DateTime.now().add(const Duration(hours: 1)).millisecondsSinceEpoch,
+      'day' =>
+        DateTime.now().add(const Duration(hours: 24)).millisecondsSinceEpoch,
+      _ => null,
+    };
+    final existing = await widget.database.getPhoneRules('white');
+    final existingRule = existing
+        .where(
+          (row) =>
+              normalizePhoneNumber(row['phone'] as String? ?? '') == number,
+        )
+        .firstOrNull;
+    if (choice == 'permanent' && existingRule != null) {
+      final id = existingRule['id'] as int?;
+      if (id != null && existingRule['expires_at'] != null) {
+        await widget.database.makePhoneRulePermanent(id);
+      }
+    } else if (existingRule == null) {
       await widget.database.insertPhoneRule(
-        phone: phone,
-        label: null,
+        phone: number,
+        label: entry.contactName.trim().isEmpty ? null : entry.contactName,
         listType: 'white',
+        expiresAt: expiresAt,
       );
     }
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(content: Text(widget.strings.call('allowlistAdded'))),
+        SnackBar(content: Text(widget.strings.call('quickAddSuccess'))),
       );
   }
 
@@ -874,6 +939,10 @@ class MorePageState extends State<MorePage> with WidgetsBindingObserver {
           'blacklist' => Icons.block_rounded,
           _ => Icons.check_circle_outline_rounded,
         };
+        final canQuickAdd =
+            _isBlockedReason(entry.reason) &&
+            !entry.phone.startsWith('@') &&
+            normalizePhoneNumber(entry.phone).isNotEmpty;
         return Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: JournalCard(
@@ -886,8 +955,10 @@ class MorePageState extends State<MorePage> with WidgetsBindingObserver {
             pale: AppPalette.accentSurface(tint),
             icon: icon,
             onDelete: () => _deleteCallLog(entry),
-            onAdd: () => _addLogPhone(entry.phone),
-            addLabel: widget.strings.call('addToAllowlist'),
+            onAdd: canQuickAdd ? () => _quickAddFromLog(entry) : null,
+            addLabel: canQuickAdd
+                ? widget.strings.call('quickAddToList')
+                : null,
           ),
         );
       }),

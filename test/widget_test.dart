@@ -529,8 +529,25 @@ void main() {
       );
       expect(
         find.text(
-          'Пропустити або заблокувати номер на 1 год, добу чи обраний час',
+          'Дозволити або заблокувати вхідний номер на 1 год, добу чи обраний час',
         ),
+        findsOneWidget,
+      );
+      final temporaryDescription = find.text(
+        'Дозволити або заблокувати вхідний номер на 1 год, добу чи обраний час',
+      );
+      final temporaryHeaderRow = find
+          .ancestor(of: temporaryDescription, matching: find.byType(Row))
+          .first;
+      expect(
+        find.descendant(
+          of: temporaryHeaderRow,
+          matching: find.text('Тимчасові правила'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: temporaryHeaderRow, matching: find.text('Додати')),
         findsOneWidget,
       );
       expect(find.text('Додати'), findsOneWidget);
@@ -559,7 +576,7 @@ void main() {
 
       expect(find.text('Тимчасове правило'), findsOneWidget);
       expect(find.text('Із контактів'), findsOneWidget);
-      expect(find.text('Із журналу'), findsOneWidget);
+      expect(find.text('Із історії викликів'), findsOneWidget);
       final oneHour = tester.widget<ChoiceChip>(
         find
             .ancestor(of: find.text('1 год'), matching: find.byType(ChoiceChip))
@@ -589,6 +606,270 @@ void main() {
             .first,
       );
       expect(oneDay.selected, isTrue);
+    },
+  );
+
+  testWidgets(
+    'call history picker fills white, black and temporary rule forms on demand',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      const screeningChannel = MethodChannel('com.wepr.callguard/screening');
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      var historyRequests = 0;
+      messenger.setMockMethodCallHandler(screeningChannel, (call) async {
+        if (call.method == 'checkPermissions') {
+          return {
+            'roleAvailable': true,
+            'callScreeningRole': true,
+            'readContacts': true,
+            'notificationsGranted': true,
+          };
+        }
+        if (call.method == 'consumePendingCallJournal') return false;
+        if (call.method == 'getRecentCallLog') {
+          historyRequests++;
+          return {
+            'permissionGranted': true,
+            'permanentlyDenied': false,
+            'calls': [
+              {
+                'number': '+1 (202) 555-0198',
+                'name': 'Avery Quinn',
+                'type': 'missed',
+                'timestamp': DateTime(2026, 11, 17, 12).millisecondsSinceEpoch,
+              },
+            ],
+          };
+        }
+        return true;
+      });
+      addTearDown(
+        () => messenger.setMockMethodCallHandler(screeningChannel, null),
+      );
+
+      Future<void> selectHistoryEntry() async {
+        final historyButton = find.text('Із історії викликів');
+        await tester.ensureVisible(historyButton);
+        await tester.tap(historyButton);
+        await tester.pump(const Duration(milliseconds: 450));
+        await waitForText(tester, 'Avery Quinn');
+        expect(find.textContaining('Пропущений'), findsOneWidget);
+        await tester.tap(find.text('Avery Quinn'));
+        await tester.pump(const Duration(milliseconds: 450));
+        final fields = find.byType(TextField);
+        expect(
+          tester.widget<TextField>(fields.first).controller!.text,
+          '+12025550198',
+        );
+        expect(
+          tester.widget<TextField>(fields.at(1)).controller!.text,
+          'Avery Quinn',
+        );
+      }
+
+      await pumpApp(tester);
+      expect(
+        historyRequests,
+        0,
+        reason: 'call history is never read at startup',
+      );
+
+      await tester.tap(find.byTooltip('Списки та фільтри'));
+      await finishSectionTransition(tester);
+      await waitForDatabase(tester);
+      await tester.tap(find.byTooltip('Додати номер'));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('Вибрати з контактів'), findsOneWidget);
+      expect(find.text('Із історії викликів'), findsOneWidget);
+      expect(historyRequests, 0);
+      await selectHistoryEntry();
+      expect(historyRequests, 1);
+      await tester.tap(find.text('Скасувати'));
+      await tester.pump(const Duration(milliseconds: 400));
+
+      await tester.tap(find.text('Чорний список'));
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.tap(find.byTooltip('Додати номер'));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('Із історії викликів'), findsOneWidget);
+      await selectHistoryEntry();
+      expect(historyRequests, 2);
+      await tester.tap(find.text('Скасувати'));
+      await tester.pump(const Duration(milliseconds: 400));
+
+      await tester.tap(find.byTooltip('Захист вхідних дзвінків'));
+      await finishSectionTransition(tester);
+      await tester.scrollUntilVisible(
+        find.text('Тимчасові правила'),
+        220,
+        scrollable: homeScrollable(),
+      );
+      final card = find
+          .ancestor(
+            of: find.text('Тимчасові правила'),
+            matching: find.byType(AppPanel),
+          )
+          .first;
+      await tester.tap(
+        find.descendant(of: card, matching: find.text('Додати')),
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('Із історії викликів'), findsOneWidget);
+      await selectHistoryEntry();
+      expect(historyRequests, 3);
+    },
+  );
+
+  testWidgets('call history permission denial explains the next step', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    const screeningChannel = MethodChannel('com.wepr.callguard/screening');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    var settingsOpened = 0;
+    messenger.setMockMethodCallHandler(screeningChannel, (call) async {
+      if (call.method == 'checkPermissions') {
+        return {
+          'roleAvailable': true,
+          'callScreeningRole': true,
+          'readContacts': true,
+          'notificationsGranted': true,
+        };
+      }
+      if (call.method == 'consumePendingCallJournal') return false;
+      if (call.method == 'getRecentCallLog') {
+        return {
+          'permissionGranted': false,
+          'permanentlyDenied': true,
+          'calls': const [],
+        };
+      }
+      if (call.method == 'openCallLogSettings') {
+        settingsOpened++;
+        return true;
+      }
+      return true;
+    });
+    addTearDown(
+      () => messenger.setMockMethodCallHandler(screeningChannel, null),
+    );
+
+    await pumpApp(tester);
+    await tester.tap(find.byTooltip('Списки та фільтри'));
+    await finishSectionTransition(tester);
+    await waitForDatabase(tester);
+    await tester.tap(find.byTooltip('Додати номер'));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.text('Із історії викликів'));
+    await tester.pump(const Duration(milliseconds: 400));
+    await waitForText(
+      tester,
+      'Щоб вибрати номер, потрібен дозвіл на доступ до історії викликів. Його можна надати лише за вашим запитом.',
+    );
+    expect(find.text('Відкрити налаштування'), findsOneWidget);
+    await tester.tap(find.text('Відкрити налаштування'));
+    expect(settingsOpened, 1);
+  });
+
+  testWidgets(
+    'blocked journal entries can be added to permanent or temporary allow rules',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.runAsync(() async {
+        await _testDatabase.clearCallLogs();
+        await _testDatabase.insertCallLog(
+          phone: '+44 (20) 7123-4567',
+          contactName: 'Allowed from journal',
+          reason: 'blacklist',
+          timestamp: DateTime(2026, 11, 18, 12).millisecondsSinceEpoch,
+        );
+        await _testDatabase.insertCallLog(
+          phone: '+1 (202) 555-0183',
+          contactName: 'Temporary from journal',
+          reason: 'operator_block',
+          timestamp: DateTime(2026, 11, 18, 11).millisecondsSinceEpoch,
+        );
+      });
+
+      const screeningChannel = MethodChannel('com.wepr.callguard/screening');
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(screeningChannel, (call) async {
+        if (call.method == 'checkPermissions') {
+          return {
+            'roleAvailable': true,
+            'callScreeningRole': true,
+            'readContacts': true,
+            'notificationsGranted': true,
+          };
+        }
+        if (call.method == 'consumePendingCallJournal') return false;
+        return true;
+      });
+      addTearDown(
+        () => messenger.setMockMethodCallHandler(screeningChannel, null),
+      );
+
+      await pumpApp(tester);
+      await tester.tap(find.byTooltip('Нагадування та Журнал'));
+      await finishSectionTransition(tester);
+      await waitForDatabase(tester);
+      await tester.tap(find.text('Журнал блокувань'));
+      await tester.pump(const Duration(milliseconds: 400));
+      await waitForText(tester, 'Allowed from journal');
+
+      Future<void> chooseQuickAdd(String contact, String option) async {
+        final card = find
+            .ancestor(of: find.text(contact), matching: find.byType(AppPanel))
+            .first;
+        await tester.ensureVisible(card);
+        await tester.tap(
+          find.descendant(of: card, matching: find.text('Додати в список')),
+        );
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(find.text('У Білий список'), findsOneWidget);
+        expect(find.text('У Тимчасовий доступ (1 год)'), findsOneWidget);
+        expect(find.text('У Тимчасовий доступ (24 год)'), findsOneWidget);
+        await tester.ensureVisible(find.text(option));
+        await tester.tap(find.text(option));
+        await tester.pump(const Duration(milliseconds: 400));
+        await waitForDatabase(tester);
+      }
+
+      await chooseQuickAdd('Allowed from journal', 'У Білий список');
+      final whiteRules = await tester.runAsync(
+        () => _testDatabase.getPhoneRules('white'),
+      );
+      expect(whiteRules!.map((row) => row['phone']), contains('+442071234567'));
+
+      await chooseQuickAdd(
+        'Temporary from journal',
+        'У Тимчасовий доступ (1 год)',
+      );
+      final temporaryRules = await tester.runAsync(
+        _testDatabase.getActiveTemporaryPhoneRules,
+      );
+      expect(
+        temporaryRules!.any(
+          (row) =>
+              row['phone'] == '+12025550183' && row['list_type'] == 'white',
+        ),
+        isTrue,
+      );
     },
   );
 
@@ -1853,7 +2134,7 @@ void main() {
     await tester.tap(aboutMenuItem);
     await tester.pumpAndSettle();
     expect(find.text('Call Gate'), findsOneWidget);
-    expect(find.textContaining('v1.8.3'), findsOneWidget);
+    expect(find.textContaining('v1.8.4'), findsOneWidget);
     expect(find.text('© 2026 CyberDesignTech Dev'), findsOneWidget);
     expect(
       find.textContaining('CyberDesignTech Dev із фокусом'),
@@ -2091,6 +2372,14 @@ void main() {
       'es': 'Desarrollado por CyberDesignTech Dev, un colectivo independiente de desarrolladores centrado en la privacidad local, la velocidad y la seguridad sin servicios en la nube.',
       'fr': 'Développé par CyberDesignTech Dev, un collectif indépendant de développeurs axé sur la confidentialité locale, la rapidité et la sécurité sans services cloud.',
     };
+    const temporaryDescriptions = {
+      'uk': 'Дозволити або заблокувати вхідний номер на 1 год, добу чи обраний час',
+      'en': 'Allow or block an incoming number for 1 hour, 24 hours, or a custom time',
+      'pl': 'Zezwól lub zablokuj numer przychodzący na 1 godz., dobę lub wybrany czas',
+      'de': 'Eingehende Nummer für 1 Std., 24 Std. oder eine gewählte Zeit erlauben oder blockieren',
+      'es': 'Permitir o bloquear un número entrante durante 1 h, 24 h o un tiempo elegido',
+      'fr': 'Autoriser ou bloquer un numéro entrant pendant 1 h, 24 h ou une durée choisie',
+    };
     for (final entry in dictionaries.entries) {
       expect(
         entry.value['copyrightLine'],
@@ -2106,6 +2395,11 @@ void main() {
         entry.value['aboutDescription'],
         aboutDescriptions[entry.key],
         reason: '${entry.key} About description',
+      );
+      expect(
+        entry.value['temporaryRulesDescription'],
+        temporaryDescriptions[entry.key],
+        reason: '${entry.key} temporary rules description',
       );
     }
 

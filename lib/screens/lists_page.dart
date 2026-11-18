@@ -8,6 +8,7 @@ import '../models/list_entry.dart';
 import '../platform/call_screening_channel.dart';
 import '../theme/app_palette.dart';
 import '../widgets/common/contact_picker.dart';
+import '../widgets/common/call_log_picker_sheet.dart';
 import '../widgets/common/entry_card.dart';
 import '../widgets/common/page_intro.dart';
 import '../widgets/common/protection_warning.dart';
@@ -198,19 +199,58 @@ class ListsPageState extends State<ListsPage>
               ),
             ),
             const SizedBox(height: 10),
-            OutlinedButton.icon(
-              onPressed: () async {
-                final contact = await pickContactFromPhoneBook(
-                  context: dialogContext,
-                  strings: widget.strings,
-                  channel: CallScreeningChannel(),
-                );
-                if (contact == null || !dialogContext.mounted) return;
-                phoneController.text = contact.phone ?? '';
-                nameController.text = contact.name ?? '';
-              },
-              icon: const Icon(Icons.contacts_outlined, size: 18),
-              label: Text(widget.strings.call('pickFromContacts')),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final contact = await pickContactFromPhoneBook(
+                        context: dialogContext,
+                        strings: widget.strings,
+                        channel: CallScreeningChannel(),
+                      );
+                      if (contact == null || !dialogContext.mounted) return;
+                      phoneController.text = contact.phone ?? '';
+                      nameController.text = contact.name ?? '';
+                    },
+                    icon: const Icon(Icons.contacts_outlined, size: 16),
+                    label: Text(
+                      widget.strings.call('pickFromContacts'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final selection = await showCallLogPickerSheet(
+                        context: dialogContext,
+                        strings: widget.strings,
+                        channel: CallScreeningChannel(),
+                      );
+                      if (selection == null || !dialogContext.mounted) return;
+                      phoneController.text = selection.number;
+                      nameController.text = selection.name;
+                    },
+                    icon: const Icon(Icons.history_rounded, size: 16),
+                    label: Text(
+                      widget.strings.call('callHistoryPicker'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

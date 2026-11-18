@@ -1,5 +1,7 @@
 import 'package:flutter/services.dart';
 
+import '../models/recent_call_log_entry.dart';
+
 class CallScreeningPermissions {
   const CallScreeningPermissions({
     required this.roleAvailable,
@@ -80,6 +82,18 @@ class CallScreeningChannel {
 
   Future<void> openDefaultAppsSettings() async {
     await _channel.invokeMethod<bool>('openDefaultAppsSettings');
+  }
+
+  Future<RecentCallLogResult> getRecentCallLog({int limit = 50}) async =>
+      RecentCallLogResult.fromMap(
+        await _channel.invokeMapMethod<String, Object?>('getRecentCallLog', {
+              'limit': limit,
+            }) ??
+            const <String, Object?>{},
+      );
+
+  Future<void> openCallLogSettings() async {
+    await _channel.invokeMethod<bool>('openCallLogSettings');
   }
 
   Future<ContactPickerResult?> pickContact() async {

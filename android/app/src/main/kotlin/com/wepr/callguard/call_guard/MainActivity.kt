@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.provider.CallLog
 import android.provider.ContactsContract
 import android.provider.Settings
 import androidx.core.app.ActivityCompat
@@ -25,6 +26,8 @@ class MainActivity : FlutterActivity() {
     private var pendingContactsResult: MethodChannel.Result? = null
     private var pendingNotificationResult: MethodChannel.Result? = null
     private var pendingContactPickerResult: MethodChannel.Result? = null
+    private var pendingCallLogResult: MethodChannel.Result? = null
+    private var pendingCallLogLimit = DEFAULT_CALL_LOG_LIMIT
     private var screeningChannel: MethodChannel? = null
     private var pendingCallJournalOpen = false
 
@@ -82,6 +85,8 @@ class MainActivity : FlutterActivity() {
             BridgeContract.Methods.REQUEST_CONTACTS_PERMISSION -> requestContactsPermission(result)
             BridgeContract.Methods.PICK_CONTACT -> pickContact(result)
             BridgeContract.Methods.LOOKUP_CONTACT_NAME -> lookupContactName(call, result)
+            BridgeContract.Methods.GET_RECENT_CALL_LOG -> getRecentCallLog(call, result)
+            BridgeContract.Methods.OPEN_CALL_LOG_SETTINGS -> openCallLogSettings(result)
             BridgeContract.Methods.REQUEST_NOTIFICATION_PERMISSION ->
                 requestNotificationPermission(result)
             BridgeContract.Methods.OPEN_NOTIFICATION_SETTINGS -> openNotificationSettings(result)
@@ -160,6 +165,117 @@ class MainActivity : FlutterActivity() {
         pendingContactsResult = result
         requestPermissions(arrayOf(Manifest.permission.READ_CONTACTS), REQUEST_READ_CONTACTS)
     }
+
+    private fun getRecentCallLog(call: MethodCall, result: MethodChannel.Result) {
+        val limit = (call.argument<Int>(BridgeContract.Arguments.LIMIT) ?: DEFAULT_CALL_LOG_LIMIT)
+            .coerceIn(1, MAX_CALL_LOG_LIMIT)
+        if (hasCallLogPermission()) {
+            readRecentCallLog(limit, result)
+            return
+        }
+        if (pendingCallLogResult != null) {
+            result.error("REQUEST_IN_PROGRESS", "A call-log permission request is already in progress", null)
+            return
+        }
+
+        val preferences = getSharedPreferences(CALL_LOG_PREFERENCES, MODE_PRIVATE)
+        val denialCount = preferences.getInt(CALL_LOG_DENIAL_COUNT, 0)
+        if (denialCount > 0 && !shouldShowRequestPermissionRationale(Manifest.permission.READ_CALL_LOG)) {
+            result.success(callLogResponse(permissionGranted = false, permanentlyDenied = true))
+            return
+        }
+
+        pendingCallLogResult = result
+        pendingCallLogLimit = limit
+        ActivityCompat.requestPermissions(
+            this,
+            arrayOf(Manifest.permission.READ_CALL_LOG),
+            REQUEST_READ_CALL_LOG,
+        )
+    }
+
+    private fun openCallLogSettings(result: MethodChannel.Result) {
+        try {
+            startActivity(
+                Intent(
+                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.fromParts("package", packageName, null),
+                ),
+            )
+            result.success(true)
+        } catch (error: Exception) {
+            result.error("CALL_LOG_SETTINGS_UNAVAILABLE", error.message, null)
+        }
+    }
+
+    private fun readRecentCallLog(limit: Int, result: MethodChannel.Result) {
+        simulationExecutor.execute {
+            try {
+                val calls = mutableListOf<Map<String, Any>>()
+                var previousNumber: String? = null
+                contentResolver.query(
+                    CallLog.Calls.CONTENT_URI,
+                    arrayOf(
+                        CallLog.Calls.NUMBER,
+                        CallLog.Calls.CACHED_NAME,
+                        CallLog.Calls.TYPE,
+                        CallLog.Calls.DATE,
+                    ),
+                    null,
+                    null,
+                    "${CallLog.Calls.DATE} DESC",
+                )?.use { cursor ->
+                    val numberIndex = cursor.getColumnIndexOrThrow(CallLog.Calls.NUMBER)
+                    val nameIndex = cursor.getColumnIndexOrThrow(CallLog.Calls.CACHED_NAME)
+                    val typeIndex = cursor.getColumnIndexOrThrow(CallLog.Calls.TYPE)
+                    val dateIndex = cursor.getColumnIndexOrThrow(CallLog.Calls.DATE)
+                    while (cursor.moveToNext() && calls.size < limit) {
+                        val rawNumber = cursor.getString(numberIndex)?.trim().orEmpty()
+                        val digits = rawNumber.filter(Char::isDigit)
+                        if (digits.isEmpty()) continue
+                        val number = if (rawNumber.startsWith("+")) "+$digits" else digits
+                        if (number == previousNumber) continue
+                        previousNumber = number
+                        val type = when (cursor.getInt(typeIndex)) {
+                            CallLog.Calls.OUTGOING_TYPE -> "outgoing"
+                            CallLog.Calls.MISSED_TYPE -> "missed"
+                            CallLog.Calls.REJECTED_TYPE -> "rejected"
+                            CallLog.Calls.BLOCKED_TYPE -> "blocked"
+                            else -> "incoming"
+                        }
+                        calls += mapOf(
+                            BridgeContract.ResultKeys.NUMBER to number,
+                            BridgeContract.ResultKeys.NAME to cursor.getString(nameIndex).orEmpty(),
+                            BridgeContract.ResultKeys.TYPE to type,
+                            BridgeContract.ResultKeys.TIMESTAMP to cursor.getLong(dateIndex),
+                        )
+                    }
+                }
+                runOnUiThread {
+                    result.success(
+                        callLogResponse(
+                            permissionGranted = true,
+                            calls = calls,
+                        ),
+                    )
+                }
+            } catch (error: Exception) {
+                runOnUiThread {
+                    result.error("CALL_LOG_READ_FAILED", error.message, null)
+                }
+            }
+        }
+    }
+
+    private fun callLogResponse(
+        permissionGranted: Boolean,
+        permanentlyDenied: Boolean = false,
+        calls: List<Map<String, Any>> = emptyList(),
+    ): Map<String, Any> = mapOf(
+        BridgeContract.ResultKeys.PERMISSION_GRANTED to permissionGranted,
+        BridgeContract.ResultKeys.PERMANENTLY_DENIED to permanentlyDenied,
+        BridgeContract.ResultKeys.CALLS to calls,
+    )
 
     private fun pickContact(result: MethodChannel.Result) {
         if (!hasContactsPermission()) {
@@ -436,6 +552,13 @@ class MainActivity : FlutterActivity() {
             checkSelfPermission(Manifest.permission.READ_CONTACTS) ==
             PackageManager.PERMISSION_GRANTED
 
+    private fun hasCallLogPermission(): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.READ_CALL_LOG,
+            ) == PackageManager.PERMISSION_GRANTED
+
     private fun hasNotificationPermission(): Boolean {
         val appNotificationsEnabled = NotificationManagerCompat.from(this)
             .areNotificationsEnabled()
@@ -506,6 +629,25 @@ class MainActivity : FlutterActivity() {
             }
             pendingNotificationResult?.success(granted)
             pendingNotificationResult = null
+        } else if (requestCode == REQUEST_READ_CALL_LOG) {
+            val result = pendingCallLogResult
+            val limit = pendingCallLogLimit
+            pendingCallLogResult = null
+            val preferences = getSharedPreferences(CALL_LOG_PREFERENCES, MODE_PRIVATE)
+            if (hasCallLogPermission()) {
+                preferences.edit().remove(CALL_LOG_DENIAL_COUNT).apply()
+                if (result != null) readRecentCallLog(limit, result)
+            } else {
+                val denialCount = preferences.getInt(CALL_LOG_DENIAL_COUNT, 0) + 1
+                preferences.edit().putInt(CALL_LOG_DENIAL_COUNT, denialCount).apply()
+                result?.success(
+                    callLogResponse(
+                        permissionGranted = false,
+                        permanentlyDenied = denialCount >= 2 &&
+                            !shouldShowRequestPermissionRationale(Manifest.permission.READ_CALL_LOG),
+                    ),
+                )
+            }
         }
     }
 
@@ -521,11 +663,13 @@ class MainActivity : FlutterActivity() {
             pendingContactsResult,
             pendingNotificationResult,
             pendingContactPickerResult,
+            pendingCallLogResult,
         )
         pendingRoleResult = null
         pendingContactsResult = null
         pendingNotificationResult = null
         pendingContactPickerResult = null
+        pendingCallLogResult = null
         results.forEach { result ->
             runCatching {
                 result?.error(
@@ -542,6 +686,11 @@ class MainActivity : FlutterActivity() {
         const val REQUEST_READ_CONTACTS = 8402
         const val REQUEST_POST_NOTIFICATIONS = 8403
         const val REQUEST_PICK_CONTACT = 8404
+        const val REQUEST_READ_CALL_LOG = 8405
+        const val DEFAULT_CALL_LOG_LIMIT = 50
+        const val MAX_CALL_LOG_LIMIT = 100
+        const val CALL_LOG_PREFERENCES = "call_guard_call_log_permissions"
+        const val CALL_LOG_DENIAL_COUNT = "denial_count"
         const val NOTIFICATION_PREFERENCES = "call_guard_notification_permissions"
         const val NOTIFICATION_DENIAL_COUNT = "denial_count"
         const val MAX_NOTIFICATION_DENIALS = 2
