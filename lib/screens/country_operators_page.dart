@@ -693,9 +693,12 @@ class CountryOperatorsPageState extends State<CountryOperatorsPage> {
     );
   }
 
-  Widget _worldCountryRow(CountryEntry country) {
+  Widget _worldCountryRow(CountryEntry country, {required bool activeFilter}) {
     final blocked = country.action == RuleState.blocked;
     return Padding(
+      key: Key(
+        'world-country-${country.isoCode}-${activeFilter ? 'active' : 'all'}',
+      ),
       padding: const EdgeInsets.only(bottom: 8),
       child: AppPanel(
         child: Padding(
@@ -828,6 +831,9 @@ class CountryOperatorsPageState extends State<CountryOperatorsPage> {
     final activeFilters = world
         .where((country) => country.action == RuleState.blocked)
         .toList();
+    final availableWorld = world
+        .where((country) => country.action != RuleState.blocked)
+        .toList();
     final items = <_ListItem>[];
     if (detailed.isNotEmpty) {
       items.add(const _SectionHeaderItem('detailedCountriesHeader'));
@@ -845,10 +851,10 @@ class CountryOperatorsPageState extends State<CountryOperatorsPage> {
         ),
       );
     }
-    if (world.isNotEmpty) {
+    if (availableWorld.isNotEmpty) {
       items.add(const _SectionHeaderItem('allWorldCountriesHeader'));
       items.addAll(
-        world.map(
+        availableWorld.map(
           (country) => _CountryItem(country: country, activeFilter: false),
         ),
       );
@@ -912,10 +918,10 @@ class CountryOperatorsPageState extends State<CountryOperatorsPage> {
         final item = items[index - 2];
         return switch (item) {
           _SectionHeaderItem(:final labelKey) => _sectionHeader(labelKey),
-          _CountryItem(:final country) =>
+          _CountryItem(:final country, :final activeFilter) =>
             _isDetailed(country)
                 ? _countryCard(country, query)
-                : _worldCountryRow(country),
+                : _worldCountryRow(country, activeFilter: activeFilter),
         };
       },
     );

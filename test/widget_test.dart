@@ -2092,7 +2092,7 @@ void main() {
     await tester.tap(aboutMenuItem);
     await tester.pumpAndSettle();
     expect(find.text('Call Gate'), findsOneWidget);
-    expect(find.textContaining('v1.9.0'), findsOneWidget);
+    expect(find.textContaining('v1.9.1'), findsOneWidget);
     expect(find.text('© 2026 CyberDesignTech Dev'), findsOneWidget);
     expect(
       find.textContaining('CyberDesignTech Dev із фокусом'),
@@ -2327,7 +2327,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('АКТИВНІ ФІЛЬТРИ КРАЇН'), findsOneWidget);
-    expect(find.text('Італія'), findsAtLeastNWidgets(2));
+    expect(find.byKey(const Key('world-country-IT-active')), findsOneWidget);
+    expect(find.byKey(const Key('world-country-IT-all')), findsNothing);
+    expect(find.text('УСІ КРАЇНИ СВІТУ'), findsNothing);
     await tester.runAsync(() async {
       final italy = (await _testDatabase.getCountries()).singleWhere(
         (row) => row['iso_code'] == 'IT',
@@ -2335,6 +2337,95 @@ void main() {
       expect(italy['action'], 'block');
     });
   });
+
+  testWidgets(
+    'world country moves between active and all lists without duplicates',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await pumpApp(tester);
+      await tester.tap(find.byTooltip('Списки та фільтри'));
+      await finishSectionTransition(tester);
+      await waitForText(tester, 'Країни та оператори');
+      await tester.tap(find.text('Країни та оператори'));
+      await finishSectionTransition(tester);
+      await waitForText(tester, 'Україна');
+
+      final scrollable = find
+          .descendant(
+            of: find.byKey(const PageStorageKey('countryOperatorsList')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      final auAll = find.byKey(const Key('world-country-AU-all'));
+      final auActive = find.byKey(const Key('world-country-AU-active'));
+      final atAll = find.byKey(const Key('world-country-AT-all'));
+      Finder switchIn(Finder row) =>
+          find.descendant(of: row, matching: find.byType(Switch));
+
+      // Normal mode: Australia appears only in «Усі країни світу».
+      expect(find.text('АКТИВНІ ФІЛЬТРИ КРАЇН'), findsNothing);
+      await tester.scrollUntilVisible(auAll, 300, scrollable: scrollable);
+      expect(auAll, findsOneWidget);
+      expect(auActive, findsNothing);
+
+      // Enabling it moves it to «Активні фільтри країн».
+      await tester.tap(switchIn(auAll));
+      await tester.pumpAndSettle();
+      await waitForDatabase(tester);
+      await tester.scrollUntilVisible(
+        find.text('АКТИВНІ ФІЛЬТРИ КРАЇН'),
+        -100,
+        scrollable: scrollable,
+      );
+      expect(find.text('АКТИВНІ ФІЛЬТРИ КРАЇН'), findsOneWidget);
+      expect(auActive, findsOneWidget);
+      expect(auAll, findsNothing);
+
+      // It no longer sits in its alphabetical place in the general list.
+      await tester.scrollUntilVisible(atAll, 300, scrollable: scrollable);
+      expect(atAll, findsOneWidget);
+      expect(auAll, findsNothing);
+
+      // Disabling it in the active section returns it to the general list.
+      await tester.scrollUntilVisible(auActive, -300, scrollable: scrollable);
+      await tester.tap(switchIn(auActive));
+      await tester.pumpAndSettle();
+      await waitForDatabase(tester);
+      expect(find.text('АКТИВНІ ФІЛЬТРИ КРАЇН'), findsNothing);
+      await tester.scrollUntilVisible(auAll, 300, scrollable: scrollable);
+      expect(auAll, findsOneWidget);
+      expect(auActive, findsNothing);
+
+      // Search mode: exactly one row per country, switching sections.
+      await tester.scrollUntilVisible(
+        find.byType(TextField),
+        -400,
+        scrollable: scrollable,
+      );
+      await tester.enterText(find.byType(TextField), 'Австралія');
+      await tester.pumpAndSettle();
+      expect(auAll, findsOneWidget);
+      expect(auActive, findsNothing);
+
+      await tester.tap(switchIn(auAll));
+      await tester.pumpAndSettle();
+      await waitForDatabase(tester);
+      expect(auActive, findsOneWidget);
+      expect(auAll, findsNothing);
+      expect(find.text('УСІ КРАЇНИ СВІТУ'), findsNothing);
+
+      await tester.tap(switchIn(auActive));
+      await tester.pumpAndSettle();
+      await waitForDatabase(tester);
+      expect(auAll, findsOneWidget);
+      expect(auActive, findsNothing);
+      expect(find.text('АКТИВНІ ФІЛЬТРИ КРАЇН'), findsNothing);
+    },
+  );
 
   test('dictionaries stay complete with identical placeholders', () {
     final dictionaries = <String, Map<String, String>>{
