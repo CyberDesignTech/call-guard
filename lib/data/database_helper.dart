@@ -1,13 +1,53 @@
 import 'package:path/path.dart' as path;
 import 'package:sqflite/sqflite.dart';
 
+import 'world_countries.dart';
+
+/// Detailed operator catalog for the countries surfaced at the top of the
+/// country screen. World countries are seeded separately from
+/// [worldCountries]; these rows carry the operator-level rules.
+const _operatorSeeds = <(String, String, String)>[
+  ('UA', 'operatorKyivstar', '67,68,96,97,98'),
+  ('UA', 'operatorVodafoneUA', '50,66,95,99'),
+  ('UA', 'operatorLifecell', '63,73,93'),
+  ('UA', 'operatorUkrtelecom', '44'),
+  ('PL', 'operatorOrange', '50,51,53,57,78,79'),
+  ('PL', 'operatorPlay', '45,53,72,73,79,88'),
+  ('PL', 'operatorWarsawLandline', '22'),
+  ('DE', 'operatorTelekom', '151,160,170,171,175'),
+  ('DE', 'operatorVodafoneDE', '152,162,172,173,174'),
+  ('DE', 'operatorBerlinLandline', '30'),
+  ('GB', 'operatorVodafoneUK', '74,75,77,78,79'),
+  ('GB', 'operatorEE', '79,75,77'),
+  ('GB', 'operatorLondonLandline', '20'),
+  ('US', 'operatorNewYorkLandline', '212'),
+  ('CA', 'operatorTorontoLandline', '416'),
+  ('ES', 'operatorMovistarES', '60,61,62'),
+  ('ES', 'operatorVodafoneES', '63,64,65'),
+  ('ES', 'operatorOrangeES', '66,67'),
+  ('ES', 'operatorYoigo', '68,69,71,72,73,74'),
+  ('ES', 'operatorMadridLandline', '91'),
+  ('FR', 'operatorOrangeFR', '60,61,62,70,71,72'),
+  ('FR', 'operatorSFR', '63,64,65,73,74,75'),
+  ('FR', 'operatorBouygues', '66,67,76,77'),
+  (
+    'FR',
+    'operatorFreeMobile',
+    '68,69,78,79,695,696,757,758,759,780,781,782,783,784,785,786,787,788,789',
+  ),
+  ('FR', 'operatorParisLandline', '1'),
+];
+
 class DatabaseHelper {
   static const _callbackSettingDefaults = <String, String>{
     'answering_auto_remind': 'false',
     'answering_auto_remind_minutes': '30',
     'answering_emergency_repeat': 'false',
     'driving_mode': 'false',
-    'status_indicator_enabled': 'true',
+    'status_tray_icon_enabled': 'true',
+    'status_tray_user_overridden': 'false',
+    'status_tray_activated': 'false',
+    'status_tray_permission_prompted': 'false',
   };
 
   DatabaseHelper._({String? databasePath}) : _databasePath = databasePath;
@@ -29,26 +69,32 @@ class DatabaseHelper {
         _databasePath ?? path.join(await getDatabasesPath(), 'call_guard.db');
     final database = await openDatabase(
       databasePath,
-      version: 7,
+      version: 8,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: (db, oldVersion, newVersion) async {
         await _ensureReminderRepeatColumns(db);
         await _ensureCallLogContactNameColumn(db);
         await _ensurePhoneRuleExpiresAtColumn(db);
+        await _ensureCountryAreaCodesColumn(db);
+        await _migrateLegacyStatusTraySettings(db);
+        await _migrateLegacyUnitedStates(db);
         if (oldVersion < 3) await _createIndexes(db);
         await _ensureCallbackSettings(db);
-        await _ensureFixedLineOperators(db);
-        await _ensureSpainFranceCatalog(db);
+        await _ensureWorldCountries(db);
+        await _ensureOperatorCatalog(db);
       },
       onOpen: (db) async {
         await _ensureReminderRepeatColumns(db);
         await _ensureCallLogContactNameColumn(db);
         await _ensurePhoneRuleExpiresAtColumn(db);
+        await _ensureCountryAreaCodesColumn(db);
+        await _migrateLegacyStatusTraySettings(db);
+        await _migrateLegacyUnitedStates(db);
         await _ensureCallbackSettings(db);
         await _normalizeLegacyCallLogReasons(db);
-        await _ensureFixedLineOperators(db);
-        await _ensureSpainFranceCatalog(db);
+        await _ensureWorldCountries(db);
+        await _ensureOperatorCatalog(db);
       },
     );
     _openedDatabase = database;
@@ -82,7 +128,8 @@ class DatabaseHelper {
         dial_code TEXT NOT NULL,
         name_key TEXT NOT NULL,
         custom_name TEXT,
-        action TEXT NOT NULL
+        action TEXT NOT NULL,
+        area_codes TEXT NOT NULL DEFAULT ''
       )
     ''');
     await db.execute('''
@@ -148,83 +195,19 @@ class DatabaseHelper {
     }
 
     final now = DateTime.now();
-    final countries = <Map<String, Object?>>[
-      {
-        'iso_code': 'UA',
-        'dial_code': '+380',
-        'name_key': 'countryUkraine',
+    for (final country in worldCountries) {
+      batch.insert('country_rules', {
+        'iso_code': country.isoCode,
+        'dial_code': country.dialCode,
+        'name_key': 'worldCountry',
+        'area_codes': country.areaCodes.join(','),
         'action': 'neutral',
-      },
-      {
-        'iso_code': 'PL',
-        'dial_code': '+48',
-        'name_key': 'countryPoland',
-        'action': 'neutral',
-      },
-      {
-        'iso_code': 'DE',
-        'dial_code': '+49',
-        'name_key': 'countryGermany',
-        'action': 'neutral',
-      },
-      {
-        'iso_code': 'GB',
-        'dial_code': '+44',
-        'name_key': 'countryUK',
-        'action': 'neutral',
-      },
-      {
-        'iso_code': 'US-CA',
-        'dial_code': '+1',
-        'name_key': 'countryNorthAmerica',
-        'action': 'neutral',
-      },
-      {
-        'iso_code': 'ES',
-        'dial_code': '+34',
-        'name_key': 'countrySpain',
-        'action': 'neutral',
-      },
-      {
-        'iso_code': 'FR',
-        'dial_code': '+33',
-        'name_key': 'countryFrance',
-        'action': 'neutral',
-      },
-    ];
-    for (final country in countries) {
-      batch.insert('country_rules', country);
+      });
     }
 
     final operators = <Map<String, Object?>>[
-      _operatorSeed('UA', 'operatorKyivstar', '67,68,96,97,98'),
-      _operatorSeed('UA', 'operatorVodafoneUA', '50,66,95,99'),
-      _operatorSeed('UA', 'operatorLifecell', '63,73,93'),
-      _operatorSeed('UA', 'operatorUkrtelecom', '44'),
-      _operatorSeed('PL', 'operatorOrange', '50,51,53,57,78,79'),
-      _operatorSeed('PL', 'operatorPlay', '45,53,72,73,79,88'),
-      _operatorSeed('PL', 'operatorWarsawLandline', '22'),
-      _operatorSeed('DE', 'operatorTelekom', '151,160,170,171,175'),
-      _operatorSeed('DE', 'operatorVodafoneDE', '152,162,172,173,174'),
-      _operatorSeed('DE', 'operatorBerlinLandline', '30'),
-      _operatorSeed('GB', 'operatorVodafoneUK', '74,75,77,78,79'),
-      _operatorSeed('GB', 'operatorEE', '79,75,77'),
-      _operatorSeed('GB', 'operatorLondonLandline', '20'),
-      _operatorSeed('US-CA', 'operatorNewYorkLandline', '212'),
-      _operatorSeed('ES', 'operatorMovistarES', '60,61,62'),
-      _operatorSeed('ES', 'operatorVodafoneES', '63,64,65'),
-      _operatorSeed('ES', 'operatorOrangeES', '66,67'),
-      _operatorSeed('ES', 'operatorYoigo', '68,69,71,72,73,74'),
-      _operatorSeed('ES', 'operatorMadridLandline', '91'),
-      _operatorSeed('FR', 'operatorOrangeFR', '60,61,62,70,71,72'),
-      _operatorSeed('FR', 'operatorSFR', '63,64,65,73,74,75'),
-      _operatorSeed('FR', 'operatorBouygues', '66,67,76,77'),
-      _operatorSeed(
-        'FR',
-        'operatorFreeMobile',
-        '68,69,78,79,695,696,757,758,759,780,781,782,783,784,785,786,787,788,789',
-      ),
-      _operatorSeed('FR', 'operatorParisLandline', '1'),
+      for (final seed in _operatorSeeds)
+        _operatorSeed(seed.$1, seed.$2, seed.$3),
     ];
     for (final operator in operators) {
       batch.insert('operator_rules', operator);
@@ -387,18 +370,133 @@ class DatabaseHelper {
     }
   }
 
-  Future<void> _ensureFixedLineOperators(DatabaseExecutor db) async {
-    const fixedLineOperators = <String, (String, String)>{
-      'operatorUkrtelecom': ('UA', '44'),
-      'operatorWarsawLandline': ('PL', '22'),
-      'operatorBerlinLandline': ('DE', '30'),
-      'operatorLondonLandline': ('GB', '20'),
-      'operatorNewYorkLandline': ('US-CA', '212'),
-    };
+  Future<void> _ensureCountryAreaCodesColumn(DatabaseExecutor db) async {
     final tableExists = (await db.rawQuery(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'operator_rules'",
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'country_rules'",
     )).isNotEmpty;
     if (!tableExists) return;
+    final columns = (await db.rawQuery('PRAGMA table_info(country_rules)'))
+        .map((column) => column['name'] as String?)
+        .whereType<String>()
+        .toSet();
+    if (!columns.contains('area_codes')) {
+      await db.execute(
+        "ALTER TABLE country_rules ADD COLUMN area_codes TEXT NOT NULL DEFAULT ''",
+      );
+    }
+  }
+
+  /// Moves the legacy tray preference onto the v1.9 keys. An explicitly
+  /// disabled legacy tray becomes a user override so auto-enable cannot
+  /// silently turn it back on.
+  Future<void> _migrateLegacyStatusTraySettings(DatabaseExecutor db) async {
+    final tableExists = (await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'app_settings'",
+    )).isNotEmpty;
+    if (!tableExists) return;
+    final legacyRows = await db.query(
+      'app_settings',
+      columns: ['value'],
+      where: 'key = ?',
+      whereArgs: ['status_indicator_enabled'],
+      limit: 1,
+    );
+    if (legacyRows.isEmpty) return;
+    final legacyEnabled = legacyRows.first['value'] == 'true';
+    final existing = (await db.query(
+      'app_settings',
+      columns: ['key'],
+      where: 'key IN (?, ?)',
+      whereArgs: ['status_tray_icon_enabled', 'status_tray_user_overridden'],
+    )).map((row) => row['key'] as String).toSet();
+    if (!existing.contains('status_tray_icon_enabled')) {
+      await db.insert('app_settings', {
+        'key': 'status_tray_icon_enabled',
+        'value': legacyEnabled.toString(),
+      });
+    }
+    if (!existing.contains('status_tray_user_overridden')) {
+      await db.insert('app_settings', {
+        'key': 'status_tray_user_overridden',
+        'value': (!legacyEnabled).toString(),
+      });
+    }
+    await db.delete(
+      'app_settings',
+      where: 'key = ?',
+      whereArgs: ['status_indicator_enabled'],
+    );
+  }
+
+  /// Replaces the legacy shared US/Canada row with separate sovereign rows so
+  /// +1 numbers can be matched by NANP area code.
+  Future<void> _migrateLegacyUnitedStates(DatabaseExecutor db) async {
+    final tables = (await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table'",
+    )).map((row) => row['name'] as String?).whereType<String>().toSet();
+    if (!tables.contains('country_rules')) return;
+    final legacyRows = await db.query(
+      'country_rules',
+      where: 'iso_code = ?',
+      whereArgs: ['US-CA'],
+      limit: 1,
+    );
+    if (legacyRows.isEmpty) return;
+
+    final unitedStates = worldCountries.firstWhere(
+      (country) => country.isoCode == 'US',
+    );
+    final existingUnitedStates = (await db.query(
+      'country_rules',
+      columns: ['action'],
+      where: 'iso_code = ?',
+      whereArgs: ['US'],
+      limit: 1,
+    ));
+    await db.insert('country_rules', {
+      'iso_code': 'US',
+      'dial_code': unitedStates.dialCode,
+      'name_key': 'worldCountry',
+      'area_codes': unitedStates.areaCodes.join(','),
+      'action': 'neutral',
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
+
+    final legacyAction = legacyRows.first['action'] as String? ?? 'neutral';
+    if (legacyAction != 'neutral' &&
+        (existingUnitedStates.isEmpty ||
+            existingUnitedStates.first['action'] == 'neutral')) {
+      await db.update(
+        'country_rules',
+        {'action': legacyAction},
+        where: 'iso_code = ?',
+        whereArgs: ['US'],
+      );
+    }
+
+    if (tables.contains('operator_rules')) {
+      await db.update(
+        'operator_rules',
+        {'country_iso': 'US'},
+        where: 'country_iso = ?',
+        whereArgs: ['US-CA'],
+      );
+    }
+    await db.delete(
+      'country_rules',
+      where: 'iso_code = ?',
+      whereArgs: ['US-CA'],
+    );
+  }
+
+  /// Seeds every missing detailed operator without overwriting saved actions.
+  Future<void> _ensureOperatorCatalog(DatabaseExecutor db) async {
+    final tables = (await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table'",
+    )).map((row) => row['name'] as String?).whereType<String>().toSet();
+    if (!tables.contains('operator_rules') ||
+        !tables.contains('country_rules')) {
+      return;
+    }
     final existing = (await db.query(
       'operator_rules',
       columns: ['operator_name'],
@@ -407,83 +505,52 @@ class DatabaseHelper {
       'country_rules',
       columns: ['iso_code'],
     )).map((row) => row['iso_code'] as String).toSet();
-    for (final entry in fixedLineOperators.entries) {
-      final storedName = '@${entry.key}';
-      if (existing.contains(storedName) ||
-          !countries.contains(entry.value.$1)) {
+    for (final seed in _operatorSeeds) {
+      final storedName = '@${seed.$2}';
+      if (existing.contains(storedName) || !countries.contains(seed.$1)) {
         continue;
       }
       await db.insert('operator_rules', {
-        'country_iso': entry.value.$1,
+        'country_iso': seed.$1,
         'operator_name': storedName,
-        'prefixes': entry.value.$2,
+        'prefixes': seed.$3,
         'action': 'neutral',
-      });
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
   }
 
-  /// Adds Spain and France without changing any existing user-selected actions.
-  Future<void> _ensureSpainFranceCatalog(DatabaseExecutor db) async {
-    final tables = (await db.rawQuery(
-      "SELECT name FROM sqlite_master WHERE type = 'table'",
-    )).map((row) => row['name'] as String?).whereType<String>().toSet();
-    if (!tables.contains('country_rules') ||
-        !tables.contains('operator_rules')) {
-      return;
-    }
-    final existingCountries = (await db.query(
+  /// Seeds the 195-country catalog and refreshes empty NANP area-code lists.
+  Future<void> _ensureWorldCountries(DatabaseExecutor db) async {
+    final tableExists = (await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'country_rules'",
+    )).isNotEmpty;
+    if (!tableExists) return;
+    final existing = <String, String>{};
+    for (final row in await db.query(
       'country_rules',
-      columns: ['iso_code'],
-    )).map((row) => row['iso_code'] as String).toSet();
-    for (final country in const [
-      ('ES', '+34', 'countrySpain'),
-      ('FR', '+33', 'countryFrance'),
-    ]) {
-      if (!existingCountries.contains(country.$1)) {
+      columns: ['iso_code', 'area_codes'],
+    )) {
+      existing[row['iso_code'] as String] = row['area_codes'] as String? ?? '';
+    }
+    for (final country in worldCountries) {
+      final areaCodes = country.areaCodes.join(',');
+      final storedAreaCodes = existing[country.isoCode];
+      if (storedAreaCodes == null) {
         await db.insert('country_rules', {
-          'iso_code': country.$1,
-          'dial_code': country.$2,
-          'name_key': country.$3,
+          'iso_code': country.isoCode,
+          'dial_code': country.dialCode,
+          'name_key': 'worldCountry',
+          'area_codes': areaCodes,
           'action': 'neutral',
         }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      } else if (areaCodes.isNotEmpty && storedAreaCodes.isEmpty) {
+        await db.update(
+          'country_rules',
+          {'area_codes': areaCodes},
+          where: 'iso_code = ?',
+          whereArgs: [country.isoCode],
+        );
       }
-    }
-
-    const operators = <(String, String, String)>{
-      ('ES', '@operatorMovistarES', '60,61,62'),
-      ('ES', '@operatorVodafoneES', '63,64,65'),
-      ('ES', '@operatorOrangeES', '66,67'),
-      ('ES', '@operatorYoigo', '68,69,71,72,73,74'),
-      ('ES', '@operatorMadridLandline', '91'),
-      ('FR', '@operatorOrangeFR', '60,61,62,70,71,72'),
-      ('FR', '@operatorSFR', '63,64,65,73,74,75'),
-      ('FR', '@operatorBouygues', '66,67,76,77'),
-      (
-        'FR',
-        '@operatorFreeMobile',
-        '68,69,78,79,695,696,757,758,759,780,781,782,783,784,785,786,787,788,789',
-      ),
-      ('FR', '@operatorParisLandline', '1'),
-    };
-    final existingOperators = (await db.query(
-      'operator_rules',
-      columns: ['operator_name'],
-    )).map((row) => row['operator_name'] as String).toSet();
-    final countries = (await db.query(
-      'country_rules',
-      columns: ['iso_code'],
-    )).map((row) => row['iso_code'] as String).toSet();
-    for (final operator in operators) {
-      if (existingOperators.contains(operator.$2) ||
-          !countries.contains(operator.$1)) {
-        continue;
-      }
-      await db.insert('operator_rules', {
-        'country_iso': operator.$1,
-        'operator_name': operator.$2,
-        'prefixes': operator.$3,
-        'action': 'neutral',
-      }, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
   }
 

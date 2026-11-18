@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -5,6 +7,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import '../data/database_helper.dart';
 import '../l10n/app_strings.dart';
 import '../platform/call_screening_channel.dart';
+import '../platform/status_tray_lifecycle.dart';
 import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common/shield_phone_logo.dart';
@@ -27,7 +30,8 @@ class CallGuardAppState extends State<CallGuardApp>
   AppLanguage _language = AppLanguage.ukrainian;
   bool _protectionEnabled = true;
   bool _drivingMode = false;
-  bool _statusIndicatorEnabled = true;
+  StatusTrayPreferences _trayPreferences = const StatusTrayPreferences();
+  StatusTrayMode _trayMode = StatusTrayMode.hidden;
   bool _blockUnknown = true;
   bool _blockNonContacts = false;
   bool _blockInternational = true;
@@ -69,6 +73,13 @@ class CallGuardAppState extends State<CallGuardApp>
   @override
   void didChangePlatformBrightness() {
     if (_themeMode == ThemeMode.system && _ready) setState(() {});
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _ready) {
+      unawaited(_reconcileStatusTray());
+    }
   }
 
   Future<void> _restoreSettings() async {
@@ -116,7 +127,15 @@ class CallGuardAppState extends State<CallGuardApp>
         _themeMode = parseTheme(settings['theme_mode']);
         _protectionEnabled = parseBool('protection_enabled', true);
         _drivingMode = parseBool('driving_mode', false);
-        _statusIndicatorEnabled = parseBool('status_indicator_enabled', true);
+        _trayPreferences = StatusTrayPreferences(
+          enabled: parseBool('status_tray_icon_enabled', true),
+          userOverridden: parseBool('status_tray_user_overridden', false),
+          activated: parseBool('status_tray_activated', false),
+          permissionPrompted: parseBool(
+            'status_tray_permission_prompted',
+            false,
+          ),
+        );
         _blockUnknown = parseBool('block_hidden', true);
         _blockNonContacts = parseBool('block_non_contacts', false);
         _blockInternational = parseBool('block_international', true);
@@ -149,7 +168,7 @@ class CallGuardAppState extends State<CallGuardApp>
         );
         _ready = true;
       });
-      _syncStatusIndicator();
+      await _reconcileStatusTray(allowPermissionRequest: true);
     } catch (error, stackTrace) {
       debugPrint(
         'Call Gate settings could not be restored: $error\n$stackTrace',
@@ -163,17 +182,88 @@ class CallGuardAppState extends State<CallGuardApp>
     minute: minutes.remainder(60).clamp(0, 59),
   );
 
-  void _persistSetting(String key, Object value) {
-    _pendingSettingsWrites = _pendingSettingsWrites
+  Future<void> _persistSetting(String key, Object value) {
+    final write = _pendingSettingsWrites
         .catchError((Object _) {})
         .then((_) => widget.database.setSetting(key, value));
+    _pendingSettingsWrites = write;
+    return write;
+  }
+
+  Future<CallScreeningPermissions?> _readPermissions() async {
+    try {
+      return await _screeningChannel.checkPermissions();
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
+  /// Hides the tray until screening is configured, auto-enables it when the
+  /// role is granted, and keeps it in sync with protection and driving modes.
+  Future<void> _reconcileStatusTray({
+    bool allowPermissionRequest = false,
+  }) async {
+    if (!_ready) return;
+    final permissions = await _readPermissions();
+    final decision = StatusTrayLifecycle.reconcile(
+      current: _trayPreferences,
+      roleGranted: permissions?.callScreeningRole ?? false,
+      protectionEnabled: _protectionEnabled,
+      drivingMode: _drivingMode,
+      notificationsGranted: permissions?.notificationsGranted ?? false,
+    );
+    final previous = _trayPreferences;
+    final next = decision.preferences;
+    if (mounted) {
+      setState(() {
+        _trayPreferences = next;
+        _trayMode = decision.mode;
+      });
+    } else {
+      _trayPreferences = next;
+      _trayMode = decision.mode;
+    }
+    await _persistTrayPreferences(previous, next);
+    if (decision.requestNotificationPermission && allowPermissionRequest) {
+      try {
+        await _screeningChannel.requestNotificationPermission();
+      } on PlatformException {
+        // The system may refuse without showing a dialog; the tray stays
+        // enabled but hidden by Android until permission is granted.
+      } on MissingPluginException {
+        // Notification permissions are Android-only.
+      }
+      await _reconcileStatusTray();
+      return;
+    }
+    _syncStatusIndicator();
+  }
+
+  Future<void> _persistTrayPreferences(
+    StatusTrayPreferences previous,
+    StatusTrayPreferences next,
+  ) async {
+    if (previous.enabled != next.enabled) {
+      await _persistSetting('status_tray_icon_enabled', next.enabled);
+    }
+    if (previous.userOverridden != next.userOverridden) {
+      await _persistSetting('status_tray_user_overridden', next.userOverridden);
+    }
+    if (previous.permissionPrompted != next.permissionPrompted) {
+      await _persistSetting(
+        'status_tray_permission_prompted',
+        next.permissionPrompted,
+      );
+    }
   }
 
   void _syncStatusIndicator() {
     if (!_ready) return;
     _screeningChannel
         .updateStatusIndicator(
-          enabled: _statusIndicatorEnabled,
+          enabled: _trayMode != StatusTrayMode.hidden,
           protectionEnabled: _protectionEnabled,
           drivingMode: _drivingMode,
           locale: _language.name,
@@ -186,19 +276,26 @@ class CallGuardAppState extends State<CallGuardApp>
 
   Future<void> _setStatusIndicatorEnabled(bool value) async {
     if (value) {
-      try {
-        final granted = await _screeningChannel.requestNotificationPermission();
-        if (!granted) return;
-      } on PlatformException {
-        return;
-      } on MissingPluginException {
-        // Keep the preference usable in widget tests and on other platforms.
+      final permissions = await _readPermissions();
+      if (permissions != null && !permissions.notificationsGranted) {
+        try {
+          await _screeningChannel.requestNotificationPermission();
+        } on PlatformException {
+          // Keep the user's explicit choice even if Android refuses.
+        } on MissingPluginException {
+          // Keep the preference usable in widget tests and on other platforms.
+        }
       }
     }
     if (!mounted) return;
-    setState(() => _statusIndicatorEnabled = value);
-    _persistSetting('status_indicator_enabled', value);
-    _syncStatusIndicator();
+    final next = StatusTrayLifecycle.userChanged(
+      _trayPreferences,
+      value,
+    ).copyWith(permissionPrompted: true);
+    final previous = _trayPreferences;
+    setState(() => _trayPreferences = next);
+    await _persistTrayPreferences(previous, next);
+    await _reconcileStatusTray();
   }
 
   void _setThemeMode(ThemeMode mode) {
@@ -255,15 +352,15 @@ class CallGuardAppState extends State<CallGuardApp>
               onProtectionChanged: (value) {
                 setState(() => _protectionEnabled = value);
                 _persistSetting('protection_enabled', value);
-                _syncStatusIndicator();
+                unawaited(_reconcileStatusTray());
               },
               drivingMode: _drivingMode,
               onDrivingModeChanged: (value) {
                 setState(() => _drivingMode = value);
                 _persistSetting('driving_mode', value);
-                _syncStatusIndicator();
+                unawaited(_reconcileStatusTray());
               },
-              statusIndicatorEnabled: _statusIndicatorEnabled,
+              statusIndicatorEnabled: _trayPreferences.enabled,
               onStatusIndicatorChanged: _setStatusIndicatorEnabled,
               blockUnknown: _blockUnknown,
               onBlockUnknownChanged: (value) {

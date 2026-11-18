@@ -14,6 +14,7 @@ object CallGuardDatabase {
     private val repeatColumnsChecked = AtomicBoolean(false)
     private val callLogContactNameChecked = AtomicBoolean(false)
     private val phoneRuleExpiresAtChecked = AtomicBoolean(false)
+    private val countryAreaCodesChecked = AtomicBoolean(false)
 
     @Volatile
     private var instance: SQLiteDatabase? = null
@@ -60,6 +61,8 @@ object CallGuardDatabase {
             ensureRepeatColumns(this)
             ensureCallLogContactNameColumn(this)
             ensurePhoneRuleExpiresAtColumn(this)
+            ensureCountryAreaCodesColumn(this)
+            migrateLegacyStatusTraySettings(this)
             ensureCallbackSettings(this)
             ensureFixedLineOperators(this)
             ensureSpainFranceCatalog(this)
@@ -174,13 +177,75 @@ object CallGuardDatabase {
         }
     }
 
+    private fun ensureCountryAreaCodesColumn(database: SQLiteDatabase) {
+        if (!countryAreaCodesChecked.compareAndSet(false, true)) return
+        try {
+            val columns = mutableSetOf<String>()
+            database.rawQuery(
+                "PRAGMA table_info(${DbContract.CountryRules.TABLE})",
+                null,
+            ).use { cursor ->
+                val nameColumn = cursor.getColumnIndexOrThrow("name")
+                while (cursor.moveToNext()) columns.add(cursor.getString(nameColumn))
+            }
+            if (columns.isNotEmpty() &&
+                DbContract.CountryRules.AREA_CODES !in columns
+            ) {
+                database.execSQL(
+                    "ALTER TABLE ${DbContract.CountryRules.TABLE} ADD COLUMN " +
+                        "${DbContract.CountryRules.AREA_CODES} TEXT NOT NULL DEFAULT ''",
+                )
+            }
+        } catch (error: Exception) {
+            countryAreaCodesChecked.set(false)
+            throw error
+        }
+    }
+
+    /**
+     * Copies the pre-1.9 status indicator preference onto the smart tray keys.
+     * An explicitly disabled legacy tray becomes a user override.
+     */
+    private fun migrateLegacyStatusTraySettings(database: SQLiteDatabase) {
+        val hasSettingsTable = database.rawQuery(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+            arrayOf(DbContract.AppSettings.TABLE),
+        ).use { it.moveToFirst() }
+        if (!hasSettingsTable) return
+        val legacyEnabled = database.rawQuery(
+            "SELECT ${DbContract.AppSettings.VALUE} FROM ${DbContract.AppSettings.TABLE} " +
+                "WHERE ${DbContract.AppSettings.KEY} = ? LIMIT 1",
+            arrayOf(DbContract.SettingKeys.LEGACY_STATUS_INDICATOR_ENABLED),
+        ).use { cursor ->
+            if (cursor.moveToFirst()) cursor.getString(0) == "true" else null
+        } ?: return
+        fun insertIfMissing(key: String, value: Boolean) {
+            database.insertWithOnConflict(
+                DbContract.AppSettings.TABLE,
+                null,
+                android.content.ContentValues().apply {
+                    put(DbContract.AppSettings.KEY, key)
+                    put(DbContract.AppSettings.VALUE, value.toString())
+                },
+                SQLiteDatabase.CONFLICT_IGNORE,
+            )
+        }
+        insertIfMissing(DbContract.SettingKeys.STATUS_TRAY_ICON_ENABLED, legacyEnabled)
+        insertIfMissing(DbContract.SettingKeys.STATUS_TRAY_USER_OVERRIDDEN, !legacyEnabled)
+        database.delete(
+            DbContract.AppSettings.TABLE,
+            "${DbContract.AppSettings.KEY} = ?",
+            arrayOf(DbContract.SettingKeys.LEGACY_STATUS_INDICATOR_ENABLED),
+        )
+    }
+
     private fun ensureFixedLineOperators(database: SQLiteDatabase) {
         val defaults = listOf(
             FixedLineOperator("UA", "@operatorUkrtelecom", "44"),
             FixedLineOperator("PL", "@operatorWarsawLandline", "22"),
             FixedLineOperator("DE", "@operatorBerlinLandline", "30"),
             FixedLineOperator("GB", "@operatorLondonLandline", "20"),
-            FixedLineOperator("US-CA", "@operatorNewYorkLandline", "212"),
+            FixedLineOperator("US", "@operatorNewYorkLandline", "212"),
         )
         defaults.forEach { operator ->
             val countryExists = database.rawQuery(
@@ -252,6 +317,12 @@ object CallGuardDatabase {
                 arrayOf(operator.countryIso),
             ).use { it.moveToFirst() }
             if (!countryExists) return@forEach
+            val operatorExists = database.rawQuery(
+                "SELECT 1 FROM ${DbContract.OperatorRules.TABLE} " +
+                    "WHERE ${DbContract.OperatorRules.OPERATOR_NAME} = ? LIMIT 1",
+                arrayOf(operator.name),
+            ).use { it.moveToFirst() }
+            if (operatorExists) return@forEach
             database.insertWithOnConflict(
                 DbContract.OperatorRules.TABLE,
                 null,
@@ -289,6 +360,9 @@ object CallGuardDatabase {
         DbContract.SettingKeys.ANSWERING_AUTO_REMIND_MINUTES to "30",
         DbContract.SettingKeys.ANSWERING_EMERGENCY_REPEAT to "false",
         DbContract.SettingKeys.DRIVING_MODE to "false",
-        DbContract.SettingKeys.STATUS_INDICATOR_ENABLED to "true",
+        DbContract.SettingKeys.STATUS_TRAY_ICON_ENABLED to "true",
+        DbContract.SettingKeys.STATUS_TRAY_USER_OVERRIDDEN to "false",
+        DbContract.SettingKeys.STATUS_TRAY_ACTIVATED to "false",
+        DbContract.SettingKeys.STATUS_TRAY_PERMISSION_PROMPTED to "false",
     )
 }

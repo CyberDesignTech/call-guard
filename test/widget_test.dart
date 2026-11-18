@@ -7,6 +7,7 @@ import 'package:sqflite/sqflite.dart' as sqflite;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart' as ffi;
 
 import 'package:call_guard/data/database_helper.dart';
+import 'package:call_guard/data/world_countries.dart';
 import 'package:call_guard/main.dart';
 import 'package:call_guard/l10n/app_strings.dart';
 import 'package:call_guard/l10n/strings_de.dart';
@@ -79,7 +80,8 @@ void main() {
     final settings = await _testDatabase.getSettings();
     final countries = await _testDatabase.getCountries();
     expect(settings['locale'], 'ukrainian');
-    expect(countries, hasLength(7));
+    expect(countries, hasLength(195));
+    expect(worldCountries, hasLength(195));
     expect(await _testDatabase.getOperators('UA'), hasLength(4));
     expect((await _testDatabase.getCallLogs()).first, contains('contact_name'));
     expect(await _testDatabase.getPhoneRules('white'), hasLength(2));
@@ -100,7 +102,9 @@ void main() {
     expect(defaults['answering_auto_remind_minutes'], '30');
     expect(defaults['answering_emergency_repeat'], 'false');
     expect(defaults['driving_mode'], 'false');
-    expect(defaults['status_indicator_enabled'], 'true');
+    expect(defaults['status_tray_icon_enabled'], 'true');
+    expect(defaults['status_tray_user_overridden'], 'false');
+    expect(defaults['status_tray_activated'], 'false');
 
     await _testDatabase.setSetting('answering_auto_remind', true);
     await _testDatabase.setSetting('answering_auto_remind_minutes', 15);
@@ -2088,7 +2092,7 @@ void main() {
     await tester.tap(aboutMenuItem);
     await tester.pumpAndSettle();
     expect(find.text('Call Gate'), findsOneWidget);
-    expect(find.textContaining('v1.8.5'), findsOneWidget);
+    expect(find.textContaining('v1.9.0'), findsOneWidget);
     expect(find.text('© 2026 CyberDesignTech Dev'), findsOneWidget);
     expect(
       find.textContaining('CyberDesignTech Dev із фокусом'),
@@ -2290,6 +2294,46 @@ void main() {
     expect(find.text('Київстар'), findsOneWidget);
     expect(find.text('Vodafone UA'), findsNothing);
     expect(find.text('lifecell'), findsNothing);
+  });
+
+  testWidgets('world country search blocks and lists active country filters', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await pumpApp(tester);
+    await tester.tap(find.byTooltip('Списки та фільтри'));
+    await finishSectionTransition(tester);
+    await waitForText(tester, 'Країни та оператори');
+    await tester.tap(find.text('Країни та оператори'));
+    await finishSectionTransition(tester);
+    await waitForText(tester, 'Україна');
+
+    expect(find.text('ДЕТАЛЬНІ КРАЇНИ ТА ОПЕРАТОРИ'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), '+39');
+    await tester.pumpAndSettle();
+    expect(find.text('Італія'), findsOneWidget);
+    expect(find.text('Ватикан'), findsOneWidget);
+    expect(find.text('Україна'), findsNothing);
+
+    await tester.enterText(find.byType(TextField), 'Італія');
+    await tester.pumpAndSettle();
+    expect(find.byType(Switch), findsOneWidget);
+    await tester.tap(find.byType(Switch));
+    await tester.pumpAndSettle();
+
+    expect(find.text('АКТИВНІ ФІЛЬТРИ КРАЇН'), findsOneWidget);
+    expect(find.text('Італія'), findsAtLeastNWidgets(2));
+    await tester.runAsync(() async {
+      final italy = (await _testDatabase.getCountries()).singleWhere(
+        (row) => row['iso_code'] == 'IT',
+      );
+      expect(italy['action'], 'block');
+    });
   });
 
   test('dictionaries stay complete with identical placeholders', () {

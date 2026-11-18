@@ -26,6 +26,7 @@ object DbContract {
         const val TABLE = "country_rules"
         const val ISO_CODE = "iso_code"
         const val DIAL_CODE = "dial_code"
+        const val AREA_CODES = "area_codes"
         const val ACTION = "action"
     }
 
@@ -67,7 +68,11 @@ object DbContract {
         const val SILENCE_MANUAL = "silence_manual"
         const val AUTOMATIC_SILENCE = "automatic_silence"
         const val DRIVING_MODE = "driving_mode"
-        const val STATUS_INDICATOR_ENABLED = "status_indicator_enabled"
+        const val STATUS_TRAY_ICON_ENABLED = "status_tray_icon_enabled"
+        const val STATUS_TRAY_USER_OVERRIDDEN = "status_tray_user_overridden"
+        const val STATUS_TRAY_ACTIVATED = "status_tray_activated"
+        const val STATUS_TRAY_PERMISSION_PROMPTED = "status_tray_permission_prompted"
+        const val LEGACY_STATUS_INDICATOR_ENABLED = "status_indicator_enabled"
         const val SILENCE_START_MINUTE = "silence_start_minute"
         const val SILENCE_END_MINUTE = "silence_end_minute"
         const val SILENCE_WEEKDAYS = "silence_weekdays"

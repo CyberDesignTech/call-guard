@@ -8,6 +8,7 @@ class CountryEntry {
     this.nameKey,
     required this.code,
     required this.operators,
+    this.areaCodes = const <String>[],
     this.action = RuleState.neutral,
   });
 
@@ -16,6 +17,7 @@ class CountryEntry {
   final String name;
   final String? nameKey;
   final String code;
+  final List<String> areaCodes;
   final List<OperatorEntry> operators;
   RuleState action;
 }

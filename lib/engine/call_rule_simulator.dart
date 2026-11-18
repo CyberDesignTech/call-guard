@@ -68,19 +68,7 @@ class CallRuleSimulator {
 
     final countries = await database.getCountries();
     final digits = canonical;
-    final country = countries
-        .where((row) {
-          final dialCode = _digits(row['dial_code'] as String? ?? '');
-          return dialCode.isNotEmpty && digits.startsWith(dialCode);
-        })
-        .fold<Map<String, Object?>?>(null, (best, candidate) {
-          if (best == null ||
-              _digits(candidate['dial_code'] as String? ?? '').length >
-                  _digits(best['dial_code'] as String? ?? '').length) {
-            return candidate;
-          }
-          return best;
-        });
+    final country = _matchCountry(countries, digits);
 
     if (country != null) {
       final isoCode = country['iso_code'] as String? ?? '';
@@ -129,6 +117,66 @@ class CallRuleSimulator {
       return verdict(false, 'allowlist_only');
     }
     return verdict(true, 'default_allow');
+  }
+
+  /// Picks the most specific country for a dialed number.
+  ///
+  /// Longest calling code wins. Shared codes (+1, +7, +39) are separated by
+  /// the national area-code list; when no area code matches, the country
+  /// without area codes is the primary one (Russia for +7, Italy for +39),
+  /// and +1 defaults to the United States.
+  Map<String, Object?>? _matchCountry(
+    List<Map<String, Object?>> countries,
+    String phoneDigits,
+  ) {
+    Map<String, Object?>? best;
+    var bestDial = '';
+    for (final row in countries) {
+      final dialCode = _digits(row['dial_code'] as String? ?? '');
+      if (dialCode.isEmpty || !phoneDigits.startsWith(dialCode)) continue;
+      if (best == null || dialCode.length > bestDial.length) {
+        best = row;
+        bestDial = dialCode;
+        continue;
+      }
+      if (dialCode.length != bestDial.length) continue;
+      final candidateArea = _areaCodeMatches(row, phoneDigits, dialCode);
+      final bestArea = _areaCodeMatches(best, phoneDigits, bestDial);
+      if (candidateArea && !bestArea) {
+        best = row;
+      } else if (!candidateArea && bestArea) {
+        continue;
+      } else if (!candidateArea && !bestArea) {
+        final candidateHasAreas = _areaCodes(row).isNotEmpty;
+        final bestHasAreas = _areaCodes(best).isNotEmpty;
+        if (bestHasAreas && !candidateHasAreas) {
+          best = row;
+        } else if (candidateHasAreas == bestHasAreas &&
+            (row['iso_code'] as String? ?? '') == 'US' &&
+            (best['iso_code'] as String? ?? '') != 'US') {
+          best = row;
+        }
+      }
+    }
+    return best;
+  }
+
+  List<String> _areaCodes(Map<String, Object?> row) =>
+      (row['area_codes'] as String? ?? '')
+          .split(',')
+          .map(_digits)
+          .where((code) => code.isNotEmpty)
+          .toList();
+
+  bool _areaCodeMatches(
+    Map<String, Object?> row,
+    String phoneDigits,
+    String dialCode,
+  ) {
+    if (phoneDigits.length <= dialCode.length) return false;
+    final nationalDigits = phoneDigits.substring(dialCode.length);
+    return _areaCodes(row)
+        .any((areaCode) => nationalDigits.startsWith(areaCode));
   }
 
   bool _isWithinSchedule(Map<String, String> settings, DateTime now) {

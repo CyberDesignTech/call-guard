@@ -125,9 +125,7 @@ class CallRuleEngine(context: Context) {
 
         val countries = readCountries(database)
         val phoneDigits = PhoneNumbers.digits(canonicalPhone)
-        val matchedCountry = countries
-            .filter { it.dialDigits.isNotEmpty() && phoneDigits.startsWith(it.dialDigits) }
-            .maxByOrNull { it.dialDigits.length }
+        val matchedCountry = matchCountry(countries, phoneDigits)
 
         if (matchedCountry != null) {
             val nationalDigits = phoneDigits.drop(matchedCountry.dialDigits.length)
@@ -182,23 +180,81 @@ class CallRuleEngine(context: Context) {
         val countries = ArrayList<CountryRule>()
         database.rawQuery(
             "SELECT ${DbContract.CountryRules.ISO_CODE}, ${DbContract.CountryRules.DIAL_CODE}, " +
-                "${DbContract.CountryRules.ACTION} FROM ${DbContract.CountryRules.TABLE}",
+                "${DbContract.CountryRules.AREA_CODES}, ${DbContract.CountryRules.ACTION} " +
+                "FROM ${DbContract.CountryRules.TABLE}",
             null,
         ).use { cursor ->
             val isoColumn = cursor.getColumnIndexOrThrow(DbContract.CountryRules.ISO_CODE)
             val dialColumn = cursor.getColumnIndexOrThrow(DbContract.CountryRules.DIAL_CODE)
+            val areaColumn = cursor.getColumnIndexOrThrow(DbContract.CountryRules.AREA_CODES)
             val actionColumn = cursor.getColumnIndexOrThrow(DbContract.CountryRules.ACTION)
             while (cursor.moveToNext()) {
                 countries.add(
                     CountryRule(
                         isoCode = cursor.getString(isoColumn),
                         dialDigits = PhoneNumbers.digits(cursor.getString(dialColumn)),
+                        areaCodes = cursor.getString(areaColumn)
+                            .orEmpty()
+                            .split(',')
+                            .map(PhoneNumbers::digits)
+                            .filter(String::isNotEmpty),
                         action = cursor.getString(actionColumn).lowercase(Locale.ROOT),
                     ),
                 )
             }
         }
         return countries
+    }
+
+    /**
+     * Longest calling code wins. Shared codes (+1, +7, +39) are separated by
+     * their NANP/area-code lists; without an area match the country that has no
+     * area codes is primary (Russia for +7, Italy for +39), and +1 defaults to
+     * the United States.
+     */
+    private fun matchCountry(
+        countries: List<CountryRule>,
+        phoneDigits: String,
+    ): CountryRule? {
+        var best: CountryRule? = null
+        for (country in countries) {
+            if (country.dialDigits.isEmpty() ||
+                !phoneDigits.startsWith(country.dialDigits)
+            ) {
+                continue
+            }
+            val current = best
+            if (current == null || country.dialDigits.length > current.dialDigits.length) {
+                best = country
+                continue
+            }
+            if (country.dialDigits.length != current.dialDigits.length) continue
+            val countryArea = areaCodeMatches(country, phoneDigits)
+            val bestArea = areaCodeMatches(current, phoneDigits)
+            when {
+                countryArea && !bestArea -> best = country
+                !countryArea && bestArea -> Unit
+                else -> {
+                    val countryHasAreas = country.areaCodes.isNotEmpty()
+                    val bestHasAreas = current.areaCodes.isNotEmpty()
+                    if (bestHasAreas && !countryHasAreas) {
+                        best = country
+                    } else if (countryHasAreas == bestHasAreas &&
+                        country.isoCode == "US" &&
+                        current.isoCode != "US"
+                    ) {
+                        best = country
+                    }
+                }
+            }
+        }
+        return best
+    }
+
+    private fun areaCodeMatches(country: CountryRule, phoneDigits: String): Boolean {
+        if (phoneDigits.length <= country.dialDigits.length) return false
+        val nationalDigits = phoneDigits.drop(country.dialDigits.length)
+        return country.areaCodes.any(nationalDigits::startsWith)
     }
 
     private fun findOperatorAction(
@@ -312,9 +368,7 @@ class CallRuleEngine(context: Context) {
 
         val countries = readCountries(database)
         val phoneDigits = PhoneNumbers.digits(canonicalPhone)
-        val matchedCountry = countries
-            .filter { it.dialDigits.isNotEmpty() && phoneDigits.startsWith(it.dialDigits) }
-            .maxByOrNull { it.dialDigits.length }
+        val matchedCountry = matchCountry(countries, phoneDigits)
 
         if (matchedCountry != null) {
             val nationalDigits = phoneDigits.drop(matchedCountry.dialDigits.length)
@@ -359,8 +413,7 @@ class CallRuleEngine(context: Context) {
     private fun homeDialCode(countries: List<CountryRule>): String? {
         val homeIso = PhoneNumbers.homeCountryIso(appContext) ?: return null
         return countries.firstOrNull { country ->
-            country.isoCode.equals(homeIso, ignoreCase = true) ||
-                (country.isoCode == "US-CA" && homeIso in setOf("US", "CA"))
+            country.isoCode.equals(homeIso, ignoreCase = true)
         }?.dialDigits
     }
 
@@ -406,6 +459,7 @@ class CallRuleEngine(context: Context) {
     private data class CountryRule(
         val isoCode: String,
         val dialDigits: String,
+        val areaCodes: List<String>,
         val action: String,
     )
 

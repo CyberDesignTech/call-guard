@@ -1,8 +1,10 @@
 package com.wepr.callguard.call_guard
 
+import android.app.role.RoleManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.util.Log
 import java.util.concurrent.Executors
 
@@ -19,10 +21,12 @@ class BootCompletedReceiver : BroadcastReceiver() {
             } finally {
                 runCatching {
                     val settings = CallGuardDatabase.readSettings(appContext)
+                    val trayEnabled = hasCallScreeningRole(appContext) &&
+                        settings[DbContract.SettingKeys.STATUS_TRAY_ICON_ENABLED]
+                            ?.toBooleanStrictOrNull() != false
                     CallNotificationHelper.updateStatusIndicator(
                         context = appContext,
-                        enabled = settings[DbContract.SettingKeys.STATUS_INDICATOR_ENABLED]
-                            ?.toBooleanStrictOrNull() ?: true,
+                        enabled = trayEnabled,
                         protectionEnabled = settings[DbContract.SettingKeys.PROTECTION_ENABLED]
                             ?.toBooleanStrictOrNull() ?: true,
                         drivingMode = settings[DbContract.SettingKeys.DRIVING_MODE]
@@ -35,6 +39,13 @@ class BootCompletedReceiver : BroadcastReceiver() {
                 pendingResult.finish()
             }
         }
+    }
+
+    private fun hasCallScreeningRole(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false
+        val roleManager = context.getSystemService(RoleManager::class.java) ?: return false
+        return roleManager.isRoleAvailable(RoleManager.ROLE_CALL_SCREENING) &&
+            roleManager.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)
     }
 
     private companion object {

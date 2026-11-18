@@ -114,4 +114,94 @@ void main() {
     expect(mobile.reason, 'operator_block');
     expect(fixed.reason, 'operator_block');
   });
+
+  test('world countries block by any E.164 calling code', () async {
+    await database.updateCountryAction('IT', 'block');
+    await database.updateCountryAction('CZ', 'block');
+    await database.updateCountryAction('TR', 'block');
+    await database.setSetting('block_international', false);
+
+    final simulator = CallRuleSimulator(database);
+    expect(
+      (await simulator.evaluate('+39 320 123 4567')).reason,
+      'country_block',
+    );
+    expect(
+      (await simulator.evaluate('+420 601 123 456')).reason,
+      'country_block',
+    );
+    expect(
+      (await simulator.evaluate('+90 532 123 4567')).reason,
+      'country_block',
+    );
+
+    // A neighbouring code that only shares the leading digit stays allowed.
+    expect(
+      (await simulator.evaluate('+380 67 555 01 02')).reason,
+      'default_allow',
+    );
+  });
+
+  test('shared +1 selects US and Canada by NANP area code', () async {
+    await database.setSetting('block_international', false);
+    await database.updateCountryAction('US', 'block');
+
+    final simulator = CallRuleSimulator(database);
+    expect(
+      (await simulator.evaluate('+1 212 555 0100')).reason,
+      'country_block',
+    );
+    expect(
+      (await simulator.evaluate('+1 416 555 0100')).reason,
+      'default_allow',
+    );
+
+    await database.updateCountryAction('US', 'neutral');
+    await database.updateCountryAction('CA', 'block');
+    expect(
+      (await simulator.evaluate('+1 416 555 0100')).reason,
+      'country_block',
+    );
+    expect(
+      (await simulator.evaluate('+1 212 555 0100')).reason,
+      'default_allow',
+    );
+  });
+
+  test(
+    'NANP operator rules still match after splitting US and Canada',
+    () async {
+      await database.setSetting('block_international', false);
+      final operators = await database.getOperators('US');
+      final newYork = operators.singleWhere(
+        (row) => row['operator_name'] == '@operatorNewYorkLandline',
+      );
+      await database.updateOperatorAction(newYork['id'] as int, 'block');
+
+      final simulator = CallRuleSimulator(database);
+      expect(
+        (await simulator.evaluate('+1 212 555 0100')).reason,
+        'operator_block',
+      );
+      expect(
+        (await simulator.evaluate('+1 416 555 0100')).reason,
+        'default_allow',
+      );
+    },
+  );
+
+  test('shared +7 selects Kazakhstan and Russia without area codes', () async {
+    await database.setSetting('block_international', false);
+    await database.updateCountryAction('KZ', 'block');
+
+    final simulator = CallRuleSimulator(database);
+    expect(
+      (await simulator.evaluate('+7 700 123 4567')).reason,
+      'country_block',
+    );
+    expect(
+      (await simulator.evaluate('+7 916 123 4567')).reason,
+      'default_allow',
+    );
+  });
 }
