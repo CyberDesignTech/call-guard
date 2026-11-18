@@ -90,6 +90,7 @@ class MainActivity : FlutterActivity() {
             BridgeContract.Methods.REQUEST_NOTIFICATION_PERMISSION ->
                 requestNotificationPermission(result)
             BridgeContract.Methods.OPEN_NOTIFICATION_SETTINGS -> openNotificationSettings(result)
+            BridgeContract.Methods.UPDATE_STATUS_INDICATOR -> updateStatusIndicator(call, result)
             BridgeContract.Methods.SCHEDULE_REMINDER -> scheduleReminder(call, result)
             BridgeContract.Methods.CANCEL_REMINDER -> cancelReminder(call, result)
             BridgeContract.Methods.RESTORE_PENDING_REMINDERS -> restorePendingReminders(result)
@@ -386,6 +387,21 @@ class MainActivity : FlutterActivity() {
                 null,
             )
         }
+    }
+
+    private fun updateStatusIndicator(call: MethodCall, result: MethodChannel.Result) {
+        val enabled = call.argument<Boolean>("enabled") ?: true
+        val protectionEnabled = call.argument<Boolean>("protectionEnabled") ?: true
+        val drivingMode = call.argument<Boolean>("drivingMode") ?: false
+        val locale = call.argument<String>("locale")
+        CallNotificationHelper.updateStatusIndicator(
+            context = applicationContext,
+            enabled = enabled,
+            protectionEnabled = protectionEnabled,
+            drivingMode = drivingMode,
+            locale = locale,
+        )
+        result.success(true)
     }
 
     private fun launchNotificationSettings(): Boolean = try {

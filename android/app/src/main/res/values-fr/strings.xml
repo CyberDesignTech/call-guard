@@ -21,4 +21,12 @@
     <string name="reminder_note_meeting">Rappeler au sujet de la réunion</string>
     <string name="reminder_note_check">Vérifier le message</string>
     <string name="reminder_note_new">Rappeler</string>
+    <string name="status_channel_name">État de CallGate</string>
+    <string name="status_channel_description">Indicateur silencieux de l’état de protection de CallGate</string>
+    <string name="status_active_title">CallGate · Protection active</string>
+    <string name="status_active_text">Le filtrage des appels entrants est activé</string>
+    <string name="status_driving_title">CallGate · Mode conduite</string>
+    <string name="status_driving_text">Tous les appels entrants sont rejetés</string>
+    <string name="status_paused_title">CallGate · Protection désactivée</string>
+    <string name="status_paused_text">Touchez pour ouvrir l’application et activer la protection</string>
 </resources>

@@ -21,4 +21,12 @@
     <string name="reminder_note_meeting">Call back about the meeting</string>
     <string name="reminder_note_check">Check the message</string>
     <string name="reminder_note_new">Call back</string>
+    <string name="status_channel_name">CallGate status</string>
+    <string name="status_channel_description">Silent indicator of CallGate protection status</string>
+    <string name="status_active_title">CallGate · Protection active</string>
+    <string name="status_active_text">Incoming call filtering is enabled</string>
+    <string name="status_driving_title">CallGate · Driving mode</string>
+    <string name="status_driving_text">All incoming calls are rejected</string>
+    <string name="status_paused_title">CallGate · Protection off</string>
+    <string name="status_paused_text">Tap to open and enable protection</string>
 </resources>

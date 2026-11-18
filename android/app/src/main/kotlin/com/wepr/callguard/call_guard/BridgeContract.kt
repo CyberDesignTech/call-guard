@@ -13,6 +13,7 @@ object BridgeContract {
         const val LOOKUP_CONTACT_NAME = "lookupContactName"
         const val REQUEST_NOTIFICATION_PERMISSION = "requestNotificationPermission"
         const val OPEN_NOTIFICATION_SETTINGS = "openNotificationSettings"
+        const val UPDATE_STATUS_INDICATOR = "updateStatusIndicator"
         const val SCHEDULE_REMINDER = "scheduleReminder"
         const val CANCEL_REMINDER = "cancelReminder"
         const val RESTORE_PENDING_REMINDERS = "restorePendingReminders"

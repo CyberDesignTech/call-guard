@@ -39,6 +39,8 @@ migrate_working_dir/
 *.apk
 *.aab
 release/
+!release/
+!release/CallGate-*.apk
 
 # Symbolication related
 app.*.symbols

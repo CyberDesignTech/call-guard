@@ -21,4 +21,12 @@
     <string name="reminder_note_meeting">Oddzwoń w sprawie spotkania</string>
     <string name="reminder_note_check">Sprawdź wiadomość</string>
     <string name="reminder_note_new">Oddzwoń</string>
+    <string name="status_channel_name">Status CallGate</string>
+    <string name="status_channel_description">Cichy wskaźnik stanu ochrony CallGate</string>
+    <string name="status_active_title">CallGate · Ochrona aktywna</string>
+    <string name="status_active_text">Filtrowanie połączeń przychodzących jest włączone</string>
+    <string name="status_driving_title">CallGate · Tryb jazdy</string>
+    <string name="status_driving_text">Wszystkie połączenia przychodzące są odrzucane</string>
+    <string name="status_paused_title">CallGate · Ochrona wyłączona</string>
+    <string name="status_paused_text">Dotknij, aby otworzyć aplikację i włączyć ochronę</string>
 </resources>

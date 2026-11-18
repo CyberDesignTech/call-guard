@@ -6,6 +6,8 @@ class DatabaseHelper {
     'answering_auto_remind': 'false',
     'answering_auto_remind_minutes': '30',
     'answering_emergency_repeat': 'false',
+    'driving_mode': 'false',
+    'status_indicator_enabled': 'true',
   };
 
   DatabaseHelper._({String? databasePath}) : _databasePath = databasePath;
@@ -27,7 +29,7 @@ class DatabaseHelper {
         _databasePath ?? path.join(await getDatabasesPath(), 'call_guard.db');
     final database = await openDatabase(
       databasePath,
-      version: 6,
+      version: 7,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: (db, oldVersion, newVersion) async {
@@ -37,6 +39,7 @@ class DatabaseHelper {
         if (oldVersion < 3) await _createIndexes(db);
         await _ensureCallbackSettings(db);
         await _ensureFixedLineOperators(db);
+        await _ensureSpainFranceCatalog(db);
       },
       onOpen: (db) async {
         await _ensureReminderRepeatColumns(db);
@@ -45,6 +48,7 @@ class DatabaseHelper {
         await _ensureCallbackSettings(db);
         await _normalizeLegacyCallLogReasons(db);
         await _ensureFixedLineOperators(db);
+        await _ensureSpainFranceCatalog(db);
       },
     );
     _openedDatabase = database;
@@ -175,6 +179,18 @@ class DatabaseHelper {
         'name_key': 'countryNorthAmerica',
         'action': 'neutral',
       },
+      {
+        'iso_code': 'ES',
+        'dial_code': '+34',
+        'name_key': 'countrySpain',
+        'action': 'neutral',
+      },
+      {
+        'iso_code': 'FR',
+        'dial_code': '+33',
+        'name_key': 'countryFrance',
+        'action': 'neutral',
+      },
     ];
     for (final country in countries) {
       batch.insert('country_rules', country);
@@ -195,6 +211,20 @@ class DatabaseHelper {
       _operatorSeed('GB', 'operatorEE', '79,75,77'),
       _operatorSeed('GB', 'operatorLondonLandline', '20'),
       _operatorSeed('US-CA', 'operatorNewYorkLandline', '212'),
+      _operatorSeed('ES', 'operatorMovistarES', '60,61,62'),
+      _operatorSeed('ES', 'operatorVodafoneES', '63,64,65'),
+      _operatorSeed('ES', 'operatorOrangeES', '66,67'),
+      _operatorSeed('ES', 'operatorYoigo', '68,69,71,72,73,74'),
+      _operatorSeed('ES', 'operatorMadridLandline', '91'),
+      _operatorSeed('FR', 'operatorOrangeFR', '60,61,62,70,71,72'),
+      _operatorSeed('FR', 'operatorSFR', '63,64,65,73,74,75'),
+      _operatorSeed('FR', 'operatorBouygues', '66,67,76,77'),
+      _operatorSeed(
+        'FR',
+        'operatorFreeMobile',
+        '68,69,78,79,695,696,757,758,759,780,781,782,783,784,785,786,787,788,789',
+      ),
+      _operatorSeed('FR', 'operatorParisLandline', '1'),
     ];
     for (final operator in operators) {
       batch.insert('operator_rules', operator);
@@ -389,6 +419,71 @@ class DatabaseHelper {
         'prefixes': entry.value.$2,
         'action': 'neutral',
       });
+    }
+  }
+
+  /// Adds Spain and France without changing any existing user-selected actions.
+  Future<void> _ensureSpainFranceCatalog(DatabaseExecutor db) async {
+    final tables = (await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table'",
+    )).map((row) => row['name'] as String?).whereType<String>().toSet();
+    if (!tables.contains('country_rules') ||
+        !tables.contains('operator_rules')) {
+      return;
+    }
+    final existingCountries = (await db.query(
+      'country_rules',
+      columns: ['iso_code'],
+    )).map((row) => row['iso_code'] as String).toSet();
+    for (final country in const [
+      ('ES', '+34', 'countrySpain'),
+      ('FR', '+33', 'countryFrance'),
+    ]) {
+      if (!existingCountries.contains(country.$1)) {
+        await db.insert('country_rules', {
+          'iso_code': country.$1,
+          'dial_code': country.$2,
+          'name_key': country.$3,
+          'action': 'neutral',
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      }
+    }
+
+    const operators = <(String, String, String)>{
+      ('ES', '@operatorMovistarES', '60,61,62'),
+      ('ES', '@operatorVodafoneES', '63,64,65'),
+      ('ES', '@operatorOrangeES', '66,67'),
+      ('ES', '@operatorYoigo', '68,69,71,72,73,74'),
+      ('ES', '@operatorMadridLandline', '91'),
+      ('FR', '@operatorOrangeFR', '60,61,62,70,71,72'),
+      ('FR', '@operatorSFR', '63,64,65,73,74,75'),
+      ('FR', '@operatorBouygues', '66,67,76,77'),
+      (
+        'FR',
+        '@operatorFreeMobile',
+        '68,69,78,79,695,696,757,758,759,780,781,782,783,784,785,786,787,788,789',
+      ),
+      ('FR', '@operatorParisLandline', '1'),
+    };
+    final existingOperators = (await db.query(
+      'operator_rules',
+      columns: ['operator_name'],
+    )).map((row) => row['operator_name'] as String).toSet();
+    final countries = (await db.query(
+      'country_rules',
+      columns: ['iso_code'],
+    )).map((row) => row['iso_code'] as String).toSet();
+    for (final operator in operators) {
+      if (existingOperators.contains(operator.$2) ||
+          !countries.contains(operator.$1)) {
+        continue;
+      }
+      await db.insert('operator_rules', {
+        'country_iso': operator.$1,
+        'operator_name': operator.$2,
+        'prefixes': operator.$3,
+        'action': 'neutral',
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
   }
 

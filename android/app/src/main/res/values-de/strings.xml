@@ -21,4 +21,12 @@
     <string name="reminder_note_meeting">Wegen des Treffens zurückrufen</string>
     <string name="reminder_note_check">Nachricht prüfen</string>
     <string name="reminder_note_new">Zurückrufen</string>
+    <string name="status_channel_name">CallGate-Status</string>
+    <string name="status_channel_description">Stiller Indikator für den CallGate-Schutzstatus</string>
+    <string name="status_active_title">CallGate · Schutz aktiv</string>
+    <string name="status_active_text">Filterung eingehender Anrufe ist aktiviert</string>
+    <string name="status_driving_title">CallGate · Fahrmodus</string>
+    <string name="status_driving_text">Alle eingehenden Anrufe werden abgewiesen</string>
+    <string name="status_paused_title">CallGate · Schutz ausgeschaltet</string>
+    <string name="status_paused_text">Tippen, um die App zu öffnen und den Schutz zu aktivieren</string>
 </resources>

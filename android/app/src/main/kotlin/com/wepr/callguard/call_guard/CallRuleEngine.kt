@@ -76,18 +76,28 @@ class CallRuleEngine(context: Context) {
         val hidden = PhoneNumbers.isHidden(rawPhone)
         val canonicalPhone = if (hidden) "" else PhoneNumbers.canonicalize(appContext, rawPhone)
 
+        // Driving mode is intentionally the highest-priority call rule. In
+        // particular, an allowlist entry or temporary allow must not bypass it.
+        if (settings.bool(DbContract.SettingKeys.DRIVING_MODE, false)) {
+            return verdict(
+                false,
+                "driving_mode",
+                PhoneNumbers.logValue(rawPhone, canonicalPhone),
+            )
+        }
+
         if (!hidden && matchesPhoneRule(database, "white", rawPhone, canonicalPhone)) {
             return verdict(true, "allowlist", canonicalPhone)
         }
 
         val calendar = Calendar.getInstance()
+        val scheduleActive =
+            settings.bool(DbContract.SettingKeys.AUTOMATIC_SILENCE, false) &&
+                isWithinQuietSchedule(settings, calendar)
         val silenceActive = settings.bool(DbContract.SettingKeys.MANUAL_SILENCE_ENABLED, false) ||
             settings.bool(DbContract.SettingKeys.MANUAL_SILENCE, false) ||
             settings.bool(DbContract.SettingKeys.SILENCE_MANUAL, false) ||
-            (
-                settings.bool(DbContract.SettingKeys.AUTOMATIC_SILENCE, false) &&
-                    isWithinQuietSchedule(settings, calendar)
-            )
+            scheduleActive
         if (silenceActive) {
             val emergencyRepeatEnabled = settings.bool(
                 DbContract.SettingKeys.ANSWERING_EMERGENCY_REPEAT,
@@ -153,8 +163,16 @@ class CallRuleEngine(context: Context) {
             return verdict(false, "blacklist", canonicalPhone)
         }
 
-        if (settings.bool(DbContract.SettingKeys.ALLOW_ONLY_WHITELIST, false)) {
-            return verdict(false, "allowlist_only", canonicalPhone.ifBlank { rawPhone })
+        // This is the schedule's whitelist-only option, not a global setting.
+        if (
+            scheduleActive &&
+            settings.bool(DbContract.SettingKeys.ALLOW_ONLY_WHITELIST, false)
+        ) {
+            return verdict(
+                false,
+                "allowlist_only",
+                canonicalPhone.ifBlank { rawPhone },
+            )
         }
 
         return verdict(true, "default_allow", canonicalPhone.ifBlank { rawPhone })

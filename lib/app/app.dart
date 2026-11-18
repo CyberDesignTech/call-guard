@@ -26,6 +26,8 @@ class CallGuardAppState extends State<CallGuardApp>
   ThemeMode _themeMode = ThemeMode.system;
   AppLanguage _language = AppLanguage.ukrainian;
   bool _protectionEnabled = true;
+  bool _drivingMode = false;
+  bool _statusIndicatorEnabled = true;
   bool _blockUnknown = true;
   bool _blockNonContacts = false;
   bool _blockInternational = true;
@@ -113,6 +115,8 @@ class CallGuardAppState extends State<CallGuardApp>
         _language = parseLanguage(settings['locale']);
         _themeMode = parseTheme(settings['theme_mode']);
         _protectionEnabled = parseBool('protection_enabled', true);
+        _drivingMode = parseBool('driving_mode', false);
+        _statusIndicatorEnabled = parseBool('status_indicator_enabled', true);
         _blockUnknown = parseBool('block_hidden', true);
         _blockNonContacts = parseBool('block_non_contacts', false);
         _blockInternational = parseBool('block_international', true);
@@ -145,6 +149,7 @@ class CallGuardAppState extends State<CallGuardApp>
         );
         _ready = true;
       });
+      _syncStatusIndicator();
     } catch (error, stackTrace) {
       debugPrint(
         'Call Gate settings could not be restored: $error\n$stackTrace',
@@ -164,6 +169,38 @@ class CallGuardAppState extends State<CallGuardApp>
         .then((_) => widget.database.setSetting(key, value));
   }
 
+  void _syncStatusIndicator() {
+    if (!_ready) return;
+    _screeningChannel
+        .updateStatusIndicator(
+          enabled: _statusIndicatorEnabled,
+          protectionEnabled: _protectionEnabled,
+          drivingMode: _drivingMode,
+          locale: _language.name,
+        )
+        .catchError((Object _) {
+          // The persistent Android status notification is unavailable on
+          // platforms that do not register the Android MethodChannel.
+        });
+  }
+
+  Future<void> _setStatusIndicatorEnabled(bool value) async {
+    if (value) {
+      try {
+        final granted = await _screeningChannel.requestNotificationPermission();
+        if (!granted) return;
+      } on PlatformException {
+        return;
+      } on MissingPluginException {
+        // Keep the preference usable in widget tests and on other platforms.
+      }
+    }
+    if (!mounted) return;
+    setState(() => _statusIndicatorEnabled = value);
+    _persistSetting('status_indicator_enabled', value);
+    _syncStatusIndicator();
+  }
+
   void _setThemeMode(ThemeMode mode) {
     setState(() => _themeMode = mode);
     _persistSetting('theme_mode', mode.name);
@@ -172,6 +209,7 @@ class CallGuardAppState extends State<CallGuardApp>
   void _setLanguage(AppLanguage language) {
     setState(() => _language = language);
     _persistSetting('locale', language.name);
+    _syncStatusIndicator();
   }
 
   void _setSilenceStart(TimeOfDay value) {
@@ -217,7 +255,16 @@ class CallGuardAppState extends State<CallGuardApp>
               onProtectionChanged: (value) {
                 setState(() => _protectionEnabled = value);
                 _persistSetting('protection_enabled', value);
+                _syncStatusIndicator();
               },
+              drivingMode: _drivingMode,
+              onDrivingModeChanged: (value) {
+                setState(() => _drivingMode = value);
+                _persistSetting('driving_mode', value);
+                _syncStatusIndicator();
+              },
+              statusIndicatorEnabled: _statusIndicatorEnabled,
+              onStatusIndicatorChanged: _setStatusIndicatorEnabled,
               blockUnknown: _blockUnknown,
               onBlockUnknownChanged: (value) {
                 setState(() => _blockUnknown = value);

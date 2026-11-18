@@ -22,6 +22,87 @@ object CallNotificationHelper {
     const val REMINDER_CHANNEL_ID = "call_guard_reminders_v2"
     const val MISSED_CALL_CHANNEL_ID = "call_guard_missed_calls_v3"
     const val QUIET_MISSED_CALL_CHANNEL_ID = "call_guard_missed_calls_quiet_v1"
+    const val STATUS_CHANNEL_ID = "call_guard_status_v1"
+    const val STATUS_NOTIFICATION_ID = 0x43474154
+
+    /** Posts or removes the persistent, silent protection state notification. */
+    fun updateStatusIndicator(
+        context: Context,
+        enabled: Boolean,
+        protectionEnabled: Boolean,
+        drivingMode: Boolean,
+        locale: String? = null,
+    ) {
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            ?: return
+        if (!enabled) {
+            manager.cancel(STATUS_NOTIFICATION_ID)
+            return
+        }
+
+        val localizedContext = localizedContext(context, locale)
+        createChannel(
+            context = context,
+            name = localizedContext.getString(R.string.status_channel_name),
+            description = localizedContext.getString(R.string.status_channel_description),
+            channelId = STATUS_CHANNEL_ID,
+            importance = NotificationManager.IMPORTANCE_LOW,
+            lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC,
+            silent = true,
+        )
+        if (!canPostNotifications(context) || !isChannelEnabled(context, STATUS_CHANNEL_ID)) {
+            return
+        }
+
+        val title: String
+        val text: String
+        val icon: Int
+        when {
+            !protectionEnabled -> {
+                title = localizedContext.getString(R.string.status_paused_title)
+                text = localizedContext.getString(R.string.status_paused_text)
+                icon = R.drawable.ic_stat_shield_paused
+            }
+            drivingMode -> {
+                title = localizedContext.getString(R.string.status_driving_title)
+                text = localizedContext.getString(R.string.status_driving_text)
+                icon = R.drawable.ic_stat_shield_driving
+            }
+            else -> {
+                title = localizedContext.getString(R.string.status_active_title)
+                text = localizedContext.getString(R.string.status_active_text)
+                icon = R.drawable.ic_stat_shield_active
+            }
+        }
+        val openApp = Intent(context, MainActivity::class.java).apply {
+            addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP,
+            )
+        }
+        val contentIntent = PendingIntent.getActivity(
+            context,
+            STATUS_NOTIFICATION_ID,
+            openApp,
+            pendingIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT),
+        )
+        val notification = NotificationCompat.Builder(localizedContext, STATUS_CHANNEL_ID)
+            .setSmallIcon(icon)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setContentIntent(contentIntent)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setSilent(true)
+            .setOnlyAlertOnce(true)
+            .setOngoing(true)
+            .setAutoCancel(false)
+            .build()
+        notify(context, STATUS_NOTIFICATION_ID, notification)
+    }
 
     fun showReminder(context: Context, reminder: CallReminderRecord): Boolean {
         val localizedContext = localizedContext(context)
@@ -331,8 +412,8 @@ object CallNotificationHelper {
             0
         }
 
-    private fun localizedContext(context: Context): Context {
-        val setting = runCatching {
+    private fun localizedContext(context: Context, localeOverride: String? = null): Context {
+        val setting = localeOverride ?: runCatching {
             CallReminderStore.getSetting(context, DbContract.SettingKeys.LOCALE, "english")
         }.getOrDefault("english")
         val language = when (setting) {

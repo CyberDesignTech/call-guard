@@ -20,6 +20,10 @@ class CallGuardShell extends StatefulWidget {
     required this.database,
     required this.protectionEnabled,
     required this.onProtectionChanged,
+    required this.drivingMode,
+    required this.onDrivingModeChanged,
+    required this.statusIndicatorEnabled,
+    required this.onStatusIndicatorChanged,
     required this.blockUnknown,
     required this.onBlockUnknownChanged,
     required this.blockNonContacts,
@@ -61,6 +65,10 @@ class CallGuardShell extends StatefulWidget {
   final DatabaseHelper database;
   final bool protectionEnabled;
   final ValueChanged<bool> onProtectionChanged;
+  final bool drivingMode;
+  final ValueChanged<bool> onDrivingModeChanged;
+  final bool statusIndicatorEnabled;
+  final ValueChanged<bool> onStatusIndicatorChanged;
   final bool blockUnknown;
   final ValueChanged<bool> onBlockUnknownChanged;
   final bool blockNonContacts;
@@ -159,7 +167,10 @@ class CallGuardShellState extends State<CallGuardShell> {
   void _openTestDialog() {
     showDialog<void>(
       context: context,
-      builder: (_) => SimulateCallDialog(strings: widget.strings),
+      builder: (_) => SimulateCallDialog(
+        strings: widget.strings,
+        database: widget.database,
+      ),
     );
   }
 
@@ -251,6 +262,8 @@ class CallGuardShellState extends State<CallGuardShell> {
             strings: widget.strings,
             protectionEnabled: widget.protectionEnabled,
             onProtectionChanged: widget.onProtectionChanged,
+            drivingMode: widget.drivingMode,
+            onDrivingModeChanged: widget.onDrivingModeChanged,
             blockUnknown: widget.blockUnknown,
             onBlockUnknownChanged: widget.onBlockUnknownChanged,
             blockNonContacts: widget.blockNonContacts,
@@ -310,6 +323,8 @@ class CallGuardShellState extends State<CallGuardShell> {
             strings: widget.strings,
             isActive: _section == AppSection.more,
             journalOpenRequest: widget.openCallJournalRequest,
+            statusIndicatorEnabled: widget.statusIndicatorEnabled,
+            onStatusIndicatorChanged: widget.onStatusIndicatorChanged,
           ),
         ],
       ),

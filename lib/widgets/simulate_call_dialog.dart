@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../data/database_helper.dart';
+import '../engine/call_rule_simulator.dart';
 import '../l10n/app_strings.dart';
 import '../platform/call_screening_channel.dart';
 import '../theme/app_palette.dart';
 
 class SimulateCallDialog extends StatefulWidget {
-  const SimulateCallDialog({required this.strings});
+  const SimulateCallDialog({required this.strings, required this.database});
 
   final AppStrings strings;
+  final DatabaseHelper database;
 
   @override
   State<SimulateCallDialog> createState() => SimulateCallDialogState();
@@ -36,12 +39,31 @@ class SimulateCallDialogState extends State<SimulateCallDialog> {
       _verdict = null;
     });
     try {
-      final verdict = await _channel.simulateCall(phoneNumber);
+      bool? isInContacts;
+      final settings = await widget.database.getSettings();
+      if (settings['block_non_contacts'] == 'true') {
+        try {
+          final permissions = await _channel.checkPermissions();
+          if (permissions.readContacts) {
+            isInContacts =
+                await _channel.lookupContactName(phoneNumber) != null;
+          }
+        } on PlatformException {
+          // Contact filtering is optional when the Android contact provider
+          // cannot be reached from a simulator/test environment.
+        } on MissingPluginException {
+          // Pure Dart simulation remains available off Android.
+        }
+      }
+      final verdict = await CallRuleSimulator(widget.database)
+          .evaluate(phoneNumber, isInContacts: isInContacts);
       if (!mounted) return;
       setState(() => _verdict = verdict);
     } on PlatformException {
       if (mounted) setState(() => _hasError = true);
     } on MissingPluginException {
+      if (mounted) setState(() => _hasError = true);
+    } catch (_) {
       if (mounted) setState(() => _hasError = true);
     } finally {
       if (mounted) setState(() => _loading = false);

@@ -66,6 +66,8 @@ object DbContract {
         const val MANUAL_SILENCE = "manual_silence"
         const val SILENCE_MANUAL = "silence_manual"
         const val AUTOMATIC_SILENCE = "automatic_silence"
+        const val DRIVING_MODE = "driving_mode"
+        const val STATUS_INDICATOR_ENABLED = "status_indicator_enabled"
         const val SILENCE_START_MINUTE = "silence_start_minute"
         const val SILENCE_END_MINUTE = "silence_end_minute"
         const val SILENCE_WEEKDAYS = "silence_weekdays"

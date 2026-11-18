@@ -10,12 +10,14 @@ import '../models/recent_call_log_entry.dart';
 import '../models/reminder.dart';
 import '../platform/call_screening_channel.dart';
 import '../theme/app_palette.dart';
+import '../widgets/common/app_panel.dart';
 import '../widgets/common/empty_state.dart';
 import '../widgets/common/contact_picker.dart';
 import '../widgets/common/journal_card.dart';
 import '../widgets/common/localized_value.dart';
 import '../widgets/common/page_intro.dart';
 import '../widgets/common/repeat_fields.dart';
+import '../widgets/common/rule_switch.dart';
 import '../widgets/common/section_heading.dart';
 import '../widgets/reminder_card.dart';
 
@@ -25,6 +27,8 @@ class MorePage extends StatefulWidget {
     required this.onStub,
     required this.strings,
     required this.isActive,
+    required this.statusIndicatorEnabled,
+    required this.onStatusIndicatorChanged,
     this.journalOpenRequest = 0,
   });
 
@@ -32,6 +36,8 @@ class MorePage extends StatefulWidget {
   final VoidCallback onStub;
   final AppStrings strings;
   final bool isActive;
+  final bool statusIndicatorEnabled;
+  final ValueChanged<bool> onStatusIndicatorChanged;
   final int journalOpenRequest;
 
   @override
@@ -399,6 +405,7 @@ class MorePageState extends State<MorePage> with WidgetsBindingObserver {
     'non_contacts',
     'not_in_contacts',
     'allowlist_only',
+    'driving_mode',
   }.contains(reason);
 
   Future<void> _quickAddFromLog(CallLogEntry entry) async {
@@ -725,6 +732,18 @@ class MorePageState extends State<MorePage> with WidgetsBindingObserver {
             subtitle: widget.strings.call('moreSubtitle'),
           ),
           const SizedBox(height: 17),
+          AppPanel(
+            child: RuleSwitch(
+              icon: Icons.shield_outlined,
+              title: widget.strings.call('statusIndicatorTitle'),
+              subtitle: widget.strings.call('statusIndicatorSubtitle'),
+              value: widget.statusIndicatorEnabled,
+              onChanged: widget.onStatusIndicatorChanged,
+              iconColor: AppPalette.blue,
+              iconBackground: AppPalette.bluePale,
+            ),
+          ),
+          const SizedBox(height: 10),
           const SizedBox(height: 8),
           SegmentedButton<int>(
             showSelectedIcon: false,
@@ -918,6 +937,7 @@ class MorePageState extends State<MorePage> with WidgetsBindingObserver {
           'operator_block' => const Color(0xFFE07A2E),
           'non_contacts' || 'not_in_contacts' => const Color(0xFFE07A2E),
           'allowlist_only' => const Color(0xFFE07A2E),
+          'driving_mode' => AppPalette.red,
           'country_allow' ||
           'operator_allow' ||
           'allowlist' ||
@@ -932,6 +952,7 @@ class MorePageState extends State<MorePage> with WidgetsBindingObserver {
           'operator_block' => Icons.cell_tower_rounded,
           'non_contacts' || 'not_in_contacts' => Icons.person_off_outlined,
           'allowlist_only' => Icons.playlist_add_check_rounded,
+          'driving_mode' => Icons.directions_car_rounded,
           'country_allow' => Icons.public_rounded,
           'operator_allow' => Icons.cell_tower_rounded,
           'allowlist' => Icons.person_outline_rounded,

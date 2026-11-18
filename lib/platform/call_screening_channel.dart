@@ -121,6 +121,20 @@ class CallScreeningChannel {
     await _channel.invokeMethod<bool>('openNotificationSettings');
   }
 
+  Future<void> updateStatusIndicator({
+    required bool enabled,
+    required bool protectionEnabled,
+    required bool drivingMode,
+    required String locale,
+  }) async {
+    await _channel.invokeMethod<bool>('updateStatusIndicator', {
+      'enabled': enabled,
+      'protectionEnabled': protectionEnabled,
+      'drivingMode': drivingMode,
+      'locale': locale,
+    });
+  }
+
   Future<bool> consumePendingCallJournal() async =>
       await _channel.invokeMethod<bool>('consumePendingCallJournal') ?? false;
 

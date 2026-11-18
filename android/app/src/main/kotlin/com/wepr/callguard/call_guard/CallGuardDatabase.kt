@@ -62,6 +62,7 @@ object CallGuardDatabase {
             ensurePhoneRuleExpiresAtColumn(this)
             ensureCallbackSettings(this)
             ensureFixedLineOperators(this)
+            ensureSpainFranceCatalog(this)
         }
     }
 
@@ -208,6 +209,75 @@ object CallGuardDatabase {
         }
     }
 
+    /** Seed the new catalog entries without overwriting a user's saved actions. */
+    private fun ensureSpainFranceCatalog(database: SQLiteDatabase) {
+        val countries = listOf(
+            CountrySeed("ES", "+34", "countrySpain"),
+            CountrySeed("FR", "+33", "countryFrance"),
+        )
+        countries.forEach { country ->
+            database.insertWithOnConflict(
+                DbContract.CountryRules.TABLE,
+                null,
+                android.content.ContentValues().apply {
+                    put(DbContract.CountryRules.ISO_CODE, country.isoCode)
+                    put(DbContract.CountryRules.DIAL_CODE, country.dialCode)
+                    put("name_key", country.nameKey)
+                    put(DbContract.CountryRules.ACTION, "neutral")
+                },
+                SQLiteDatabase.CONFLICT_IGNORE,
+            )
+        }
+
+        val operators = listOf(
+            CatalogOperator("ES", "@operatorMovistarES", "60,61,62"),
+            CatalogOperator("ES", "@operatorVodafoneES", "63,64,65"),
+            CatalogOperator("ES", "@operatorOrangeES", "66,67"),
+            CatalogOperator("ES", "@operatorYoigo", "68,69,71,72,73,74"),
+            CatalogOperator("ES", "@operatorMadridLandline", "91"),
+            CatalogOperator("FR", "@operatorOrangeFR", "60,61,62,70,71,72"),
+            CatalogOperator("FR", "@operatorSFR", "63,64,65,73,74,75"),
+            CatalogOperator("FR", "@operatorBouygues", "66,67,76,77"),
+            CatalogOperator(
+                "FR",
+                "@operatorFreeMobile",
+                "68,69,78,79,695,696,757,758,759,780,781,782,783,784,785,786,787,788,789",
+            ),
+            CatalogOperator("FR", "@operatorParisLandline", "1"),
+        )
+        operators.forEach { operator ->
+            val countryExists = database.rawQuery(
+                "SELECT 1 FROM ${DbContract.CountryRules.TABLE} " +
+                    "WHERE ${DbContract.CountryRules.ISO_CODE} = ? LIMIT 1",
+                arrayOf(operator.countryIso),
+            ).use { it.moveToFirst() }
+            if (!countryExists) return@forEach
+            database.insertWithOnConflict(
+                DbContract.OperatorRules.TABLE,
+                null,
+                android.content.ContentValues().apply {
+                    put(DbContract.OperatorRules.COUNTRY_ISO, operator.countryIso)
+                    put(DbContract.OperatorRules.OPERATOR_NAME, operator.name)
+                    put(DbContract.OperatorRules.PREFIXES, operator.prefixes)
+                    put(DbContract.OperatorRules.ACTION, "neutral")
+                },
+                SQLiteDatabase.CONFLICT_IGNORE,
+            )
+        }
+    }
+
+    private data class CountrySeed(
+        val isoCode: String,
+        val dialCode: String,
+        val nameKey: String,
+    )
+
+    private data class CatalogOperator(
+        val countryIso: String,
+        val name: String,
+        val prefixes: String,
+    )
+
     private data class FixedLineOperator(
         val countryIso: String,
         val name: String,
@@ -218,5 +288,7 @@ object CallGuardDatabase {
         DbContract.SettingKeys.ANSWERING_AUTO_REMIND to "false",
         DbContract.SettingKeys.ANSWERING_AUTO_REMIND_MINUTES to "30",
         DbContract.SettingKeys.ANSWERING_EMERGENCY_REPEAT to "false",
+        DbContract.SettingKeys.DRIVING_MODE to "false",
+        DbContract.SettingKeys.STATUS_INDICATOR_ENABLED to "true",
     )
 }

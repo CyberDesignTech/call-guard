@@ -91,6 +91,8 @@ class CountryOperatorsPageState extends State<CountryOperatorsPage> {
     'DE' => '🇩🇪',
     'GB' => '🇬🇧',
     'US-CA' => '🇺🇸🇨🇦',
+    'ES' => '🇪🇸',
+    'FR' => '🇫🇷',
     _ => '🌐',
   };
 

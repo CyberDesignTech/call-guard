@@ -29,6 +29,8 @@ class HomePage extends StatefulWidget {
     required this.strings,
     required this.protectionEnabled,
     required this.onProtectionChanged,
+    required this.drivingMode,
+    required this.onDrivingModeChanged,
     required this.blockUnknown,
     required this.onBlockUnknownChanged,
     required this.blockNonContacts,
@@ -46,6 +48,8 @@ class HomePage extends StatefulWidget {
   final AppStrings strings;
   final bool protectionEnabled;
   final ValueChanged<bool> onProtectionChanged;
+  final bool drivingMode;
+  final ValueChanged<bool> onDrivingModeChanged;
   final bool blockUnknown;
   final ValueChanged<bool> onBlockUnknownChanged;
   final bool blockNonContacts;
@@ -761,6 +765,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         AppPanel(
           child: Column(
             children: [
+              RuleSwitch(
+                icon: Icons.directions_car_rounded,
+                title: widget.strings.call('drivingModeTitle'),
+                subtitle: widget.strings.call('drivingModeSubtitle'),
+                value: widget.drivingMode,
+                onChanged: widget.onDrivingModeChanged,
+                iconColor: const Color(0xFF2B6CB0),
+                iconBackground: AppPalette.bluePale,
+              ),
+              const ThinDivider(),
               RuleSwitch(
                 icon: Icons.notifications_off_outlined,
                 title: widget.strings.call('manualSilenceTitle'),

@@ -21,4 +21,12 @@
     <string name="reminder_note_meeting">Devolver llamada sobre la reunión</string>
     <string name="reminder_note_check">Revisar el mensaje</string>
     <string name="reminder_note_new">Devolver llamada</string>
+    <string name="status_channel_name">Estado de CallGate</string>
+    <string name="status_channel_description">Indicador silencioso del estado de protección de CallGate</string>
+    <string name="status_active_title">CallGate · Protección activa</string>
+    <string name="status_active_text">El filtrado de llamadas entrantes está activado</string>
+    <string name="status_driving_title">CallGate · Modo conducción</string>
+    <string name="status_driving_text">Se rechazan todas las llamadas entrantes</string>
+    <string name="status_paused_title">CallGate · Protección desactivada</string>
+    <string name="status_paused_text">Toca para abrir la aplicación y activar la protección</string>
 </resources>

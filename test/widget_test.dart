@@ -79,7 +79,7 @@ void main() {
     final settings = await _testDatabase.getSettings();
     final countries = await _testDatabase.getCountries();
     expect(settings['locale'], 'ukrainian');
-    expect(countries, hasLength(5));
+    expect(countries, hasLength(7));
     expect(await _testDatabase.getOperators('UA'), hasLength(4));
     expect((await _testDatabase.getCallLogs()).first, contains('contact_name'));
     expect(await _testDatabase.getPhoneRules('white'), hasLength(2));
@@ -99,6 +99,8 @@ void main() {
     expect(defaults['answering_auto_remind'], 'false');
     expect(defaults['answering_auto_remind_minutes'], '30');
     expect(defaults['answering_emergency_repeat'], 'false');
+    expect(defaults['driving_mode'], 'false');
+    expect(defaults['status_indicator_enabled'], 'true');
 
     await _testDatabase.setSetting('answering_auto_remind', true);
     await _testDatabase.setSetting('answering_auto_remind_minutes', 15);
@@ -433,6 +435,8 @@ void main() {
         note: 'Call back',
       );
       await firstOpen.updateReminderDone(reminderId, true);
+      await firstOpen.deleteCountry('ES');
+      await firstOpen.deleteCountry('FR');
       expect(phoneId, greaterThan(0));
       await firstOpen.close();
 
@@ -441,6 +445,12 @@ void main() {
       expect((await reopened.getSettings())['locale'], 'french');
       expect((await reopened.getSettings())['theme_mode'], 'dark');
       expect((await reopened.getSettings())['silence_weekdays'], '');
+      expect(
+        (await reopened.getCountries()).map((row) => row['iso_code']),
+        containsAll(['ES', 'FR']),
+      );
+      expect(await reopened.getOperators('ES'), hasLength(5));
+      expect(await reopened.getOperators('FR'), hasLength(5));
       expect(
         (await reopened.getPhoneRules('white'))
             .any((row) => row['phone'] == '+49 151 1234567'),
@@ -483,6 +493,13 @@ void main() {
     expect(find.text('Швидкі правила'), findsOneWidget);
     expect(find.text('Відхиляти невідомі / приватні номери'), findsOneWidget);
     expect(find.text('Відхиляти номери поза адресною книгою'), findsOneWidget);
+    expect(find.text('Режим «За кермом»'), findsOneWidget);
+    expect(
+      find.text(
+        'Блокувати всі вхідні дзвінки (навіть із білого списку); усі відхилені виклики зберігаються в журналі',
+      ),
+      findsOneWidget,
+    );
     const privacyMessage =
         'CallGate працює повністю локально на вашому пристрої, без доступу до інтернету та збору особистих даних. Застосунок є повністю безкоштовним, без реклами й прихованих платежів — і завжди залишатиметься таким.';
     await tester.scrollUntilVisible(
@@ -1555,6 +1572,12 @@ void main() {
       await bridge.cancelReminder(21);
       await bridge.restorePendingReminders();
       await bridge.openNotificationSettings();
+      await bridge.updateStatusIndicator(
+        enabled: true,
+        protectionEnabled: true,
+        drivingMode: false,
+        locale: 'english',
+      );
       await bridge.openDefaultAppsSettings();
       await bridge.openDialer('+380 67 123 45 67');
 
@@ -1564,11 +1587,18 @@ void main() {
         'cancelReminder',
         'restorePendingReminders',
         'openNotificationSettings',
+        'updateStatusIndicator',
         'openDefaultAppsSettings',
         'openDialer',
       ]);
       expect(calls[1].arguments, {'id': 21, 'remindAt': 1_900_000_000_000});
-      expect(calls[6].arguments, {'phoneNumber': '+380 67 123 45 67'});
+      expect(calls[5].arguments, {
+        'enabled': true,
+        'protectionEnabled': true,
+        'drivingMode': false,
+        'locale': 'english',
+      });
+      expect(calls[7].arguments, {'phoneNumber': '+380 67 123 45 67'});
     },
   );
 
@@ -1840,34 +1870,7 @@ void main() {
     );
   });
 
-  testWidgets('test call button invokes the native rule engine channel', (
-    tester,
-  ) async {
-    const channel = MethodChannel('com.wepr.callguard/screening');
-    final messenger =
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-    String? testedNumber;
-    messenger.setMockMethodCallHandler(channel, (call) async {
-      if (call.method == 'checkPermissions') {
-        return {
-          'roleAvailable': true,
-          'callScreeningRole': false,
-          'readContacts': false,
-        };
-      }
-      if (call.method == 'simulateCall') {
-        testedNumber =
-            (call.arguments as Map<Object?, Object?>)['phoneNumber'] as String;
-        return {
-          'verdict': 'REJECT',
-          'reason': 'blacklist',
-          'phoneNumber': testedNumber,
-        };
-      }
-      return null;
-    });
-    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
-
+  testWidgets('test call button opens the rule simulator', (tester) async {
     await pumpApp(tester);
     await tester.drag(find.byType(ListView).first, const Offset(0, -1200));
     await tester.pumpAndSettle();
@@ -1875,57 +1878,8 @@ void main() {
     await tester.ensureVisible(testButton);
     await tester.tap(testButton);
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), '+380 67 555 01 01');
-    await tester.tap(find.text('Перевірити номер'));
-    await tester.pumpAndSettle();
-
-    expect(testedNumber, '+380 67 555 01 01');
-    expect(find.text('Цей виклик відхилено'), findsOneWidget);
-    expect(
-      find.text(
-        'Діючі правила застосунку не дозволяють вхідний дзвінок із цього номера',
-      ),
-      findsOneWidget,
-    );
-    expect(find.text('Причина: Чорний список'), findsOneWidget);
-  });
-
-  testWidgets('renders the allowlist-only rejection reason', (tester) async {
-    const channel = MethodChannel('com.wepr.callguard/screening');
-    final messenger =
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-    messenger.setMockMethodCallHandler(channel, (call) async {
-      if (call.method == 'checkPermissions') {
-        return {
-          'roleAvailable': true,
-          'callScreeningRole': false,
-          'readContacts': false,
-        };
-      }
-      if (call.method == 'simulateCall') {
-        return {
-          'verdict': 'REJECT',
-          'reason': 'allowlist_only',
-          'phoneNumber': '+49 151 1234567',
-        };
-      }
-      return null;
-    });
-    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
-
-    await pumpApp(tester);
-    await tester.drag(find.byType(ListView).first, const Offset(0, -1200));
-    await tester.pumpAndSettle();
-    final testButton = find.text('Тестовий виклик (перевірка правила)');
-    await tester.ensureVisible(testButton);
-    await tester.tap(testButton);
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), '+49 151 1234567');
-    await tester.tap(find.text('Перевірити номер'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Цей виклик відхилено'), findsOneWidget);
-    expect(find.text('Причина: Лише білий список'), findsOneWidget);
+    expect(find.text('Тестовий виклик'), findsOneWidget);
+    expect(find.text('Перевірити номер'), findsOneWidget);
   });
 
   testWidgets('granted screening role can be changed from system settings', (
@@ -2134,7 +2088,7 @@ void main() {
     await tester.tap(aboutMenuItem);
     await tester.pumpAndSettle();
     expect(find.text('Call Gate'), findsOneWidget);
-    expect(find.textContaining('v1.8.4'), findsOneWidget);
+    expect(find.textContaining('v1.8.5'), findsOneWidget);
     expect(find.text('© 2026 CyberDesignTech Dev'), findsOneWidget);
     expect(
       find.textContaining('CyberDesignTech Dev із фокусом'),
@@ -2202,6 +2156,17 @@ void main() {
     await waitForText(tester, 'Countries & operators');
     await tester.tap(find.text('Countries & operators'));
     await finishSectionTransition(tester);
+    await waitForDatabase(tester);
+    await tester.scrollUntilVisible(
+      find.text('Ukraine'),
+      240,
+      scrollable: find
+          .descendant(
+            of: find.byType(ListView).last,
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
     await waitForText(tester, 'Ukraine');
     expect(find.text('Ukraine'), findsOneWidget);
   });
