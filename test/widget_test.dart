@@ -1853,7 +1853,12 @@ void main() {
     await tester.tap(aboutMenuItem);
     await tester.pumpAndSettle();
     expect(find.text('Call Gate'), findsOneWidget);
-    expect(find.textContaining('v1.8.2'), findsOneWidget);
+    expect(find.textContaining('v1.8.3'), findsOneWidget);
+    expect(find.text('© 2026 CyberDesignTech Dev'), findsOneWidget);
+    expect(
+      find.textContaining('CyberDesignTech Dev із фокусом'),
+      findsOneWidget,
+    );
     expect(find.textContaining('не надсилаються на сервер'), findsOneWidget);
 
     await tester.tap(find.text('Закрити вікно'));
@@ -1874,6 +1879,25 @@ void main() {
     await tester.tap(find.text('Підтримати через Monobank'));
     await tester.pumpAndSettle();
     expect(openedUrls, contains('https://send.monobank.ua/jar/AhQrx7NK3q'));
+  });
+
+  testWidgets('More tab shows the localized developer attribution footer', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    await tester.tap(find.byTooltip('Нагадування та Журнал'));
+    await finishSectionTransition(tester);
+    await waitForDatabase(tester);
+
+    final copyright = find.text('© 2026 CyberDesignTech Dev');
+    final collective = find.text('Незалежне об’єднання розробників');
+    await tester.drag(find.byType(ListView).last, const Offset(0, -1800));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.ensureVisible(copyright);
+    await tester.ensureVisible(collective);
+
+    expect(copyright, findsOneWidget);
+    expect(collective, findsOneWidget);
   });
 
   testWidgets('changes the app language and shows country operators', (
@@ -2049,6 +2073,40 @@ void main() {
           reason: '${entry.key}.$key placeholders must match Ukrainian',
         );
       }
+    }
+
+    const collectiveLabels = {
+      'uk': 'Незалежне об’єднання розробників',
+      'en': 'Independent developers collective',
+      'pl': 'Niezależny zespół programistów',
+      'de': 'Unabhängiges Entwicklerkollektiv',
+      'es': 'Colectivo independiente de desarrolladores',
+      'fr': 'Collectif indépendant de développeurs',
+    };
+    const aboutDescriptions = {
+      'uk': 'Розроблено незалежним об’єднанням розробників CyberDesignTech Dev із фокусом на локальну приватність, швидкість та безпеку без хмарних сервісів.',
+      'en': 'Developed by CyberDesignTech Dev, an independent developers collective focused on local privacy, speed, and security without cloud services.',
+      'pl': 'Stworzone przez CyberDesignTech Dev — niezależny zespół programistów skupiony na lokalnej prywatności, szybkości i bezpieczeństwie bez chmury.',
+      'de': 'Entwickelt von CyberDesignTech Dev, einem unabhängigen Entwicklerkollektiv mit Fokus auf lokale Privatsphäre, Geschwindigkeit und Sicherheit ohne Cloud-Dienste.',
+      'es': 'Desarrollado por CyberDesignTech Dev, un colectivo independiente de desarrolladores centrado en la privacidad local, la velocidad y la seguridad sin servicios en la nube.',
+      'fr': 'Développé par CyberDesignTech Dev, un collectif indépendant de développeurs axé sur la confidentialité locale, la rapidité et la sécurité sans services cloud.',
+    };
+    for (final entry in dictionaries.entries) {
+      expect(
+        entry.value['copyrightLine'],
+        '© 2026 CyberDesignTech Dev',
+        reason: '${entry.key} copyright line',
+      );
+      expect(
+        entry.value['footerCollective'],
+        collectiveLabels[entry.key],
+        reason: '${entry.key} footer collective label',
+      );
+      expect(
+        entry.value['aboutDescription'],
+        aboutDescriptions[entry.key],
+        reason: '${entry.key} About description',
+      );
     }
 
     const removedKeys = {

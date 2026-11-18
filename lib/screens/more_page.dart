@@ -695,6 +695,30 @@ class MorePageState extends State<MorePage> with WidgetsBindingObserver {
           ),
           const SizedBox(height: 18),
           if (_segment == 0) ..._reminderContent() else ..._journalContent(),
+          const SizedBox(height: 22),
+          Center(
+            child: Column(
+              children: [
+                Text(
+                  widget.strings.call('copyrightLine'),
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant
+                        .withValues(alpha: 0.52),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  widget.strings.call('footerCollective'),
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant
+                        .withValues(alpha: 0.52),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

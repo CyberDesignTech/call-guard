@@ -39,8 +39,10 @@ const Map<String, String> stringsUk = {
   'aboutApp': 'Про додаток',
   'supportProject': 'Підтримати проєкт',
   'versionLabel': 'Версія',
-  'aboutDescription': 'Захищайте від небажаних вхідних дзвінків за допомогою списків номерів, правил для країн і операторів та розкладу тиші.',
+  'aboutDescription': 'Розроблено незалежним об’єднанням розробників CyberDesignTech Dev із фокусом на локальну приватність, швидкість та безпеку без хмарних сервісів.',
   'aboutPrivacy': 'Ваші налаштування та списки зберігаються лише на цьому пристрої. Дані не надсилаються на сервер.',
+  'copyrightLine': '© 2026 CyberDesignTech Dev',
+  'footerCollective': 'Незалежне об’єднання розробників',
   'supportThanks':
       'Дякуємо, що користуєтеся Call Gate і допомагаєте проєкту розвиватися!',
   'supportMonobankTitle': 'Підтримати через Monobank',

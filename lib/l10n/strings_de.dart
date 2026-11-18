@@ -39,8 +39,10 @@ const Map<String, String> stringsDe = {
   'aboutApp': 'Über die App',
   'supportProject': 'Projekt unterstützen',
   'versionLabel': 'Version',
-  'aboutDescription': 'Schützen Sie sich mit Nummernlisten, Länder- und Anbieterregeln sowie Ruhezeiten vor unerwünschten eingehenden Anrufen.',
+  'aboutDescription': 'Entwickelt von CyberDesignTech Dev, einem unabhängigen Entwicklerkollektiv mit Fokus auf lokale Privatsphäre, Geschwindigkeit und Sicherheit ohne Cloud-Dienste.',
   'aboutPrivacy': 'Ihre Einstellungen und Listen werden nur auf diesem Gerät gespeichert. Es werden keine Daten an einen Server gesendet.',
+  'copyrightLine': '© 2026 CyberDesignTech Dev',
+  'footerCollective': 'Unabhängiges Entwicklerkollektiv',
   'supportThanks':
       'Danke, dass Sie Call Gate nutzen und das Projekt unterstützen!',
   'supportMonobankTitle': 'Über Monobank unterstützen',

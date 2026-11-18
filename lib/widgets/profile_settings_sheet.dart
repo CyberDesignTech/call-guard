@@ -39,7 +39,7 @@ class ProfileSettingsSheetState extends State<ProfileSettingsSheet> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              '${widget.strings.call('versionLabel')}  v1.8.2',
+              '${widget.strings.call('versionLabel')}  v1.8.3',
               style: TextStyle(
                 color: AppPalette.accent(AppPalette.blue),
                 fontWeight: FontWeight.w800,
@@ -74,6 +74,15 @@ class ProfileSettingsSheetState extends State<ProfileSettingsSheet> {
                     ),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              widget.strings.call('copyrightLine'),
+              textAlign: TextAlign.center,
+              style: Theme.of(dialogContext).textTheme.bodySmall?.copyWith(
+                color: Theme.of(dialogContext).colorScheme.onSurfaceVariant
+                    .withValues(alpha: 0.7),
               ),
             ),
           ],
