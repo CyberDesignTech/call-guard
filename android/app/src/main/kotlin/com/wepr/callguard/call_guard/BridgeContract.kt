@@ -24,6 +24,12 @@ object BridgeContract {
         const val OPEN_EXTERNAL_URL = "openExternalUrl"
         const val GET_RECENT_CALL_LOG = "getRecentCallLog"
         const val OPEN_CALL_LOG_SETTINGS = "openCallLogSettings"
+        const val STATUS_MODES_CHANGED = "statusModesChanged"
+        const val CALL_HANDLED = "callHandled"
+    }
+
+    object Actions {
+        const val STATUS_MODES_CHANGED = "com.wepr.callguard.action.STATUS_MODES_CHANGED"
     }
 
     object Arguments {

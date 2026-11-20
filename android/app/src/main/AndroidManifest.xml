@@ -9,6 +9,8 @@
     <application
         android:label="Call Gate"
         android:name="${applicationName}"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"
@@ -46,6 +48,10 @@
             android:exported="false" />
         <receiver
             android:name=".AnsweringActionReceiver"
+            android:enabled="true"
+            android:exported="false" />
+        <receiver
+            android:name=".CallStatusActionReceiver"
             android:enabled="true"
             android:exported="false" />
         <receiver

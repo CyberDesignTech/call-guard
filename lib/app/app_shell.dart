@@ -55,6 +55,7 @@ class CallGuardShell extends StatefulWidget {
     required this.answeringEmergencyRepeat,
     required this.onAnsweringEmergencyRepeatChanged,
     required this.openCallJournalRequest,
+    required this.callHandledRequest,
     required this.themeMode,
     required this.language,
     required this.strings,
@@ -100,6 +101,7 @@ class CallGuardShell extends StatefulWidget {
   final bool answeringEmergencyRepeat;
   final ValueChanged<bool> onAnsweringEmergencyRepeatChanged;
   final int openCallJournalRequest;
+  final int callHandledRequest;
   final ThemeMode themeMode;
   final AppLanguage language;
   final AppStrings strings;
@@ -280,6 +282,7 @@ class CallGuardShellState extends State<CallGuardShell> {
             onStub: _showStub,
             strings: widget.strings,
             isActive: _section == AppSection.lists,
+            callHandledRequest: widget.callHandledRequest,
             protectionEnabled: widget.protectionEnabled,
             onEdgeSwipe: (direction) => _selectSection(
               AppSection.values[AppSection.lists.index + direction],
@@ -323,6 +326,7 @@ class CallGuardShellState extends State<CallGuardShell> {
             strings: widget.strings,
             isActive: _section == AppSection.more,
             journalOpenRequest: widget.openCallJournalRequest,
+            callHandledRequest: widget.callHandledRequest,
             statusIndicatorEnabled: widget.statusIndicatorEnabled,
             onStatusIndicatorChanged: widget.onStatusIndicatorChanged,
           ),

@@ -29,4 +29,8 @@
     <string name="status_driving_text">All incoming calls are rejected</string>
     <string name="status_paused_title">CallGate · Protection off</string>
     <string name="status_paused_text">Tap to open and enable protection</string>
+    <string name="status_action_enable_protection">Enable protection</string>
+    <string name="status_action_disable_protection">Disable protection</string>
+    <string name="status_action_enable_driving">Enable driving mode</string>
+    <string name="status_action_disable_driving">Disable driving mode</string>
 </resources>

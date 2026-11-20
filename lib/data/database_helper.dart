@@ -194,7 +194,6 @@ class DatabaseHelper {
       });
     }
 
-    final now = DateTime.now();
     for (final country in worldCountries) {
       batch.insert('country_rules', {
         'iso_code': country.isoCode,
@@ -212,71 +211,6 @@ class DatabaseHelper {
     for (final operator in operators) {
       batch.insert('operator_rules', operator);
     }
-
-    final createdAt = now.millisecondsSinceEpoch;
-    batch.insert('phone_rules', {
-      'phone': '+380 67 123 45 67',
-      'label': '@demoMother',
-      'list_type': 'white',
-      'created_at': createdAt,
-    });
-    batch.insert('phone_rules', {
-      'phone': '+380 44 220 18 40',
-      'label': '@demoWork',
-      'list_type': 'white',
-      'created_at': createdAt,
-    });
-    batch.insert('phone_rules', {
-      'phone': '+48 600 123 456',
-      'label': '@demoUnwanted',
-      'list_type': 'black',
-      'created_at': createdAt,
-    });
-    batch.insert('phone_rules', {
-      'phone': '+380 67 555 01 01',
-      'label': '@demoAdvertising',
-      'list_type': 'black',
-      'created_at': createdAt,
-    });
-
-    batch.insert('call_reminders', {
-      'phone': '+380 67 123 45 67',
-      'contact_name': '@reminderOlena',
-      'remind_at': now.add(const Duration(hours: 3)).millisecondsSinceEpoch,
-      'note': '@reminderNoteMeeting',
-      'is_done': 0,
-    });
-    batch.insert('call_reminders', {
-      'phone': '+48 600 123 456',
-      'contact_name': '@reminderUnknown',
-      'remind_at': now
-          .add(const Duration(days: 1, hours: 9))
-          .millisecondsSinceEpoch,
-      'note': '@reminderNoteCheck',
-      'is_done': 0,
-    });
-
-    batch.insert('call_logs', {
-      'phone': '+48 600 123 456',
-      'reason': 'country_block',
-      'timestamp': now
-          .subtract(const Duration(hours: 2))
-          .millisecondsSinceEpoch,
-    });
-    batch.insert('call_logs', {
-      'phone': '@numberHidden',
-      'reason': 'hidden_number',
-      'timestamp': now
-          .subtract(const Duration(hours: 5))
-          .millisecondsSinceEpoch,
-    });
-    batch.insert('call_logs', {
-      'phone': '+380 44 555 20 20',
-      'reason': 'silent_schedule',
-      'timestamp': now
-          .subtract(const Duration(days: 1, hours: 4))
-          .millisecondsSinceEpoch,
-    });
 
     await batch.commit(noResult: true);
   }

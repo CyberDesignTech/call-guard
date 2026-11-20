@@ -30,6 +30,7 @@ class MorePage extends StatefulWidget {
     required this.statusIndicatorEnabled,
     required this.onStatusIndicatorChanged,
     this.journalOpenRequest = 0,
+    this.callHandledRequest = 0,
   });
 
   final DatabaseHelper database;
@@ -39,6 +40,7 @@ class MorePage extends StatefulWidget {
   final bool statusIndicatorEnabled;
   final ValueChanged<bool> onStatusIndicatorChanged;
   final int journalOpenRequest;
+  final int callHandledRequest;
 
   @override
   State<MorePage> createState() => MorePageState();
@@ -78,6 +80,9 @@ class MorePageState extends State<MorePage> with WidgetsBindingObserver {
     if (oldWidget.journalOpenRequest != widget.journalOpenRequest &&
         widget.journalOpenRequest > 0) {
       setState(() => _segment = 1);
+      unawaited(_reload());
+    }
+    if (oldWidget.callHandledRequest != widget.callHandledRequest) {
       unawaited(_reload());
     }
     if (!oldWidget.isActive && widget.isActive) {

@@ -48,6 +48,8 @@ class CallGuardAppState extends State<CallGuardApp>
   int _answeringAutoRemindMinutes = 30;
   bool _answeringEmergencyRepeat = false;
   int _openCallJournalRequest = 0;
+  int _callHandledRequest = 0;
+  int _modeRefreshGeneration = 0;
   late final CallScreeningChannel _screeningChannel;
   Future<void> _pendingSettingsWrites = Future<void>.value();
 
@@ -60,6 +62,10 @@ class CallGuardAppState extends State<CallGuardApp>
         if (!mounted) return false;
         setState(() => _openCallJournalRequest++);
         return true;
+      })
+      ..setStatusModesChangedHandler(_refreshModesFromDatabase)
+      ..setCallHandledHandler(() async {
+        if (mounted) setState(() => _callHandledRequest++);
       });
     _restoreSettings();
   }
@@ -78,7 +84,33 @@ class CallGuardAppState extends State<CallGuardApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && _ready) {
-      unawaited(_reconcileStatusTray());
+      unawaited(_refreshModesFromDatabase());
+    }
+  }
+
+  Future<void> _refreshModesFromDatabase() async {
+    if (!_ready) return;
+    final generation = ++_modeRefreshGeneration;
+    try {
+      final settings = await widget.database.getSettings();
+      if (!mounted || generation != _modeRefreshGeneration) return;
+      bool parseBool(String key, bool fallback) =>
+          settings[key] == null ? fallback : settings[key] == 'true';
+      final protectionEnabled = parseBool('protection_enabled', true);
+      final drivingMode = parseBool('driving_mode', false);
+      if (protectionEnabled != _protectionEnabled ||
+          drivingMode != _drivingMode) {
+        setState(() {
+          _protectionEnabled = protectionEnabled;
+          _drivingMode = drivingMode;
+        });
+      }
+      await _reconcileStatusTray();
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Call Gate modes could not be refreshed from SQLite: '
+        '$error\n$stackTrace',
+      );
     }
   }
 
@@ -429,6 +461,7 @@ class CallGuardAppState extends State<CallGuardApp>
                 _persistSetting('answering_emergency_repeat', value);
               },
               openCallJournalRequest: _openCallJournalRequest,
+              callHandledRequest: _callHandledRequest,
               themeMode: _themeMode,
               language: _language,
               strings: strings,

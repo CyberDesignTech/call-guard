@@ -29,4 +29,8 @@
     <string name="status_driving_text">Tous les appels entrants sont rejetés</string>
     <string name="status_paused_title">CallGate · Protection désactivée</string>
     <string name="status_paused_text">Touchez pour ouvrir l’application et activer la protection</string>
+    <string name="status_action_enable_protection">Activer la protection</string>
+    <string name="status_action_disable_protection">Désactiver la protection</string>
+    <string name="status_action_enable_driving">Activer le mode conduite</string>
+    <string name="status_action_disable_driving">Désactiver le mode conduite</string>
 </resources>

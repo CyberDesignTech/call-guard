@@ -21,6 +21,7 @@ class ListsPage extends StatefulWidget {
     required this.strings,
     required this.isActive,
     required this.protectionEnabled,
+    this.callHandledRequest = 0,
     this.onEdgeSwipe,
   });
 
@@ -29,6 +30,7 @@ class ListsPage extends StatefulWidget {
   final AppStrings strings;
   final bool isActive;
   final bool protectionEnabled;
+  final int callHandledRequest;
   final ValueChanged<int>? onEdgeSwipe;
 
   @override
@@ -65,6 +67,12 @@ class ListsPageState extends State<ListsPage>
   void didUpdateWidget(covariant ListsPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!oldWidget.isActive && widget.isActive) {
+      unawaited(_reloadRules());
+      unawaited(
+        _countryPageKey.currentState?.refresh() ?? Future<void>.value(),
+      );
+    }
+    if (oldWidget.callHandledRequest != widget.callHandledRequest) {
       unawaited(_reloadRules());
       unawaited(
         _countryPageKey.currentState?.refresh() ?? Future<void>.value(),

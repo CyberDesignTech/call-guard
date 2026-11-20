@@ -77,6 +77,7 @@ class CallGuardScreeningService : CallScreeningService() {
                 } catch (error: Exception) {
                     Log.e(TAG, "Could not return the call-screening response", error)
                 }
+                CallScreeningEvents.notifyCallHandled()
             }
         }
     }

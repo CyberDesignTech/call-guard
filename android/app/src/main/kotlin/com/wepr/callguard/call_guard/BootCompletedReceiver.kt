@@ -41,22 +41,22 @@ class BootCompletedReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun hasCallScreeningRole(context: Context): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false
-        val roleManager = context.getSystemService(RoleManager::class.java) ?: return false
-        return roleManager.isRoleAvailable(RoleManager.ROLE_CALL_SCREENING) &&
-            roleManager.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)
-    }
+    companion object {
+        internal fun hasCallScreeningRole(context: Context): Boolean {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false
+            val roleManager = context.getSystemService(RoleManager::class.java) ?: return false
+            return roleManager.isRoleAvailable(RoleManager.ROLE_CALL_SCREENING) &&
+                roleManager.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)
+        }
 
-    private companion object {
-        const val TAG = "BootCompletedReceiver"
-        val RESTORE_ACTIONS = setOf(
+        private const val TAG = "BootCompletedReceiver"
+        private val RESTORE_ACTIONS = setOf(
             Intent.ACTION_BOOT_COMPLETED,
             Intent.ACTION_MY_PACKAGE_REPLACED,
             Intent.ACTION_TIME_CHANGED,
             Intent.ACTION_TIMEZONE_CHANGED,
         )
-        val worker = Executors.newSingleThreadExecutor { runnable ->
+        private val worker = Executors.newSingleThreadExecutor { runnable ->
             Thread(runnable, "CallGuardBootRestore").apply { isDaemon = true }
         }
     }

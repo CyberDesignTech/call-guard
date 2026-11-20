@@ -29,4 +29,8 @@
     <string name="status_driving_text">Wszystkie połączenia przychodzące są odrzucane</string>
     <string name="status_paused_title">CallGate · Ochrona wyłączona</string>
     <string name="status_paused_text">Dotknij, aby otworzyć aplikację i włączyć ochronę</string>
+    <string name="status_action_enable_protection">Włącz ochronę</string>
+    <string name="status_action_disable_protection">Wyłącz ochronę</string>
+    <string name="status_action_enable_driving">Włącz tryb jazdy</string>
+    <string name="status_action_disable_driving">Wyłącz tryb jazdy</string>
 </resources>

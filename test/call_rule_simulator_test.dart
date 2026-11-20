@@ -63,8 +63,83 @@ void main() {
   });
 
   test(
+    'active schedule with whitelist-only disabled continues normal rules',
+    () async {
+      final now = DateTime(2026, 11, 16, 22, 30); // Monday
+      await database.setSetting('automatic_silence', true);
+      await database.setSetting('allow_only_whitelist', false);
+      await database.setSetting('silence_start_minute', 22 * 60);
+      await database.setSetting('silence_end_minute', 7 * 60);
+      await database.setSetting('silence_weekdays', '1');
+      await database.setSetting('block_international', false);
+
+      final verdict = await CallRuleSimulator(database)
+          .evaluate('+380 63 555 01 02', now: now);
+
+      expect(verdict.allowed, isTrue);
+      expect(verdict.reason, 'default_allow');
+    },
+  );
+
+  test('blacklist rejects a number even when its country is allowed', () async {
+    await database.updateCountryAction('UA', 'allow');
+    await database.insertPhoneRule(
+      phone: '+380 67 123 45 67',
+      label: 'Explicit block',
+      listType: 'black',
+    );
+
+    final verdict = await CallRuleSimulator(database)
+        .evaluate('+380 67 123 45 67');
+
+    expect(verdict.allowed, isFalse);
+    expect(verdict.reason, 'blacklist');
+  });
+
+  test(
+    'emergency repeat may pass a scheduled rejection after two prior calls',
+    () async {
+      final now = DateTime(2026, 11, 16, 22, 30); // Monday
+      const number = '+380 63 555 01 02';
+      await database.setSetting('automatic_silence', true);
+      await database.setSetting('allow_only_whitelist', true);
+    await database.setSetting('answering_enabled', true);
+    await database.setSetting('answering_emergency_repeat', true);
+    await database.setSetting('block_international', false);
+      await database.setSetting('silence_start_minute', 22 * 60);
+      await database.setSetting('silence_end_minute', 7 * 60);
+      await database.setSetting('silence_weekdays', '1');
+      await database.insertCallLog(
+        phone: number,
+        reason: 'silent_schedule',
+        timestamp:
+            now.millisecondsSinceEpoch -
+            const Duration(minutes: 2).inMilliseconds,
+      );
+      await database.insertCallLog(
+        phone: number,
+        reason: 'silent_schedule',
+        timestamp:
+            now.millisecondsSinceEpoch -
+            const Duration(minutes: 1).inMilliseconds,
+      );
+
+      final verdict = await CallRuleSimulator(database)
+          .evaluate(number, now: now);
+
+      expect(verdict.allowed, isTrue);
+      expect(verdict.reason, 'emergency_repeat');
+    },
+  );
+
+  test(
     'driving mode rejects a whitelisted caller with its own reason',
     () async {
+      await database.insertPhoneRule(
+        phone: '+380 67 123 45 67',
+        label: 'Test allow rule',
+        listType: 'white',
+      );
       await database.setSetting('driving_mode', true);
 
       final verdict = await CallRuleSimulator(database)

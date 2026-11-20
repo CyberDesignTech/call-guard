@@ -67,6 +67,9 @@ class CallScreeningChannel {
     : _channel = channel ?? const MethodChannel('com.wepr.callguard/screening');
 
   final MethodChannel _channel;
+  Future<bool> Function()? _openCallJournalHandler;
+  Future<void> Function()? _statusModesChangedHandler;
+  Future<void> Function()? _callHandledHandler;
 
   Future<CallScreeningPermissions> checkPermissions() async =>
       CallScreeningPermissions.fromMap(
@@ -139,8 +142,33 @@ class CallScreeningChannel {
       await _channel.invokeMethod<bool>('consumePendingCallJournal') ?? false;
 
   void setOpenCallJournalHandler(Future<bool> Function() handler) {
+    _openCallJournalHandler = handler;
+    _installMethodCallHandler();
+  }
+
+  void setStatusModesChangedHandler(Future<void> Function() handler) {
+    _statusModesChangedHandler = handler;
+    _installMethodCallHandler();
+  }
+
+  void setCallHandledHandler(Future<void> Function() handler) {
+    _callHandledHandler = handler;
+    _installMethodCallHandler();
+  }
+
+  void _installMethodCallHandler() {
     _channel.setMethodCallHandler((call) async {
-      if (call.method == 'openCallJournal') return handler();
+      if (call.method == 'openCallJournal') {
+        return await _openCallJournalHandler?.call() ?? false;
+      }
+      if (call.method == 'statusModesChanged') {
+        await _statusModesChangedHandler?.call();
+        return true;
+      }
+      if (call.method == 'callHandled') {
+        await _callHandledHandler?.call();
+        return true;
+      }
       return null;
     });
   }

@@ -5,6 +5,9 @@ import android.app.Activity
 import android.app.NotificationManager
 import android.app.role.RoleManager
 import android.content.ActivityNotFoundException
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.IntentFilter
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -30,6 +33,12 @@ class MainActivity : FlutterActivity() {
     private var pendingCallLogLimit = DEFAULT_CALL_LOG_LIMIT
     private var screeningChannel: MethodChannel? = null
     private var pendingCallJournalOpen = false
+    private var statusModesReceiverRegistered = false
+    private val statusModesChangedReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            screeningChannel?.invokeMethod(BridgeContract.Methods.STATUS_MODES_CHANGED, null)
+        }
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -37,6 +46,7 @@ class MainActivity : FlutterActivity() {
             flutterEngine.dartExecutor.binaryMessenger,
             BridgeContract.CHANNEL_NAME,
         ).also { channel ->
+            CallScreeningEvents.attach(channel)
             channel.setMethodCallHandler { call, result -> handleScreeningMethod(call, result) }
         }
         captureCallJournalIntent(intent)
@@ -47,6 +57,27 @@ class MainActivity : FlutterActivity() {
         setIntent(intent)
         captureCallJournalIntent(intent)
         dispatchCallJournalRequest()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (!statusModesReceiverRegistered) {
+            ContextCompat.registerReceiver(
+                this,
+                statusModesChangedReceiver,
+                IntentFilter(BridgeContract.Actions.STATUS_MODES_CHANGED),
+                ContextCompat.RECEIVER_NOT_EXPORTED,
+            )
+            statusModesReceiverRegistered = true
+        }
+    }
+
+    override fun onStop() {
+        if (statusModesReceiverRegistered) {
+            unregisterReceiver(statusModesChangedReceiver)
+            statusModesReceiverRegistered = false
+        }
+        super.onStop()
     }
 
     private fun captureCallJournalIntent(intent: Intent?) {
@@ -668,6 +699,7 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        screeningChannel?.let(CallScreeningEvents::detach)
         failPendingResults()
         super.onDestroy()
     }

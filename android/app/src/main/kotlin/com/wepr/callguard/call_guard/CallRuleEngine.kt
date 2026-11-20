@@ -94,10 +94,12 @@ class CallRuleEngine(context: Context) {
         val scheduleActive =
             settings.bool(DbContract.SettingKeys.AUTOMATIC_SILENCE, false) &&
                 isWithinQuietSchedule(settings, calendar)
-        val silenceActive = settings.bool(DbContract.SettingKeys.MANUAL_SILENCE_ENABLED, false) ||
+        val manualSilenceActive = settings.bool(DbContract.SettingKeys.MANUAL_SILENCE_ENABLED, false) ||
             settings.bool(DbContract.SettingKeys.MANUAL_SILENCE, false) ||
-            settings.bool(DbContract.SettingKeys.SILENCE_MANUAL, false) ||
-            scheduleActive
+            settings.bool(DbContract.SettingKeys.SILENCE_MANUAL, false)
+        val scheduleWhitelistOnly = scheduleActive &&
+            settings.bool(DbContract.SettingKeys.ALLOW_ONLY_WHITELIST, false)
+        val silenceActive = manualSilenceActive || scheduleWhitelistOnly
         if (silenceActive) {
             val emergencyRepeatEnabled = settings.bool(
                 DbContract.SettingKeys.ANSWERING_EMERGENCY_REPEAT,
@@ -110,6 +112,10 @@ class CallRuleEngine(context: Context) {
                 return verdict(true, "emergency_repeat", canonicalPhone)
             }
             return verdict(false, "silent_schedule", PhoneNumbers.logValue(rawPhone, canonicalPhone))
+        }
+
+        if (!hidden && matchesPhoneRule(database, "black", rawPhone, canonicalPhone)) {
+            return verdict(false, "blacklist", canonicalPhone)
         }
 
         if (hidden && settings.bool(DbContract.SettingKeys.BLOCK_HIDDEN, true)) {
@@ -154,22 +160,6 @@ class CallRuleEngine(context: Context) {
                 false,
                 "international_block",
                 PhoneNumbers.logValue(rawPhone, canonicalPhone),
-            )
-        }
-
-        if (!hidden && matchesPhoneRule(database, "black", rawPhone, canonicalPhone)) {
-            return verdict(false, "blacklist", canonicalPhone)
-        }
-
-        // This is the schedule's whitelist-only option, not a global setting.
-        if (
-            scheduleActive &&
-            settings.bool(DbContract.SettingKeys.ALLOW_ONLY_WHITELIST, false)
-        ) {
-            return verdict(
-                false,
-                "allowlist_only",
-                canonicalPhone.ifBlank { rawPhone },
             )
         }
 

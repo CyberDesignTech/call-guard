@@ -103,7 +103,7 @@ void main() {
     await migrated.close();
   });
 
-  test('fresh v8 install seeds populated area-code columns', () async {
+  test('fresh v8 install seeds catalogs but no personal records', () async {
     final database = DatabaseHelper.forTesting();
     await database.initialize();
     final countries = await database.getCountries();
@@ -112,6 +112,11 @@ void main() {
     expect(romania['area_codes'], isA<String>());
     final canada = countries.singleWhere((row) => row['iso_code'] == 'CA');
     expect((canada['area_codes'] as String).split(','), contains('416'));
+    expect(await database.getPhoneRules('white'), isEmpty);
+    expect(await database.getPhoneRules('black'), isEmpty);
+    expect(await database.getActiveTemporaryPhoneRules(), isEmpty);
+    expect(await database.getReminders(), isEmpty);
+    expect(await database.getCallLogs(), isEmpty);
     await database.close();
   });
 }

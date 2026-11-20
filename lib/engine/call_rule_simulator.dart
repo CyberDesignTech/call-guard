@@ -51,12 +51,33 @@ class CallRuleSimulator {
     final scheduleActive =
         _bool(settings, 'automatic_silence', false) &&
         _isWithinSchedule(settings, currentTime);
+    final scheduleWhitelistOnly =
+        scheduleActive && _bool(settings, 'allow_only_whitelist', false);
     final manualSilence =
         _bool(settings, 'manual_silence_enabled', false) ||
         _bool(settings, 'manual_silence', false) ||
         _bool(settings, 'silence_manual', false);
-    if (manualSilence || scheduleActive) {
+    if (manualSilence || scheduleWhitelistOnly) {
+      final emergencyRepeatEnabled =
+          _bool(settings, 'answering_emergency_repeat', false) &&
+          _bool(settings, 'answering_enabled', false);
+      if (emergencyRepeatEnabled &&
+          !hidden &&
+          canonical.isNotEmpty &&
+          !await _isExplicitlyBlocked(rawPhone, canonical, settings) &&
+          await _hasRecentRejectedSilenceCalls(canonical, currentTime)) {
+        return verdict(true, 'emergency_repeat');
+      }
       return verdict(false, 'silent_schedule');
+    }
+
+    final blackRules = await database.getPhoneRules('black');
+    if (!hidden &&
+        blackRules.any(
+          (row) =>
+              _samePhone(rawPhone, canonical, row['phone'] as String? ?? ''),
+        )) {
+      return verdict(false, 'blacklist');
     }
 
     if (hidden && _bool(settings, 'block_hidden', true)) {
@@ -102,21 +123,72 @@ class CallRuleSimulator {
       }
     }
 
+    return verdict(true, 'default_allow');
+  }
+
+  Future<bool> _isExplicitlyBlocked(
+    String rawPhone,
+    String canonical,
+    Map<String, String> settings,
+  ) async {
     final blackRules = await database.getPhoneRules('black');
-    if (!hidden &&
-        blackRules.any(
-          (row) =>
-              _samePhone(rawPhone, canonical, row['phone'] as String? ?? ''),
-        )) {
-      return verdict(false, 'blacklist');
+    if (blackRules.any(
+      (row) => _samePhone(rawPhone, canonical, row['phone'] as String? ?? ''),
+    )) {
+      return true;
     }
 
-    // The schedule whitelist setting is not a permanent, global allowlist
-    // policy. Its effect is limited to an enabled schedule in its time window.
-    if (scheduleActive && _bool(settings, 'allow_only_whitelist', false)) {
-      return verdict(false, 'allowlist_only');
+    final countries = await database.getCountries();
+    final country = _matchCountry(countries, canonical);
+    if (country != null) {
+      final isoCode = country['iso_code'] as String? ?? '';
+      final dialCode = _digits(country['dial_code'] as String? ?? '');
+      final nationalDigits = canonical.substring(dialCode.length);
+      final operators = await database.getOperators(isoCode);
+      final matchingOperator = <(String, String)>[
+        for (final operator in operators)
+          for (final prefix in (operator['prefixes'] as String? ?? '').split(
+            ',',
+          ))
+            if (_digits(prefix).isNotEmpty &&
+                nationalDigits.startsWith(_digits(prefix)))
+              (_digits(prefix), operator['action'] as String? ?? 'neutral'),
+      ]..sort((a, b) => b.$1.length.compareTo(a.$1.length));
+      if (matchingOperator.isNotEmpty && matchingOperator.first.$2 == 'block') {
+        return true;
+      }
+      if ((country['action'] as String? ?? 'neutral') == 'block') return true;
+      if (_bool(settings, 'block_international', false) &&
+          _isInternational(rawPhone, country, countries)) {
+        return true;
+      }
     }
-    return verdict(true, 'default_allow');
+    return false;
+  }
+
+  Future<bool> _hasRecentRejectedSilenceCalls(
+    String canonical,
+    DateTime now,
+  ) async {
+    final targetDigits = _digits(canonical);
+    if (targetDigits.isEmpty) return false;
+    final cutoff =
+        now.millisecondsSinceEpoch - const Duration(minutes: 5).inMilliseconds;
+    var rejectedMatches = 0;
+    for (final row in await database.getCallLogs()) {
+      if ((row['reason'] as String? ?? '') != 'silent_schedule' ||
+          (row['timestamp'] as int? ?? 0) < cutoff) {
+        continue;
+      }
+      final recentPhone = row['phone'] as String? ?? '';
+      if (_isHidden(recentPhone) ||
+          _digits(_canonical(recentPhone)) != targetDigits) {
+        continue;
+      }
+      rejectedMatches++;
+      if (rejectedMatches >= 2) return true;
+    }
+    return false;
   }
 
   /// Picks the most specific country for a dialed number.

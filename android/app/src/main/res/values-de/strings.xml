@@ -29,4 +29,8 @@
     <string name="status_driving_text">Alle eingehenden Anrufe werden abgewiesen</string>
     <string name="status_paused_title">CallGate · Schutz ausgeschaltet</string>
     <string name="status_paused_text">Tippen, um die App zu öffnen und den Schutz zu aktivieren</string>
+    <string name="status_action_enable_protection">Schutz einschalten</string>
+    <string name="status_action_disable_protection">Schutz ausschalten</string>
+    <string name="status_action_enable_driving">Fahrmodus einschalten</string>
+    <string name="status_action_disable_driving">Fahrmodus ausschalten</string>
 </resources>

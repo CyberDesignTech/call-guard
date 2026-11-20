@@ -76,25 +76,32 @@ void main() {
       )
       .first;
 
-  test('SQLite schema seeds settings, countries and operators', () async {
-    final settings = await _testDatabase.getSettings();
-    final countries = await _testDatabase.getCountries();
-    expect(settings['locale'], 'ukrainian');
-    expect(countries, hasLength(195));
-    expect(worldCountries, hasLength(195));
-    expect(await _testDatabase.getOperators('UA'), hasLength(4));
-    expect((await _testDatabase.getCallLogs()).first, contains('contact_name'));
-    expect(await _testDatabase.getPhoneRules('white'), hasLength(2));
-    expect(
-      await _testDatabase.getIndexNamesForTesting(),
-      containsAll(<String>[
-        'idx_phone_rules_list_type',
-        'idx_operator_rules_country_id',
-        'idx_call_reminders_pending',
-        'idx_call_logs_timestamp',
-      ]),
-    );
-  });
+  test(
+    'fresh database seeds defaults and catalogs but not user records',
+    () async {
+      final settings = await _testDatabase.getSettings();
+      final countries = await _testDatabase.getCountries();
+      expect(settings['locale'], 'ukrainian');
+      expect(settings['protection_enabled'], 'true');
+      expect(countries, hasLength(195));
+      expect(worldCountries, hasLength(195));
+      expect(await _testDatabase.getOperators('UA'), hasLength(4));
+      expect(await _testDatabase.getPhoneRules('white'), isEmpty);
+      expect(await _testDatabase.getPhoneRules('black'), isEmpty);
+      expect(await _testDatabase.getActiveTemporaryPhoneRules(), isEmpty);
+      expect(await _testDatabase.getReminders(), isEmpty);
+      expect(await _testDatabase.getCallLogs(), isEmpty);
+      expect(
+        await _testDatabase.getIndexNamesForTesting(),
+        containsAll(<String>[
+          'idx_phone_rules_list_type',
+          'idx_operator_rules_country_id',
+          'idx_call_reminders_pending',
+          'idx_call_logs_timestamp',
+        ]),
+      );
+    },
+  );
 
   test('callback assistant settings default safely and persist', () async {
     final defaults = await _testDatabase.getSettings();
@@ -381,19 +388,32 @@ void main() {
   test(
     'can edit a reminder time and delete or clear call log entries',
     () async {
-      final reminder = (await _testDatabase.getReminders()).first;
-      final newReminderAt = DateTime(2027, 2, 3, 14, 45).millisecondsSinceEpoch;
-      await _testDatabase.updateReminderTime(
-        reminder['id'] as int,
-        newReminderAt,
+      final reminderId = await _testDatabase.insertReminder(
+        phone: '+380 67 123 45 67',
+        contactName: 'Test Contact',
+        remindAt: DateTime.now()
+            .add(const Duration(hours: 1))
+            .millisecondsSinceEpoch,
+        note: 'Test reminder',
       );
+      final newReminderAt = DateTime(2027, 2, 3, 14, 45).millisecondsSinceEpoch;
+      await _testDatabase.updateReminderTime(reminderId, newReminderAt);
       expect(
         (await _testDatabase.getReminders()).firstWhere(
-          (row) => row['id'] == reminder['id'],
+          (row) => row['id'] == reminderId,
         )['remind_at'],
         newReminderAt,
       );
 
+      for (var index = 0; index < 3; index++) {
+        await _testDatabase.insertCallLog(
+          phone: '+380 44 123 45 6$index',
+          reason: 'country_block',
+          timestamp: DateTime.now()
+              .subtract(Duration(minutes: index))
+              .millisecondsSinceEpoch,
+        );
+      }
       final firstLog = (await _testDatabase.getCallLogs()).first;
       await _testDatabase.deleteCallLog(firstLog['id'] as int);
       expect(await _testDatabase.getCallLogs(), hasLength(2));
@@ -439,6 +459,11 @@ void main() {
         note: 'Call back',
       );
       await firstOpen.updateReminderDone(reminderId, true);
+      await firstOpen.insertCallLog(
+        phone: '+49 151 1234567',
+        reason: 'country_block',
+        timestamp: DateTime(2026, 11, 1).millisecondsSinceEpoch,
+      );
       await firstOpen.deleteCountry('ES');
       await firstOpen.deleteCountry('FR');
       expect(phoneId, greaterThan(0));
@@ -512,6 +537,39 @@ void main() {
       scrollable: homeScrollable(),
     );
     expect(find.text(privacyMessage), findsOneWidget);
+  });
+
+  testWidgets('native status mode changes refresh Flutter settings', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    await tester.runAsync(() async {
+      await _testDatabase.setSetting('protection_enabled', false);
+      await _testDatabase.setSetting('driving_mode', true);
+    });
+
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    final refreshResponse = messenger.handlePlatformMessage(
+      'com.wepr.callguard/screening',
+      const StandardMethodCodec().encodeMethodCall(
+        const MethodCall('statusModesChanged'),
+      ),
+      (_) {},
+    );
+    await waitForText(tester, 'Захист призупинено');
+    await refreshResponse;
+
+    final drivingLabel = find.text('Режим «За кермом»');
+    await tester.scrollUntilVisible(
+      drivingLabel,
+      250,
+      scrollable: homeScrollable(),
+    );
+    final drivingSwitch = find
+        .ancestor(of: drivingLabel, matching: find.byType(SwitchListTile))
+        .first;
+    expect(tester.widget<SwitchListTile>(drivingSwitch).value, isTrue);
   });
 
   testWidgets(
@@ -1318,7 +1376,7 @@ void main() {
       expect(find.text(link).hitTestable(), findsNothing);
     }
 
-    await waitForText(tester, 'Олена Коваль');
+    await waitForText(tester, 'Нагадувань поки немає.');
     await waitForDatabase(tester);
   });
 
@@ -1373,10 +1431,20 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
+    await tester.runAsync(
+      () => _testDatabase.insertReminder(
+        phone: '+380 67 123 45 67',
+        contactName: 'Test Contact',
+        remindAt: DateTime.now()
+            .add(const Duration(hours: 1))
+            .millisecondsSinceEpoch,
+        note: 'Test reminder',
+      ),
+    );
     await pumpApp(tester);
     await tester.tap(find.byTooltip('Нагадування та Журнал'));
     await finishSectionTransition(tester);
-    await waitForText(tester, 'Олена Коваль');
+    await waitForText(tester, 'Test Contact');
 
     expect(find.text('Позначити виконаним'), findsWidgets);
   });
@@ -1384,6 +1452,13 @@ void main() {
   testWidgets('horizontal swipe changes the main navigation section', (
     tester,
   ) async {
+    await tester.runAsync(
+      () => _testDatabase.insertPhoneRule(
+        phone: '+380 67 123 45 67',
+        label: 'Мама',
+        listType: 'white',
+      ),
+    );
     await pumpApp(tester);
 
     await tester.drag(find.byType(PageView).first, const Offset(-450, 0));
@@ -1715,9 +1790,16 @@ void main() {
     addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
 
     await tester.runAsync(() async {
-      final reminder = (await _testDatabase.getReminders()).first;
+      final reminderId = await _testDatabase.insertReminder(
+        phone: '+380 67 123 45 67',
+        contactName: 'Олена Коваль',
+        remindAt: DateTime.now()
+            .add(const Duration(days: 3))
+            .millisecondsSinceEpoch,
+        note: 'Test reminder',
+      );
       await _testDatabase.updateReminderSchedule(
-        id: reminder['id'] as int,
+        id: reminderId,
         remindAt: DateTime.now()
             .add(const Duration(days: 3))
             .millisecondsSinceEpoch,
@@ -1802,6 +1884,13 @@ void main() {
     });
     addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
 
+    await tester.runAsync(
+      () => _testDatabase.insertPhoneRule(
+        phone: '+380 67 123 45 67',
+        label: 'Мама',
+        listType: 'white',
+      ),
+    );
     await pumpApp(tester);
     await tester.tap(find.byTooltip('Списки та фільтри'));
     await finishSectionTransition(tester);
@@ -1823,7 +1912,7 @@ void main() {
 
     await tester.tap(find.byTooltip('Нагадування та Журнал'));
     await finishSectionTransition(tester);
-    await waitForText(tester, 'Олена Коваль');
+    await waitForText(tester, 'Нагадувань поки немає.');
     await tester.drag(find.byType(ListView).last, const Offset(0, -700));
     await tester.pumpAndSettle();
     await waitForText(tester, 'Створити нагадування');
@@ -2252,7 +2341,7 @@ void main() {
     await pumpApp(tester);
     await tester.tap(find.byTooltip('Нагадування та Журнал'));
     await finishSectionTransition(tester);
-    await waitForText(tester, 'Олена Коваль');
+    await waitForText(tester, 'Нагадувань поки немає.');
     expect(find.text('Останні блокування'), findsNothing);
 
     await messenger.handlePlatformMessage(
@@ -2266,7 +2355,7 @@ void main() {
 
     expect(find.text('Останні блокування'), findsOneWidget);
     expect(find.text('Нагадування про дзвінки'), findsOneWidget);
-    expect(find.text('Олена Коваль'), findsNothing);
+    expect(find.text('Записів у журналі поки немає.'), findsOneWidget);
   });
 
   testWidgets('operator search matches localized name case-insensitively', (

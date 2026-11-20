@@ -92,6 +92,20 @@ object CallNotificationHelper {
             .setContentTitle(title)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .addAction(
+                android.R.drawable.ic_lock_power_off,
+                localizedContext.getString(
+                    StatusModeToggle.PROTECTION.actionLabelRes(protectionEnabled),
+                ),
+                statusActionPendingIntent(context, StatusModeToggle.PROTECTION),
+            )
+            .addAction(
+                android.R.drawable.ic_menu_directions,
+                localizedContext.getString(
+                    StatusModeToggle.DRIVING.actionLabelRes(drivingMode),
+                ),
+                statusActionPendingIntent(context, StatusModeToggle.DRIVING),
+            )
             .setContentIntent(contentIntent)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setPriority(NotificationCompat.PRIORITY_LOW)
@@ -103,6 +117,17 @@ object CallNotificationHelper {
             .build()
         notify(context, STATUS_NOTIFICATION_ID, notification)
     }
+
+    private fun statusActionPendingIntent(
+        context: Context,
+        toggle: StatusModeToggle,
+    ): PendingIntent = PendingIntent.getBroadcast(
+        context,
+        toggle.requestCode,
+        Intent(context, CallStatusActionReceiver::class.java)
+            .setAction(toggle.action),
+        pendingIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT),
+    )
 
     fun showReminder(context: Context, reminder: CallReminderRecord): Boolean {
         val localizedContext = localizedContext(context)
@@ -195,8 +220,9 @@ object CallNotificationHelper {
             return false
         }
 
-        val notificationId = ANSWERING_NOTIFICATION_ID_BASE + phone.hashCode()
         val cleanNumber = PhoneNumbers.canonicalize(context, phone).ifBlank { phone }
+        val notificationKey = cleanNumber.ifBlank { phone.trim() }
+        val notificationId = ANSWERING_NOTIFICATION_ID_BASE + notificationKey.hashCode()
         val contentPendingIntent = if (hiddenNumber) {
             PendingIntent.getActivity(
                 context,
@@ -245,6 +271,7 @@ object CallNotificationHelper {
             )
             .setCategory(Notification.CATEGORY_CALL)
             .setAutoCancel(true)
+            .setOnlyAlertOnce(true)
             // Tapping the notification body is the primary ACTION_DIAL callback action.
             .setContentIntent(contentPendingIntent)
             .setPublicVersion(publicNotification)
