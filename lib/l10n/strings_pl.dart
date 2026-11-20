@@ -70,6 +70,8 @@ const Map<String, String> stringsPl = {
   'quickHiddenSubtitle': 'Odrzucaj nieznane / prywatne numery',
   'quickNonContactsTitle': 'Spoza kontaktów',
   'quickNonContactsSubtitle': 'Odrzucaj numery spoza książki adresowej',
+  'quickShortNumbersTitle': 'Krótkie i usługowe numery',
+  'quickShortNumbersSubtitle': 'Blokuj połączenia z krótkich kodów (3–6 cyfr), z wyjątkiem kontaktów i służb ratunkowych',
   'quickInternationalTitle': 'Międzynarodowe połączenia przychodzące',
   'drivingModeTitle': 'Tryb jazdy',
   'drivingModeSubtitle': 'Blokuj wszystkie połączenia przychodzące (nawet z białej listy); wszystkie odrzucone są zapisywane w dzienniku',
@@ -347,6 +349,8 @@ const Map<String, String> stringsPl = {
   'country_block': 'Kraj zablokowany',
   'country_allow': 'Kraj dozwolony',
   'international_block': 'Międzynarodowe połączenie przychodzące zablokowane',
+  'short_number_block': 'Krótki lub usługowy numer zablokowany',
+  'emergency_service': 'Numer alarmowy dozwolony',
   'blacklist': 'Czarna lista',
   'default_allow': 'Połączenie przychodzące domyślnie dozwolone',
   'database_unavailable':

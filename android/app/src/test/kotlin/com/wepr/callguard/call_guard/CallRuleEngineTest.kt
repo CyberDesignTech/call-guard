@@ -46,6 +46,17 @@ class CallRuleEngineTest {
                     putNull(DbContract.PhoneRules.EXPIRES_AT)
                 },
             )
+            fixture.insertOrThrow(
+                DbContract.PhoneRules.TABLE,
+                null,
+                ContentValues().apply {
+                    put(DbContract.PhoneRules.PHONE, "112")
+                    put(DbContract.PhoneRules.LABEL, "Explicit emergency block")
+                    put(DbContract.PhoneRules.LIST_TYPE, DbContract.PhoneRules.BLACK)
+                    put(DbContract.PhoneRules.CREATED_AT, 1L)
+                    putNull(DbContract.PhoneRules.EXPIRES_AT)
+                },
+            )
         } finally {
             fixture.close()
         }
@@ -67,6 +78,68 @@ class CallRuleEngineTest {
             BridgeContract.Verdicts.REJECT,
             verdict.toMap()[BridgeContract.ResultKeys.VERDICT],
         )
+        val emergencyOverridesRules = CallRuleEngine(context).evaluate(
+            "112",
+            settings + mapOf(
+                DbContract.SettingKeys.DRIVING_MODE to "true",
+                DbContract.SettingKeys.BLOCK_SHORT_NUMBERS to "true",
+            ),
+        )
+        assertEquals(true, emergencyOverridesRules.allowed)
+        assertEquals("emergency_service", emergencyOverridesRules.reason)
+
+        val shortSettings = settings + mapOf(
+            DbContract.SettingKeys.BLOCK_INTERNATIONAL to "true",
+            DbContract.SettingKeys.BLOCK_SHORT_NUMBERS to "false",
+        )
+        val shortAllowlistOff = CallRuleEngine(context) { _, _ -> false }
+        assertEquals("default_allow", shortAllowlistOff.evaluate("3700", shortSettings).reason)
+        assertEquals("default_allow", shortAllowlistOff.evaluate("466", shortSettings).reason)
+
+        val shortBlockingSettings = shortSettings +
+            (DbContract.SettingKeys.BLOCK_SHORT_NUMBERS to "true")
+        val blockedShort = shortAllowlistOff.evaluate("3700", shortBlockingSettings)
+        assertFalse(blockedShort.allowed)
+        assertEquals("short_number_block", blockedShort.reason)
+
+        val contactShort = CallRuleEngine(context) { _, _ -> true }
+            .evaluate("3700", shortBlockingSettings)
+        assertEquals("default_allow", contactShort.reason)
+
+        CallGuardDatabase.withDatabase(context) { database ->
+            database.insertOrThrow(
+                DbContract.PhoneRules.TABLE,
+                null,
+                ContentValues().apply {
+                    put(DbContract.PhoneRules.PHONE, "3700")
+                    put(DbContract.PhoneRules.LABEL, "Short code contact allow")
+                    put(DbContract.PhoneRules.LIST_TYPE, DbContract.PhoneRules.WHITE)
+                    put(DbContract.PhoneRules.CREATED_AT, 1L)
+                    putNull(DbContract.PhoneRules.EXPIRES_AT)
+                },
+            )
+        }
+        val allowlistedShort = shortAllowlistOff.evaluate("3700", shortBlockingSettings)
+        assertEquals("allowlist", allowlistedShort.reason)
+    }
+
+    @Test
+    fun emergencyServiceNumbersAlwaysPassBeforeCallRules() {
+        val settings = mapOf(
+            DbContract.SettingKeys.PROTECTION_ENABLED to "true",
+            DbContract.SettingKeys.DRIVING_MODE to "true",
+            DbContract.SettingKeys.MANUAL_SILENCE_ENABLED to "true",
+            DbContract.SettingKeys.BLOCK_SHORT_NUMBERS to "true",
+            DbContract.SettingKeys.BLOCK_INTERNATIONAL to "true",
+        )
+        val engine = CallRuleEngine(RuntimeEnvironment.getApplication())
+
+        listOf("101", "102", "103", "104", "112", "911", "999", "+1 12", "00-911")
+            .forEach { phone ->
+                val verdict = engine.evaluate(phone, settings)
+                assertEquals("$phone must be allowed", true, verdict.allowed)
+                assertEquals("$phone", "emergency_service", verdict.reason)
+            }
     }
 
     private fun createSchema(database: SQLiteDatabase) {

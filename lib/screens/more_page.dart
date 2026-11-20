@@ -406,6 +406,7 @@ class MorePageState extends State<MorePage> with WidgetsBindingObserver {
     'country_block',
     'international_block',
     'blacklist',
+    'short_number_block',
     'operator_block',
     'non_contacts',
     'not_in_contacts',
@@ -938,7 +939,8 @@ class MorePageState extends State<MorePage> with WidgetsBindingObserver {
           'hidden_number' => AppPalette.amber,
           'country_block' ||
           'international_block' ||
-          'blacklist' => AppPalette.red,
+          'blacklist' ||
+          'short_number_block' => AppPalette.red,
           'operator_block' => const Color(0xFFE07A2E),
           'non_contacts' || 'not_in_contacts' => const Color(0xFFE07A2E),
           'allowlist_only' => const Color(0xFFE07A2E),
@@ -946,7 +948,8 @@ class MorePageState extends State<MorePage> with WidgetsBindingObserver {
           'country_allow' ||
           'operator_allow' ||
           'allowlist' ||
-          'emergency_repeat' => AppPalette.green,
+          'emergency_repeat' ||
+          'emergency_service' => AppPalette.green,
           _ => AppPalette.blue,
         };
         final icon = switch (entry.reason) {
@@ -958,10 +961,12 @@ class MorePageState extends State<MorePage> with WidgetsBindingObserver {
           'non_contacts' || 'not_in_contacts' => Icons.person_off_outlined,
           'allowlist_only' => Icons.playlist_add_check_rounded,
           'driving_mode' => Icons.directions_car_rounded,
+          'short_number_block' => Icons.dialpad_rounded,
           'country_allow' => Icons.public_rounded,
           'operator_allow' => Icons.cell_tower_rounded,
           'allowlist' => Icons.person_outline_rounded,
           'emergency_repeat' => Icons.phone_callback_rounded,
+          'emergency_service' => Icons.emergency_rounded,
           'blacklist' => Icons.block_rounded,
           _ => Icons.check_circle_outline_rounded,
         };

@@ -54,6 +54,10 @@ void main() {
     await tester.pumpWidget(CallGuardApp(database: _testDatabase));
     await waitForText(tester, 'Захист вхідних дзвінків');
     await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await _testDatabase.getSettings();
+    });
   }
 
   Future<void> waitForDatabase(WidgetTester tester) async {
@@ -83,6 +87,7 @@ void main() {
       final countries = await _testDatabase.getCountries();
       expect(settings['locale'], 'ukrainian');
       expect(settings['protection_enabled'], 'true');
+      expect(settings[DatabaseHelper.settingBlockShortNumbers], 'false');
       expect(countries, hasLength(195));
       expect(worldCountries, hasLength(195));
       expect(await _testDatabase.getOperators('UA'), hasLength(4));
@@ -632,6 +637,34 @@ void main() {
       expect(find.text('Додати'), findsOneWidget);
     },
   );
+
+  testWidgets('short-number switch is shown and persists its setting', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    final label = find.text('Короткі та службові номери');
+    await tester.scrollUntilVisible(label, 250, scrollable: homeScrollable());
+
+    final switchTile = find
+        .ancestor(of: label, matching: find.byType(SwitchListTile))
+        .first;
+    expect(tester.widget<SwitchListTile>(switchTile).value, isFalse);
+    expect(
+      find.text(
+        'Блокувати вхідні виклики з коротких кодів (3–6 цифр), крім контактів та екстрених служб',
+      ),
+      findsOneWidget,
+    );
+
+    await tester.ensureVisible(switchTile);
+    await tester.pump();
+    await tester.tap(switchTile);
+    await tester.pump();
+    final savedSettings = await tester.runAsync(_testDatabase.getSettings);
+
+    expect(savedSettings?[DatabaseHelper.settingBlockShortNumbers], 'true');
+    expect(tester.widget<SwitchListTile>(switchTile).value, isTrue);
+  });
 
   testWidgets(
     'Home opens the temporary-rule dialog with action and duration choices',
@@ -2181,7 +2214,7 @@ void main() {
     await tester.tap(aboutMenuItem);
     await tester.pumpAndSettle();
     expect(find.text('Call Gate'), findsOneWidget);
-    expect(find.textContaining('v1.9.1'), findsOneWidget);
+    expect(find.textContaining('v1.9.2'), findsOneWidget);
     expect(find.text('© 2026 CyberDesignTech Dev'), findsOneWidget);
     expect(
       find.textContaining('CyberDesignTech Dev із фокусом'),

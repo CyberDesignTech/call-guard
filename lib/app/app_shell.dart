@@ -30,6 +30,8 @@ class CallGuardShell extends StatefulWidget {
     required this.onBlockNonContactsChanged,
     required this.blockInternational,
     required this.onBlockInternationalChanged,
+    required this.blockShortNumbers,
+    required this.onBlockShortNumbersChanged,
     required this.automaticSilence,
     required this.manualSilenceEnabled,
     required this.onManualSilenceChanged,
@@ -76,6 +78,8 @@ class CallGuardShell extends StatefulWidget {
   final ValueChanged<bool> onBlockNonContactsChanged;
   final bool blockInternational;
   final ValueChanged<bool> onBlockInternationalChanged;
+  final bool blockShortNumbers;
+  final ValueChanged<bool> onBlockShortNumbersChanged;
   final bool automaticSilence;
   final bool manualSilenceEnabled;
   final ValueChanged<bool> onManualSilenceChanged;
@@ -272,6 +276,8 @@ class CallGuardShellState extends State<CallGuardShell> {
             onBlockNonContactsChanged: widget.onBlockNonContactsChanged,
             blockInternational: widget.blockInternational,
             onBlockInternationalChanged: widget.onBlockInternationalChanged,
+            blockShortNumbers: widget.blockShortNumbers,
+            onBlockShortNumbersChanged: widget.onBlockShortNumbersChanged,
             manualSilenceEnabled: widget.manualSilenceEnabled,
             onManualSilenceChanged: widget.onManualSilenceChanged,
             onTest: _openTestDialog,

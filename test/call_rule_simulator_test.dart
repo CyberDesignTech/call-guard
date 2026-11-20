@@ -96,6 +96,71 @@ void main() {
     expect(verdict.reason, 'blacklist');
   });
 
+  test('emergency service codes bypass all call rules exactly', () async {
+    await database.setSetting('driving_mode', true);
+    await database.setSetting('manual_silence_enabled', true);
+    await database.setSetting(DatabaseHelper.settingBlockShortNumbers, true);
+    for (final number in [
+      '101',
+      '102',
+      '103',
+      '104',
+      '112',
+      '911',
+      '999',
+      '+1 12',
+      '00-911',
+    ]) {
+      await database.insertPhoneRule(
+        phone: number,
+        label: 'Explicit block',
+        listType: 'black',
+      );
+      final verdict = await CallRuleSimulator(database).evaluate(number);
+      expect(verdict.allowed, isTrue, reason: '$number should be allowed');
+      expect(verdict.reason, 'emergency_service');
+    }
+  });
+
+  test(
+    'short numbers skip international rules and follow their own switch',
+    () async {
+      await database.setSetting('block_international', true);
+      await database.setSetting(DatabaseHelper.settingBlockShortNumbers, false);
+      for (final number in ['3700', '466']) {
+        final verdict = await CallRuleSimulator(database).evaluate(number);
+        expect(verdict.allowed, isTrue);
+        expect(verdict.reason, 'default_allow');
+      }
+
+      await database.setSetting(DatabaseHelper.settingBlockShortNumbers, true);
+      final notContact = await CallRuleSimulator(database)
+          .evaluate('3700', isInContacts: false);
+      expect(notContact.allowed, isFalse);
+      expect(notContact.reason, 'short_number_block');
+
+      final contact = await CallRuleSimulator(database)
+          .evaluate('3700', isInContacts: true);
+      expect(contact.allowed, isTrue);
+      expect(contact.reason, 'default_allow');
+
+      final unknownContactStatus = await CallRuleSimulator(database)
+          .evaluate('3700');
+      expect(unknownContactStatus.allowed, isTrue);
+      expect(unknownContactStatus.reason, 'default_allow');
+
+      await database.insertPhoneRule(
+        phone: '3700',
+        label: 'Explicit allow',
+        listType: 'white',
+      );
+      final allowlisted = await CallRuleSimulator(database)
+          .evaluate('3700', isInContacts: false);
+      expect(allowlisted.allowed, isTrue);
+      expect(allowlisted.reason, 'allowlist');
+    },
+  );
+
   test(
     'emergency repeat may pass a scheduled rejection after two prior calls',
     () async {
@@ -103,9 +168,9 @@ void main() {
       const number = '+380 63 555 01 02';
       await database.setSetting('automatic_silence', true);
       await database.setSetting('allow_only_whitelist', true);
-    await database.setSetting('answering_enabled', true);
-    await database.setSetting('answering_emergency_repeat', true);
-    await database.setSetting('block_international', false);
+      await database.setSetting('answering_enabled', true);
+      await database.setSetting('answering_emergency_repeat', true);
+      await database.setSetting('block_international', false);
       await database.setSetting('silence_start_minute', 22 * 60);
       await database.setSetting('silence_end_minute', 7 * 60);
       await database.setSetting('silence_weekdays', '1');

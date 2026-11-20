@@ -37,6 +37,8 @@ class HomePage extends StatefulWidget {
     required this.onBlockNonContactsChanged,
     required this.blockInternational,
     required this.onBlockInternationalChanged,
+    required this.blockShortNumbers,
+    required this.onBlockShortNumbersChanged,
     required this.manualSilenceEnabled,
     required this.onManualSilenceChanged,
     required this.onTest,
@@ -56,6 +58,8 @@ class HomePage extends StatefulWidget {
   final ValueChanged<bool> onBlockNonContactsChanged;
   final bool blockInternational;
   final ValueChanged<bool> onBlockInternationalChanged;
+  final bool blockShortNumbers;
+  final ValueChanged<bool> onBlockShortNumbersChanged;
   final bool manualSilenceEnabled;
   final ValueChanged<bool> onManualSilenceChanged;
   final VoidCallback onTest;
@@ -801,6 +805,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 subtitle: widget.strings.call('quickNonContactsSubtitle'),
                 value: widget.blockNonContacts,
                 onChanged: widget.onBlockNonContactsChanged,
+              ),
+              const ThinDivider(),
+              RuleSwitch(
+                icon: Icons.dialpad_rounded,
+                title: widget.strings.call('quickShortNumbersTitle'),
+                subtitle: widget.strings.call('quickShortNumbersSubtitle'),
+                value: widget.blockShortNumbers,
+                onChanged: widget.onBlockShortNumbersChanged,
               ),
               const ThinDivider(),
               RuleSwitch(

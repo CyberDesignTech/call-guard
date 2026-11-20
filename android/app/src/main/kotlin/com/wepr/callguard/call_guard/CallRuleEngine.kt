@@ -21,7 +21,16 @@ data class CallRuleVerdict(
 }
 
 /** Reads the same SQLite file and setting keys used by Flutter's sqflite layer. */
-class CallRuleEngine(context: Context) {
+class CallRuleEngine(
+    context: Context,
+    private val contactLookup: (Context, String) -> Boolean? = { lookupContext, number ->
+        if (!ContactLookup.hasPermission(lookupContext)) {
+            null
+        } else {
+            ContactLookup.isContact(lookupContext, number)
+        }
+    },
+) {
     private val appContext = context.applicationContext
 
     fun evaluate(phoneNumber: String?): CallRuleVerdict =
@@ -36,6 +45,9 @@ class CallRuleEngine(context: Context) {
         settings: Map<String, String>?,
     ): CallRuleVerdict {
         val rawPhone = phoneNumber.orEmpty().trim()
+        if (PhoneNumbers.isEmergencyServiceNumber(rawPhone)) {
+            return verdict(true, "emergency_service", rawPhone)
+        }
         return try {
             val snapshot = settings ?: CallGuardDatabase.readSettings(appContext)
             CallGuardDatabase.withDatabase(appContext) { database ->
@@ -74,7 +86,12 @@ class CallRuleEngine(context: Context) {
         }
 
         val hidden = PhoneNumbers.isHidden(rawPhone)
-        val canonicalPhone = if (hidden) "" else PhoneNumbers.canonicalize(appContext, rawPhone)
+        val shortNumber = PhoneNumbers.isShortNumber(rawPhone)
+        val canonicalPhone = when {
+            hidden -> ""
+            shortNumber -> PhoneNumbers.digits(rawPhone)
+            else -> PhoneNumbers.canonicalize(appContext, rawPhone)
+        }
 
         // Driving mode is intentionally the highest-priority call rule. In
         // particular, an allowlist entry or temporary allow must not bypass it.
@@ -120,6 +137,17 @@ class CallRuleEngine(context: Context) {
 
         if (hidden && settings.bool(DbContract.SettingKeys.BLOCK_HIDDEN, true)) {
             return verdict(false, "hidden_number", PhoneNumbers.HIDDEN_NUMBER)
+        }
+
+        if (shortNumber) {
+            val shouldBlockShortNumber = settings.bool(
+                DbContract.SettingKeys.BLOCK_SHORT_NUMBERS,
+                false,
+            )
+            if (!shouldBlockShortNumber || contactLookup(appContext, canonicalPhone) != false) {
+                return verdict(true, "default_allow", canonicalPhone)
+            }
+            return verdict(false, "short_number_block", canonicalPhone)
         }
 
         if (settings.bool(DbContract.SettingKeys.BLOCK_NON_CONTACTS, false) &&
@@ -355,6 +383,7 @@ class CallRuleEngine(context: Context) {
         if (matchesPhoneRule(database, DbContract.PhoneRules.BLACK, rawPhone, canonicalPhone)) {
             return true
         }
+        if (PhoneNumbers.isShortNumber(rawPhone)) return false
 
         val countries = readCountries(database)
         val phoneDigits = PhoneNumbers.digits(canonicalPhone)

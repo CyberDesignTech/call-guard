@@ -18,7 +18,6 @@ class CallRuleSimulator {
     bool? isInContacts,
   }) async {
     final rawPhone = phoneNumber.trim();
-    final settings = await database.getSettings();
     final canonical = _canonical(rawPhone);
     CallSimulationVerdict verdict(bool allowed, String reason) =>
         CallSimulationVerdict(
@@ -27,6 +26,11 @@ class CallRuleSimulator {
           phoneNumber: canonical.isEmpty ? rawPhone : '+$canonical',
         );
 
+    if (_isEmergencyServiceNumber(rawPhone)) {
+      return verdict(true, 'emergency_service');
+    }
+
+    final settings = await database.getSettings();
     if (!_bool(settings, 'protection_enabled', true)) {
       return verdict(true, 'protection_disabled');
     }
@@ -83,6 +87,15 @@ class CallRuleSimulator {
     if (hidden && _bool(settings, 'block_hidden', true)) {
       return verdict(false, 'hidden_number');
     }
+
+    if (_isShortNumber(rawPhone)) {
+      if (!_bool(settings, DatabaseHelper.settingBlockShortNumbers, false) ||
+          isInContacts != false) {
+        return verdict(true, 'default_allow');
+      }
+      return verdict(false, 'short_number_block');
+    }
+
     if (_bool(settings, 'block_non_contacts', false) && isInContacts == false) {
       return verdict(false, 'not_in_contacts');
     }
@@ -137,6 +150,7 @@ class CallRuleSimulator {
     )) {
       return true;
     }
+    if (_isShortNumber(rawPhone)) return false;
 
     final countries = await database.getCountries();
     final country = _matchCountry(countries, canonical);
@@ -313,6 +327,24 @@ class CallRuleSimulator {
         'anonymous',
       }.contains(number.trim().toLowerCase());
 
+  bool _isEmergencyServiceNumber(String phone) {
+    var cleaned = _removeShortNumberSeparators(phone);
+    if (cleaned.startsWith('+')) cleaned = cleaned.substring(1);
+    if (cleaned.startsWith('00')) cleaned = cleaned.substring(2);
+    return RegExp(r'^\d+$').hasMatch(cleaned) &&
+        _emergencyServiceNumbers.contains(cleaned);
+  }
+
+  bool _isShortNumber(String phone) {
+    final cleaned = _removeShortNumberSeparators(phone);
+    if (cleaned.startsWith('+') || cleaned.startsWith('00')) return false;
+    if (!RegExp(r'^\d{3,6}$').hasMatch(cleaned)) return false;
+    return !_emergencyServiceNumbers.contains(cleaned);
+  }
+
+  String _removeShortNumberSeparators(String phone) =>
+      phone.trim().replaceAll(RegExp(r'[\s()./-]'), '');
+
   String _canonical(String phone) {
     final normalized = _digits(phone);
     if (normalized.startsWith('00')) return normalized.substring(2);
@@ -326,4 +358,14 @@ class CallRuleSimulator {
 
   int _int(Map<String, String> settings, String key, int fallback) =>
       int.tryParse(settings[key] ?? '') ?? fallback;
+
+  static const _emergencyServiceNumbers = {
+    '101',
+    '102',
+    '103',
+    '104',
+    '112',
+    '911',
+    '999',
+  };
 }

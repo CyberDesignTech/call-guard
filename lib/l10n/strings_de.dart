@@ -71,6 +71,8 @@ const Map<String, String> stringsDe = {
   'quickHiddenSubtitle': 'Unbekannte / unterdrückte Nummern abweisen',
   'quickNonContactsTitle': 'Nicht in Kontakten',
   'quickNonContactsSubtitle': 'Nummern außerhalb des Adressbuchs abweisen',
+  'quickShortNumbersTitle': 'Kurze und Servicenummern',
+  'quickShortNumbersSubtitle': 'Eingehende Anrufe von Kurzwahlen (3–6 Ziffern) blockieren, außer Kontakten und Notdiensten',
   'quickInternationalTitle': 'Internationale eingehende Anrufe',
   'drivingModeTitle': 'Fahrmodus',
   'drivingModeSubtitle': 'Alle eingehenden Anrufe blockieren (auch von der Whitelist); alle abgewiesenen Anrufe werden im Protokoll gespeichert',
@@ -347,6 +349,8 @@ const Map<String, String> stringsDe = {
   'country_block': 'Land blockiert',
   'country_allow': 'Land erlaubt',
   'international_block': 'Internationaler eingehender Anruf blockiert',
+  'short_number_block': 'Kurze oder Servicenummer blockiert',
+  'emergency_service': 'Notrufnummer zugelassen',
   'blacklist': 'Sperrliste',
   'default_allow': 'Eingehender Anruf standardmäßig erlaubt',
   'database_unavailable':

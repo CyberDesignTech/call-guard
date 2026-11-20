@@ -39,10 +39,13 @@ const _operatorSeeds = <(String, String, String)>[
 ];
 
 class DatabaseHelper {
+  static const settingBlockShortNumbers = 'block_short_numbers';
+
   static const _callbackSettingDefaults = <String, String>{
     'answering_auto_remind': 'false',
     'answering_auto_remind_minutes': '30',
     'answering_emergency_repeat': 'false',
+    settingBlockShortNumbers: 'false',
     'driving_mode': 'false',
     'status_tray_icon_enabled': 'true',
     'status_tray_user_overridden': 'false',

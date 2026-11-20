@@ -10,6 +10,9 @@ import java.util.Locale
 object PhoneNumbers {
     const val HIDDEN_NUMBER = "@numberHidden"
 
+    private val emergencyServiceNumbers = setOf("101", "102", "103", "104", "112", "911", "999")
+    private val shortNumberSeparators = Regex("[\\s()./\\-]")
+
     private val hiddenNumberMarkers = setOf(
         "UNKNOWN",
         "PRIVATE",
@@ -19,6 +22,22 @@ object PhoneNumbers {
     )
 
     fun normalize(phone: String): String = PhoneNumberUtils.normalizeNumber(phone)
+
+    /** True only for an exact emergency service code, optionally prefixed with + or 00. */
+    fun isEmergencyServiceNumber(phone: String): Boolean {
+        var cleaned = phone.trim().replace(shortNumberSeparators, "")
+        if (cleaned.startsWith("+")) cleaned = cleaned.drop(1)
+        if (cleaned.startsWith("00")) cleaned = cleaned.drop(2)
+        return cleaned.all { it in '0'..'9' } && cleaned in emergencyServiceNumbers
+    }
+
+    /** Classifies a short code before E.164 formatting can treat it like a country prefix. */
+    fun isShortNumber(phone: String): Boolean {
+        val cleaned = phone.trim().replace(shortNumberSeparators, "")
+        if (cleaned.startsWith("+") || cleaned.startsWith("00")) return false
+        if (cleaned.length !in 3..6 || !cleaned.all { it in '0'..'9' }) return false
+        return cleaned !in emergencyServiceNumbers
+    }
 
     fun digits(value: String): String =
         normalize(value).filter { it in '0'..'9' }

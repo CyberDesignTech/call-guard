@@ -35,6 +35,7 @@ class CallGuardAppState extends State<CallGuardApp>
   bool _blockUnknown = true;
   bool _blockNonContacts = false;
   bool _blockInternational = true;
+  bool _blockShortNumbers = false;
   bool _automaticSilence = false;
   bool _manualSilenceEnabled = false;
   bool _allowOnlyWhitelist = true;
@@ -171,6 +172,10 @@ class CallGuardAppState extends State<CallGuardApp>
         _blockUnknown = parseBool('block_hidden', true);
         _blockNonContacts = parseBool('block_non_contacts', false);
         _blockInternational = parseBool('block_international', true);
+        _blockShortNumbers = parseBool(
+          DatabaseHelper.settingBlockShortNumbers,
+          false,
+        );
         _automaticSilence = parseBool('automatic_silence', false);
         _manualSilenceEnabled = parseBool('manual_silence_enabled', false);
         _allowOnlyWhitelist = parseBool('allow_only_whitelist', true);
@@ -282,6 +287,9 @@ class CallGuardAppState extends State<CallGuardApp>
     }
     if (previous.userOverridden != next.userOverridden) {
       await _persistSetting('status_tray_user_overridden', next.userOverridden);
+    }
+    if (previous.activated != next.activated) {
+      await _persistSetting('status_tray_activated', next.activated);
     }
     if (previous.permissionPrompted != next.permissionPrompted) {
       await _persistSetting(
@@ -408,6 +416,11 @@ class CallGuardAppState extends State<CallGuardApp>
               onBlockInternationalChanged: (value) {
                 setState(() => _blockInternational = value);
                 _persistSetting('block_international', value);
+              },
+              blockShortNumbers: _blockShortNumbers,
+              onBlockShortNumbersChanged: (value) {
+                setState(() => _blockShortNumbers = value);
+                _persistSetting(DatabaseHelper.settingBlockShortNumbers, value);
               },
               automaticSilence: _automaticSilence,
               manualSilenceEnabled: _manualSilenceEnabled,

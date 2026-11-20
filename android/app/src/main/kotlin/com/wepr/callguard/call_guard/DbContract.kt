@@ -79,6 +79,7 @@ object DbContract {
         const val BLOCK_HIDDEN = "block_hidden"
         const val BLOCK_NON_CONTACTS = "block_non_contacts"
         const val BLOCK_INTERNATIONAL = "block_international"
+        const val BLOCK_SHORT_NUMBERS = "block_short_numbers"
         const val ALLOW_ONLY_WHITELIST = "allow_only_whitelist"
         const val ANSWERING_SCENARIO = "answering_scenario"
         const val ANSWERING_ENABLED = "answering_enabled"

@@ -578,17 +578,20 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun permissionState(): Map<String, Boolean> {
-        val roleManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            getSystemService(RoleManager::class.java)
+        val roleAvailable: Boolean
+        val callScreeningRoleHeld: Boolean
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val roleManager = getSystemService(RoleManager::class.java)
+            roleAvailable = roleManager.isRoleAvailable(RoleManager.ROLE_CALL_SCREENING)
+            callScreeningRoleHeld = roleAvailable &&
+                roleManager.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)
         } else {
-            null
+            roleAvailable = false
+            callScreeningRoleHeld = false
         }
-        val roleAvailable = roleManager?.isRoleAvailable(RoleManager.ROLE_CALL_SCREENING) == true
         return mapOf(
             BridgeContract.ResultKeys.ROLE_AVAILABLE to roleAvailable,
-            BridgeContract.ResultKeys.CALL_SCREENING_ROLE to (
-                roleAvailable && roleManager?.isRoleHeld(RoleManager.ROLE_CALL_SCREENING) == true
-                ),
+            BridgeContract.ResultKeys.CALL_SCREENING_ROLE to callScreeningRoleHeld,
             BridgeContract.ResultKeys.READ_CONTACTS to hasContactsPermission(),
             BridgeContract.ResultKeys.NOTIFICATIONS_GRANTED to hasNotificationPermission(),
         )
