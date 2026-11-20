@@ -36,6 +36,9 @@ migrate_working_dir/
 
 # Local Android SDK paths and generated APK/AAB artifacts
 /android/local.properties
+**/key.properties
+**/*.jks
+**/*.keystore
 *.apk
 *.aab
 release/

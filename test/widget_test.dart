@@ -2214,7 +2214,7 @@ void main() {
     await tester.tap(aboutMenuItem);
     await tester.pumpAndSettle();
     expect(find.text('Call Gate'), findsOneWidget);
-    expect(find.textContaining('v1.9.2'), findsOneWidget);
+    expect(find.textContaining('v2.0.0'), findsOneWidget);
     expect(find.text('© 2026 CyberDesignTech Dev'), findsOneWidget);
     expect(
       find.textContaining('CyberDesignTech Dev із фокусом'),
