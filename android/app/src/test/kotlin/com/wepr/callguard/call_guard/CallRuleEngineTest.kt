@@ -4,6 +4,7 @@ import android.content.ContentValues
 import android.database.sqlite.SQLiteDatabase
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -13,6 +14,68 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class CallRuleEngineTest {
+    @Test
+    fun manualSilenceRejectionIsLoggedAndNotifiesCallHandled() {
+        val context = RuntimeEnvironment.getApplication()
+        val databaseFile = context.getDatabasePath(DbContract.DATABASE_NAME)
+        databaseFile.parentFile?.mkdirs()
+        databaseFile.delete()
+
+        val fixture = SQLiteDatabase.openOrCreateDatabase(databaseFile, null)
+        try {
+            createSchema(fixture)
+        } finally {
+            fixture.close()
+        }
+
+        val settings = mapOf(
+            DbContract.SettingKeys.PROTECTION_ENABLED to "true",
+            DbContract.SettingKeys.DRIVING_MODE to "false",
+            DbContract.SettingKeys.MANUAL_SILENCE_ENABLED to "true",
+            DbContract.SettingKeys.AUTOMATIC_SILENCE to "false",
+            DbContract.SettingKeys.BLOCK_HIDDEN to "false",
+            DbContract.SettingKeys.BLOCK_NON_CONTACTS to "false",
+            DbContract.SettingKeys.BLOCK_INTERNATIONAL to "false",
+        )
+        try {
+            val engine = CallRuleEngine(context)
+            val verdict = engine.evaluate("+1 202 555 0123", settings)
+            assertFalse(verdict.allowed)
+            assertEquals("silent_schedule", verdict.reason)
+
+            var callHandledNotified = false
+            var completionDelivered = false
+            CallScreeningPostResponseWork.complete(
+                verdict = verdict,
+                onRejectedCall = { throw IllegalStateException("Optional work failed") },
+                recordCallLog = {
+                    engine.recordCallLog(verdict.phoneNumber, verdict.reason, "Test caller")
+                },
+                notifyCallHandled = { onDelivered ->
+                    callHandledNotified = true
+                    onDelivered()
+                },
+                onComplete = { completionDelivered = true },
+            )
+
+            assertTrue(callHandledNotified)
+            assertTrue(completionDelivered)
+            CallGuardDatabase.withDatabase(context) { database ->
+                database.rawQuery(
+                    "SELECT phone, reason FROM ${DbContract.CallLogs.TABLE} " +
+                        "ORDER BY ${DbContract.CallLogs.TIMESTAMP} DESC LIMIT 1",
+                    null,
+                ).use { cursor ->
+                    assertTrue(cursor.moveToFirst())
+                    assertEquals(verdict.phoneNumber, cursor.getString(0))
+                    assertEquals("silent_schedule", cursor.getString(1))
+                }
+            }
+        } finally {
+            CallGuardDatabase.closeForTesting()
+        }
+    }
+
     @Test
     fun blacklistRejectsNumberEvenWhenCountryIsAllowed() {
         val context = RuntimeEnvironment.getApplication()

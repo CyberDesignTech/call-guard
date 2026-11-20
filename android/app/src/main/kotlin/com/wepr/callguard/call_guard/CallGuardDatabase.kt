@@ -29,6 +29,18 @@ object CallGuardDatabase {
     fun <T> withDatabase(context: Context, block: (SQLiteDatabase) -> T): T =
         block(open(context))
 
+    /** Closes the process singleton so database tests can isolate their fixtures. */
+    internal fun closeForTesting() {
+        synchronized(this) {
+            instance?.close()
+            instance = null
+            repeatColumnsChecked.set(false)
+            callLogContactNameChecked.set(false)
+            phoneRuleExpiresAtChecked.set(false)
+            countryAreaCodesChecked.set(false)
+        }
+    }
+
     /** Reads every row of app_settings once, so one call can share a settings snapshot. */
     fun readSettings(context: Context): Map<String, String> =
         withDatabase(context) { database ->

@@ -19,12 +19,21 @@ object CallScreeningEvents {
         if (channel === targetChannel) channel = null
     }
 
-    fun notifyCallHandled() {
-        val targetChannel = channel ?: return
-        mainHandler.post {
-            if (channel === targetChannel) {
-                targetChannel.invokeMethod(BridgeContract.Methods.CALL_HANDLED, null)
+    fun notifyCallHandled(onDelivered: () -> Unit = {}) {
+        val targetChannel = channel
+        if (targetChannel == null) {
+            onDelivered()
+            return
+        }
+        val posted = mainHandler.post {
+            try {
+                if (channel === targetChannel) {
+                    targetChannel.invokeMethod(BridgeContract.Methods.CALL_HANDLED, null)
+                }
+            } finally {
+                onDelivered()
             }
         }
+        if (!posted) onDelivered()
     }
 }
