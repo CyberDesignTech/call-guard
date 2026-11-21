@@ -1,72 +1,137 @@
 # CallGate
 
-**CallGate v2.5.0** — локальний фільтр вхідних дзвінків для Android. Керуйте правилами, тишею та блокуваннями без акаунта й власного серверного бекенду.
+**CallGate v2.5.0** is an offline Android call-screening application that
+filters incoming calls, synchronizes selected quiet modes with Android Do Not
+Disturb, and keeps all settings and history on the device.
 
-## Можливості
+[![Version](https://img.shields.io/badge/version-2.5.0-4c8bf5.svg)](https://github.com/CyberDesignTech/call-guard/releases/latest)
+![Platform](https://img.shields.io/badge/platform-Android%2010%2B%20(API%2029%2B)-34a853.svg)
+![Architecture](https://img.shields.io/badge/architecture-arm64--v8a-fbbc04.svg)
+![Privacy](https://img.shields.io/badge/privacy-100%25%20offline%20%7C%20zero%20telemetry-673ab7.svg)
+[![License](https://img.shields.io/badge/license-MIT-e91e63.svg)](LICENSE)
 
-- Білий і чорний списки, тимчасові правила та фільтри країн і операторів.
-- Фільтр коротких/службових номерів довжиною 2–6 цифр із винятками для контактів і Білого списку.
-- Безумовний дозвіл екстрених кодів `101–104`, `112`, `911` і `999`.
-- Блокування прихованих номерів, невідомих контактів і міжнародних викликів.
-- Режим «За кермом», ручна тиша та розклад із вибором днів і режимом «Лише білий список».
-- Керування режимами захисту й водіння зі сповіщення в системній шторці.
-- Журнал блокувань, нагадування передзвонити та повторний дзвінок у режимі тиші.
-- Інтерфейс українською, англійською, польською, німецькою, іспанською та французькою.
+## Download Latest APK
 
-Контакти, правила й журнал зберігаються локально в SQLite на пристрої. Серверного акаунта чи синхронізації CallGate не має.
+Download the latest release from:
 
-## Вимоги
+- [GitHub Releases](https://github.com/CyberDesignTech/call-guard/releases/latest)
+- [CallGate-2.5.0.apk](release/CallGate-2.5.0.apk) from this repository
 
-- Android 10 (API 29) або новіший.
-- Системна роль фільтрації дзвінків (`CallScreeningService`), яку користувач надає в Android.
-- Для розробки: Flutter SDK, Android SDK та JDK 17 (версії Android Gradle Plugin/Kotlin задаються проєктом).
+The APK targets Android 10 (API 29) and newer and is built for
+`arm64-v8a`. To install it, download the APK, allow installation from the
+selected file manager or browser when Android asks, and open the app. Android
+will guide you through granting the call-screening role and optional
+permissions.
 
-## Збірка та перевірки
+## Key Features
 
-З кореня репозиторію:
+- **Priority-based call filtering** powered by Android
+  `CallScreeningService`.
+- Emergency service numbers bypass user-configured blocking rules.
+- Allowlist, blocklist, country and operator rules, temporary rules, hidden
+  number filtering, short-number handling, and international-call filtering.
+- Four status-bar notification states: active protection, Driving Mode, Silence
+  Mode, and paused protection.
+- **Messenger Silence Mode** through Android
+  `NotificationManager.Policy`, covering notifications from apps such as
+  Telegram, WhatsApp, Viber, and Signal without reading their content.
+- Built-in call-rule simulator for testing local settings.
+- Local blocked-call journal and callback reminders.
+- Six UI languages: `uk`, `en`, `pl`, `de`, `es`, and `fr`.
+
+## Screenshots
+
+Screenshots can be added under `docs/screenshots/` using the following
+placeholders:
+
+| Screen | File |
+| --- | --- |
+| Home and protection status | `docs/screenshots/home.png` |
+| Call lists and country rules | `docs/screenshots/lists.png` |
+| Silence and DND settings | `docs/screenshots/silence-mode.png` |
+| Local call journal | `docs/screenshots/call-journal.png` |
+
+## Privacy & Security
+
+- **100% offline:** settings, lists, contacts lookups, and call history remain
+  on the device.
+- **Zero telemetry:** CallGate has no account, analytics service, cloud
+  backend, or remote synchronization.
+- CallGate does **not** declare
+  `BIND_NOTIFICATION_LISTENER_SERVICE` and does **not** use
+  `AccessibilityService`.
+- The app uses Android's protected `BIND_SCREENING_SERVICE` boundary for call
+  screening.
+- If the local SQLite database is unavailable while evaluating a call, the
+  rule engine fails open and allows the call rather than risking accidental
+  blocking.
+- Permissions are explicit and optional where possible:
+  `READ_CONTACTS`, `READ_CALL_LOG`, `POST_NOTIFICATIONS`,
+  `ACCESS_NOTIFICATION_POLICY`, `SCHEDULE_EXACT_ALARM`,
+  `RECEIVE_BOOT_COMPLETED`, and `WAKE_LOCK`.
+- Signing keys, passwords, local SDK paths, environment files, and build
+  outputs are excluded from Git by `.gitignore`.
+
+## Architecture Overview
+
+```text
+Flutter UI (lib/)
+  ├─ settings, localization, lists, journal, simulator
+  ├─ DatabaseHelper / sqflite
+  └─ typed MethodChannel facade
+
+Android Kotlin
+  ├─ MainActivity              Flutter bridge and permission flows
+  ├─ CallGuardScreeningService cold call-screening entry point
+  ├─ CallRuleEngine             priority-based native rule evaluation
+  ├─ DndSyncController           NotificationManager.Policy ownership
+  ├─ CallGuardDatabase           shared SQLite access and migrations
+  └─ receivers / schedulers      alarms, boot recovery, notifications
+```
+
+The Flutter database helper and native database layer share the same SQLite
+file and setting keys. The native screening service remains independent of
+Flutter startup so it can respond quickly during an incoming call.
+
+## Building from Source
+
+### Requirements
+
+- Flutter SDK compatible with the version in `pubspec.yaml`
+- Android SDK with API 29 or newer
+- JDK 17
+- Android device or emulator for runtime validation
+
+Clone the repository and run:
 
 ```sh
-/home/wepr/flutter/bin/flutter pub get
-/home/wepr/flutter/bin/flutter analyze
-/home/wepr/flutter/bin/flutter test
+git clone https://github.com/CyberDesignTech/call-guard.git
+cd call-guard
+
+flutter pub get
+flutter analyze
+flutter test
+
 cd android
 ./gradlew :app:testDebugUnitTest :app:lintDebug
 cd ..
-/home/wepr/flutter/bin/flutter build apk --release --target-platform android-arm64
+
+flutter build apk --release --target-platform android-arm64
 ```
 
-Зібраний APK з’явиться у `build/app/outputs/flutter-apk/app-release.apk`.
+The unsigned or locally signed output is written to
+`build/app/outputs/flutter-apk/app-release.apk`.
 
-### Підпис release APK
+For a production release, keep `android/key.properties` and the signing
+keystore outside version control. The repository intentionally contains no
+release credentials.
 
-Production-підпис налаштовується локальним файлом `android/key.properties` і keystore-файлом. Обидва ігноруються Git — **не додавайте їх у коміт і не передавайте паролі**.
+## Documentation & Support
 
-Структура `android/key.properties`:
+- [Official website](https://www.cyberdesigntech.link/)
+- [FAQ](https://www.cyberdesigntech.link/#faq)
+- [GitHub Issues](https://github.com/CyberDesignTech/call-guard/issues)
 
-```properties
-storePassword=<keystore password>
-keyPassword=<key password>
-keyAlias=callgate
-storeFile=/absolute/path/to/callgate-release.jks
-```
+## License
 
-Release збірка використовує alias `callgate`, якщо `android/key.properties` присутній. Для стороннього середовища без цього файла передбачений debug-signing fallback; такі APK не призначені для публікації.
-
-## Архітектура
-
-- **Flutter / Dart (`lib/`)** — інтерфейс, локалізація, налаштування, екрани списків і журналу, симулятор правил.
-- **SQLite (`DatabaseHelper`)** — локальне сховище налаштувань, списків, каталогу країн/операторів і журналів.
-- **Android / Kotlin (`android/app/src/main/kotlin/...`)** — `CallGuardScreeningService` приймає подію системи Android, `CallRuleEngine` оцінює номер і повертає системі рішення дозволити або відхилити дзвінок. `CallGuardDatabase` читає ту саму SQLite-базу, що й Flutter.
-- **MethodChannel** — міст між Flutter та Android для системної ролі, дозволів, журналу викликів, сповіщень і статусних подій.
-- **Лендінг (`landing/`)** — статична багатомовна сторінка про можливості застосунку та посилання на релізний APK.
-
-## Структура проєкту
-
-```text
-lib/                         Flutter UI, дані, локалізація та симулятор правил
-android/app/src/main/        AndroidManifest, Kotlin-служба й системні інтеграції
-android/app/src/test/        Kotlin unit-тести
-test/                        Dart/Flutter та widget-тести
-landing/                     Статичний сайт CallGate
-release/                     Актуальний релізний APK
-```
+CallGate is released under the [MIT License](LICENSE).
