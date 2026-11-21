@@ -29,6 +29,11 @@
     <string name="status_driving_text">Alle eingehenden Anrufe werden abgewiesen</string>
     <string name="status_paused_title">CallGate · Schutz ausgeschaltet</string>
     <string name="status_paused_text">Tippen, um die App zu öffnen und den Schutz zu aktivieren</string>
+    <string name="status_silence_title">CallGate · Ruhemodus</string>
+    <string name="status_silence_text">Schutz aktiv • Ruhemodus</string>
+    <string name="status_messenger_mute_title">CallGate · Messenger-Ruhe</string>
+    <string name="status_messenger_mute_text">Schutz aktiv • Messenger-Ruhe</string>
+    <string name="status_silence_messenger_text">Schutz aktiv • Ruhemodus • Messenger-Ruhe</string>
     <string name="status_action_enable_protection">Schutz einschalten</string>
     <string name="status_action_disable_protection">Schutz ausschalten</string>
     <string name="status_action_enable_driving">Fahrmodus einschalten</string>

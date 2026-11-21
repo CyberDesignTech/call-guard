@@ -6,7 +6,12 @@ import android.telephony.PhoneNumberUtils
 import android.telephony.TelephonyManager
 import java.util.Locale
 
-/** Shared phone-number normalization used by call screening and the answering module. */
+/**
+ * Shared phone-number normalization used by call screening and the answering module.
+ *
+ * Short codes are classified before E.164 formatting, while exact emergency
+ * service codes bypass all user-configured blocking rules.
+ */
 object PhoneNumbers {
     const val HIDDEN_NUMBER = "@numberHidden"
 
@@ -21,9 +26,11 @@ object PhoneNumbers {
         "UNAVAILABLE",
     )
 
+    /** Removes punctuation using Android's telecom-compatible normalization. */
     fun normalize(phone: String): String = PhoneNumberUtils.normalizeNumber(phone)
 
     /** True only for an exact emergency service code, optionally prefixed with + or 00. */
+    /** Returns true only for an exact supported emergency service code. */
     fun isEmergencyServiceNumber(phone: String): Boolean {
         var cleaned = phone.trim().replace(shortNumberSeparators, "")
         if (cleaned.startsWith("+")) cleaned = cleaned.drop(1)
@@ -32,6 +39,7 @@ object PhoneNumbers {
     }
 
     /** Classifies a 2–6 digit code before E.164 formatting can treat it like a country prefix. */
+    /** Classifies non-emergency numbers containing two to six digits. */
     fun isShortNumber(phone: String): Boolean {
         val phoneDigits = phone.filter { it in '0'..'9' }
         return phoneDigits.length in 2..6 && phoneDigits !in emergencyServiceNumbers
@@ -45,6 +53,7 @@ object PhoneNumbers {
         return value.isEmpty() || value in hiddenNumberMarkers
     }
 
+    /** Converts a visible number to an E.164-like value using the home region. */
     fun canonicalize(context: Context, phone: String): String {
         val normalized = normalize(phone)
         val phoneDigits = digits(normalized)

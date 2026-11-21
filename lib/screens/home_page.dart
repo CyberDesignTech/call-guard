@@ -41,6 +41,8 @@ class HomePage extends StatefulWidget {
     required this.onBlockShortNumbersChanged,
     required this.manualSilenceEnabled,
     required this.onManualSilenceChanged,
+    required this.manualMessengerMute,
+    required this.onManualMessengerMuteChanged,
     required this.onTest,
     required this.onSupport,
   });
@@ -62,6 +64,8 @@ class HomePage extends StatefulWidget {
   final ValueChanged<bool> onBlockShortNumbersChanged;
   final bool manualSilenceEnabled;
   final ValueChanged<bool> onManualSilenceChanged;
+  final bool manualMessengerMute;
+  final ValueChanged<bool> onManualMessengerMuteChanged;
   final VoidCallback onTest;
   final VoidCallback onSupport;
 
@@ -73,12 +77,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   final _screeningChannel = CallScreeningChannel();
   List<Map<String, Object?>> _temporaryRules = [];
   Timer? _temporaryRulesTimer;
+  bool _dndPolicyAccessGranted = false;
+  bool _pendingMessengerMuteEnable = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     unawaited(_reloadTemporaryRules());
+    unawaited(_refreshDndPolicyAccess());
     _temporaryRulesTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       if (widget.isActive &&
           WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
@@ -97,8 +104,103 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && widget.isActive) {
-      unawaited(_reloadTemporaryRules());
+    if (state == AppLifecycleState.resumed) {
+      if (widget.isActive) unawaited(_reloadTemporaryRules());
+      unawaited(_refreshDndPolicyAccess());
+    }
+  }
+
+  Future<void> _refreshDndPolicyAccess() async {
+    var granted = false;
+    try {
+      granted = await _screeningChannel.isDndPolicyAccessGranted();
+    } on PlatformException {
+      // Do Not Disturb access is an optional Android policy permission.
+    } on MissingPluginException {
+      // The quick mute remains available on platforms without Android APIs.
+    }
+    if (!mounted) return;
+    final enablePendingMute = granted && _pendingMessengerMuteEnable;
+    setState(() {
+      _dndPolicyAccessGranted = granted;
+      if (_pendingMessengerMuteEnable) _pendingMessengerMuteEnable = false;
+    });
+    if (enablePendingMute) {
+      widget.onManualMessengerMuteChanged(true);
+    } else if (granted && widget.manualMessengerMute) {
+      try {
+        await _screeningChannel.syncDndState();
+      } on PlatformException {
+        // DND synchronization is retried after another mode change.
+      } on MissingPluginException {
+        // System DND is only available through the Android bridge.
+      }
+    }
+  }
+
+  Future<void> _openDndPolicyAccessSettings() async {
+    try {
+      await _screeningChannel.openDndPolicyAccessSettings();
+    } on PlatformException {
+      // The system access page is optional and Android-specific.
+    } on MissingPluginException {
+      // Keep the home screen usable without the Android method channel.
+    }
+  }
+
+  Future<void> _changeManualMessengerMute(bool enabled) async {
+    if (!enabled) {
+      widget.onManualMessengerMuteChanged(false);
+      return;
+    }
+
+    var granted = false;
+    try {
+      granted = await _screeningChannel.isDndPolicyAccessGranted();
+    } on PlatformException {
+      // Fall through to the explanatory permission dialog.
+    } on MissingPluginException {
+      // Fall through to the explanatory permission dialog.
+    }
+    if (!mounted) return;
+    setState(() => _dndPolicyAccessGranted = granted);
+    if (granted) {
+      widget.onManualMessengerMuteChanged(true);
+      return;
+    }
+
+    setState(() => _pendingMessengerMuteEnable = true);
+    final openSettings = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(widget.strings.call('dndSyncTitle')),
+        content: Text(widget.strings.call('dndAccessWarning')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(widget.strings.call('closeLabel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(widget.strings.call('dndGrantAccess')),
+          ),
+        ],
+      ),
+    );
+
+    if (openSettings == true) {
+      try {
+        final opened = await _screeningChannel.openDndPolicyAccessSettings();
+        if (!opened && mounted) {
+          setState(() => _pendingMessengerMuteEnable = false);
+        }
+      } on PlatformException {
+        if (mounted) setState(() => _pendingMessengerMuteEnable = false);
+      } on MissingPluginException {
+        if (mounted) setState(() => _pendingMessengerMuteEnable = false);
+      }
+    } else if (mounted) {
+      setState(() => _pendingMessengerMuteEnable = false);
     }
   }
 
@@ -790,6 +892,36 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   const Color(0xFF7663D9),
                 ),
               ),
+              const ThinDivider(),
+              RuleSwitch(
+                icon: Icons.volume_off_rounded,
+                title: widget.strings.call('manualMessengerMuteTitle'),
+                subtitle: widget.strings.call('manualMessengerMuteSubtitle'),
+                value: widget.manualMessengerMute,
+                onChanged: _changeManualMessengerMute,
+                iconColor: AppPalette.accent(AppPalette.blue),
+                iconBackground: AppPalette.bluePale,
+              ),
+              if (widget.manualMessengerMute && !_dndPolicyAccessGranted) ...[
+                Padding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(62, 0, 12, 4),
+                  child: Text(
+                    widget.strings.call('dndAccessWarning'),
+                    style: TextStyle(color: AppPalette.muted, fontSize: 11),
+                  ),
+                ),
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Padding(
+                    padding: const EdgeInsetsDirectional.only(start: 58),
+                    child: TextButton.icon(
+                      onPressed: _openDndPolicyAccessSettings,
+                      icon: const Icon(Icons.settings_outlined, size: 16),
+                      label: Text(widget.strings.call('dndGrantAccess')),
+                    ),
+                  ),
+                ),
+              ],
               const ThinDivider(),
               RuleSwitch(
                 icon: Icons.visibility_off_outlined,

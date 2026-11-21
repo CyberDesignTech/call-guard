@@ -29,6 +29,11 @@
     <string name="status_driving_text">Se rechazan todas las llamadas entrantes</string>
     <string name="status_paused_title">CallGate · Protección desactivada</string>
     <string name="status_paused_text">Toca para abrir la aplicación y activar la protección</string>
+    <string name="status_silence_title">CallGate · Modo silencio</string>
+    <string name="status_silence_text">Protección activa • Modo silencio</string>
+    <string name="status_messenger_mute_title">CallGate · Silencio en mensajería</string>
+    <string name="status_messenger_mute_text">Protección activa • Silencio en mensajería</string>
+    <string name="status_silence_messenger_text">Protección activa • Modo silencio • Silencio en mensajería</string>
     <string name="status_action_enable_protection">Activar protección</string>
     <string name="status_action_disable_protection">Desactivar protección</string>
     <string name="status_action_enable_driving">Activar modo conducción</string>

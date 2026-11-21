@@ -91,6 +91,11 @@ void main() {
       expect(settings[DatabaseHelper.settingBlockShortNumbers], 'false');
       expect(settings['dnd_sync_enabled'], 'false');
       expect(settings['dnd_previous_filter'], '-1');
+      expect(settings['dnd_previous_policy_categories'], '-1');
+      expect(settings['dnd_previous_policy_call_senders'], '-1');
+      expect(settings['dnd_previous_policy_msg_senders'], '-1');
+      expect(settings['dnd_previous_policy_suppressed'], '-1');
+      expect(settings['manual_messenger_mute'], 'false');
       expect(countries, hasLength(195));
       expect(worldCountries, hasLength(195));
       expect(await _testDatabase.getOperators('UA'), hasLength(4));
@@ -672,6 +677,10 @@ void main() {
   testWidgets(
     'Home opens the temporary-rule dialog with action and duration choices',
     (tester) async {
+      tester.view.physicalSize = const Size(390, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       await pumpApp(tester);
       await tester.scrollUntilVisible(
         find.text('Тимчасові правила'),
@@ -684,9 +693,18 @@ void main() {
             matching: find.byType(AppPanel),
           )
           .first;
-      await tester.tap(
-        find.descendant(of: temporaryCard, matching: find.text('Додати')),
+      final addRuleButton = find.descendant(
+        of: temporaryCard,
+        matching: find.text('Додати'),
       );
+      await tester.scrollUntilVisible(
+        addRuleButton,
+        180,
+        scrollable: homeScrollable(),
+      );
+      await tester.drag(find.byType(ListView).first, const Offset(0, -180));
+      await tester.pumpAndSettle();
+      await tester.tap(addRuleButton);
       await tester.pumpAndSettle();
 
       expect(find.text('Тимчасове правило'), findsOneWidget);
@@ -1312,13 +1330,18 @@ void main() {
     final messenger =
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     var openedDndSettings = false;
+    var dndAccessGranted = false;
+    var dndSyncCalls = 0;
     messenger.setMockMethodCallHandler(channel, (call) async {
-      if (call.method == 'isDndPolicyAccessGranted') return false;
+      if (call.method == 'isDndPolicyAccessGranted') return dndAccessGranted;
       if (call.method == 'openDndPolicyAccessSettings') {
         openedDndSettings = true;
         return true;
       }
-      if (call.method == 'syncDndState') return true;
+      if (call.method == 'syncDndState') {
+        dndSyncCalls++;
+        return true;
+      }
       if (call.method == 'checkPermissions') {
         return {
           'roleAvailable': true,
@@ -1337,7 +1360,7 @@ void main() {
     await tester.tap(find.byTooltip('Графік режиму тиші'));
     await finishSectionTransition(tester);
 
-    final title = find.text('Приглушувати месенджери (Не турбувати)');
+    final title = find.text('Тиша в месенджерах (Не турбувати)');
     await tester.ensureVisible(title);
     await tester.tap(title);
     await tester.pump();
@@ -1354,6 +1377,132 @@ void main() {
     await tester.tap(accessButton);
     await tester.pump();
     expect(openedDndSettings, isTrue);
+
+    dndAccessGranted = true;
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    await tester.pump();
+    expect(
+      find.text(
+        'Для синхронізації Call Gate потрібен доступ до політики «Не турбувати» в налаштуваннях Android.',
+      ),
+      findsNothing,
+    );
+    expect(dndSyncCalls, greaterThan(0));
+
+    dndAccessGranted = false;
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    await tester.pump();
+    expect(
+      find.text(
+        'Для синхронізації Call Gate потрібен доступ до політики «Не турбувати» в налаштуваннях Android.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('manual messenger mute requests policy access before enabling', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 1800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    const channel = MethodChannel('com.wepr.callguard/screening');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    var policyAccessGranted = false;
+    var openedPolicySettings = false;
+    var syncCalls = 0;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'isDndPolicyAccessGranted') {
+        return policyAccessGranted;
+      }
+      if (call.method == 'openDndPolicyAccessSettings') {
+        openedPolicySettings = true;
+        policyAccessGranted = true;
+        return true;
+      }
+      if (call.method == 'syncDndState') {
+        syncCalls++;
+        return true;
+      }
+      if (call.method == 'checkPermissions') {
+        return {
+          'roleAvailable': true,
+          'callScreeningRole': false,
+          'readContacts': false,
+          'notificationsGranted': true,
+        };
+      }
+      if (call.method == 'consumePendingCallJournal') return false;
+      if (call.method == 'restorePendingReminders') return true;
+      return null;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    await pumpApp(tester);
+    final muteTitle = find.text('Тиша в месенджерах');
+    await tester.scrollUntilVisible(
+      muteTitle,
+      240,
+      scrollable: homeScrollable(),
+    );
+    await tester.tap(muteTitle);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Для синхронізації Call Gate потрібен доступ до політики «Не турбувати» в налаштуваннях Android.',
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Налаштувати доступ'));
+    await tester.pumpAndSettle();
+    expect(openedPolicySettings, isTrue);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    await tester.pump();
+
+    final settings = await tester.runAsync(_testDatabase.getSettings);
+    expect(settings?['manual_messenger_mute'], 'true');
+    expect(syncCalls, greaterThan(0));
+    expect(
+      find.text(
+        'Для синхронізації Call Gate потрібен доступ до політики «Не турбувати» в налаштуваннях Android.',
+      ),
+      findsNothing,
+    );
+
+    policyAccessGranted = false;
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    await tester.pump();
+    expect(
+      find.text(
+        'Для синхронізації Call Gate потрібен доступ до політики «Не турбувати» в налаштуваннях Android.',
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('schedule settings stay locked until its schedule switch is on', (
@@ -2453,13 +2602,24 @@ void main() {
     await tester.tap(aboutMenuItem);
     await tester.pumpAndSettle();
     expect(find.text('Call Gate'), findsOneWidget);
-    expect(find.textContaining('v2.2.0'), findsOneWidget);
+    expect(find.textContaining('v2.5.0'), findsOneWidget);
     expect(find.text('© 2026 CyberDesignTech Dev'), findsOneWidget);
     expect(
       find.textContaining('CyberDesignTech Dev із фокусом'),
       findsOneWidget,
     );
     expect(find.textContaining('не надсилаються на сервер'), findsOneWidget);
+
+    final developerWebsite = find.text('Вебсайт розробника');
+    await tester.ensureVisible(developerWebsite);
+    await tester.tap(developerWebsite);
+    await tester.pumpAndSettle();
+    expect(openedUrls, contains('https://www.cyberdesigntech.link/'));
+    final helpFaq = find.text('Інструкція та часті запитання (FAQ)');
+    await tester.ensureVisible(helpFaq);
+    await tester.tap(helpFaq);
+    await tester.pumpAndSettle();
+    expect(openedUrls, contains('https://www.cyberdesigntech.link/#faq'));
 
     await tester.tap(find.text('Закрити вікно'));
     await tester.pumpAndSettle();

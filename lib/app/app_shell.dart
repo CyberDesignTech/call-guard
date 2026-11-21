@@ -13,8 +13,10 @@ import '../widgets/profile_settings_sheet.dart';
 import '../widgets/simulate_call_dialog.dart';
 import '../widgets/support_project_dialog.dart';
 
+/// Top-level sections kept in a swipeable order for the compact mobile shell.
 enum AppSection { home, lists, schedule, answering, more }
 
+/// Coordinates section navigation while keeping each screen's local state alive.
 class CallGuardShell extends StatefulWidget {
   const CallGuardShell({
     required this.database,
@@ -35,6 +37,8 @@ class CallGuardShell extends StatefulWidget {
     required this.automaticSilence,
     required this.manualSilenceEnabled,
     required this.onManualSilenceChanged,
+    required this.manualMessengerMute,
+    required this.onManualMessengerMuteChanged,
     required this.onAutomaticSilenceChanged,
     required this.dndSyncEnabled,
     required this.onDndSyncEnabledChanged,
@@ -85,6 +89,8 @@ class CallGuardShell extends StatefulWidget {
   final bool automaticSilence;
   final bool manualSilenceEnabled;
   final ValueChanged<bool> onManualSilenceChanged;
+  final bool manualMessengerMute;
+  final ValueChanged<bool> onManualMessengerMuteChanged;
   final ValueChanged<bool> onAutomaticSilenceChanged;
   final bool dndSyncEnabled;
   final ValueChanged<bool> onDndSyncEnabledChanged;
@@ -147,6 +153,7 @@ class CallGuardShellState extends State<CallGuardShell> {
     super.dispose();
   }
 
+  /// Selects a section and chooses animation versus a direct jump for long hops.
   void _selectSection(AppSection section) {
     if (_section != section) {
       setState(() => _section = section);
@@ -307,6 +314,8 @@ class CallGuardShellState extends State<CallGuardShell> {
             onBlockShortNumbersChanged: widget.onBlockShortNumbersChanged,
             manualSilenceEnabled: widget.manualSilenceEnabled,
             onManualSilenceChanged: widget.onManualSilenceChanged,
+            manualMessengerMute: widget.manualMessengerMute,
+            onManualMessengerMuteChanged: widget.onManualMessengerMuteChanged,
             onTest: _openTestDialog,
             onSupport: _openSupportDialog,
           ),

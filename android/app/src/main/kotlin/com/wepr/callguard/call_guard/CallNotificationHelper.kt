@@ -16,8 +16,15 @@ import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import java.util.Calendar
 import java.util.Locale
 
+/**
+ * Owns notification channels and local notifications used by CallGate.
+ *
+ * Notification content is generated locally; the status notification mirrors
+ * the same protection, driving, and silence modes used by call screening.
+ */
 object CallNotificationHelper {
     const val REMINDER_CHANNEL_ID = "call_guard_reminders_v2"
     const val MISSED_CALL_CHANNEL_ID = "call_guard_missed_calls_v3"
@@ -54,26 +61,30 @@ object CallNotificationHelper {
             return
         }
 
-        val title: String
-        val text: String
-        val icon: Int
-        when {
-            !protectionEnabled -> {
-                title = localizedContext.getString(R.string.status_paused_title)
-                text = localizedContext.getString(R.string.status_paused_text)
-                icon = R.drawable.ic_stat_shield_paused
-            }
-            drivingMode -> {
-                title = localizedContext.getString(R.string.status_driving_title)
-                text = localizedContext.getString(R.string.status_driving_text)
-                icon = R.drawable.ic_stat_shield_driving
-            }
-            else -> {
-                title = localizedContext.getString(R.string.status_active_title)
-                text = localizedContext.getString(R.string.status_active_text)
-                icon = R.drawable.ic_stat_shield_active
-            }
-        }
+        val settings = runCatching { CallGuardDatabase.readSettings(context) }
+            .getOrDefault(emptyMap())
+        val quietMode = StatusNotificationHelper.quietModeActive(
+            settings,
+            Calendar.getInstance(),
+        )
+        val messengerMute = StatusNotificationHelper.messengerMuteEnabled(settings) &&
+            runCatching {
+                DndSyncController.hasPolicyAccess(context) &&
+                    manager.currentInterruptionFilter !=
+                    NotificationManager.INTERRUPTION_FILTER_ALL
+            }.getOrDefault(false)
+        val statusMode = StatusNotificationHelper.modeFor(
+            protectionEnabled = protectionEnabled,
+            drivingMode = drivingMode,
+            silenceMode = quietMode || messengerMute,
+        )
+        val title = localizedContext.getString(
+            StatusNotificationHelper.titleFor(statusMode, messengerMute),
+        )
+        val text = localizedContext.getString(
+            StatusNotificationHelper.textFor(statusMode, quietMode, messengerMute),
+        )
+        val icon = StatusNotificationHelper.iconFor(statusMode)
         val openApp = Intent(context, MainActivity::class.java).apply {
             addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK or

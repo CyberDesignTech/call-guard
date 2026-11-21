@@ -29,8 +29,8 @@ const Map<String, String> stringsEs = {
   'quickRules': 'Reglas rápidas',
   'quickSubtitle': 'Elige qué llamadas entrantes filtrar',
   'scheduleToggle': 'Activar según horario',
-  'dndSyncTitle': 'Silenciar mensajería (No molestar)',
-  'dndSyncDescription': 'Activar No molestar de Android mientras esté activo el modo conducción, el silencio manual o el horario de silencio.',
+  'dndSyncTitle': 'Silencio en mensajería (No molestar)',
+  'dndSyncDescription': 'Activar automáticamente No molestar de Android durante los modos Conducción o Silencio para no recibir llamadas de Telegram, WhatsApp, Viber y Signal.',
   'dndAccessWarning': 'Call Gate necesita acceso a la política No molestar en los ajustes de Android para sincronizar este modo.',
   'dndGrantAccess': 'Configurar acceso',
   'whiteTab': 'Lista permitida',
@@ -44,6 +44,8 @@ const Map<String, String> stringsEs = {
   'versionLabel': 'Versión',
   'aboutDescription': 'Desarrollado por CyberDesignTech Dev, un colectivo independiente de desarrolladores centrado en la privacidad local, la velocidad y la seguridad sin servicios en la nube.',
   'aboutPrivacy': 'La configuración y las listas se guardan solo en este dispositivo. No se envían datos a ningún servidor.',
+  'developerWebsite': 'Sitio web del desarrollador',
+  'aboutHelpFaq': 'Guía y preguntas frecuentes (FAQ)',
   'copyrightLine': '© 2026 CyberDesignTech Dev',
   'footerCollective': 'Colectivo independiente de desarrolladores',
   'supportThanks':
@@ -331,6 +333,8 @@ const Map<String, String> stringsEs = {
   'manualSilenceTitle': 'Silencio manual',
   'manualSilenceSubtitle':
       'Rechazar ahora las llamadas entrantes fuera de la lista permitida',
+  'manualMessengerMuteTitle': 'Silencio en mensajería',
+  'manualMessengerMuteSubtitle': 'Activa No molestar para que no te molesten las llamadas entrantes de Telegram, WhatsApp, Viber y Signal.',
   'runSimulation': 'Comprobar número',
   'checkingCallRules': 'Comprobando reglas…',
   'verdictAllowed': 'Esta llamada está permitida',

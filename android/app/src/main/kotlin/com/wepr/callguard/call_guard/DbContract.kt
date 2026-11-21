@@ -89,6 +89,11 @@ object DbContract {
         const val ANSWERING_EMERGENCY_REPEAT = "answering_emergency_repeat"
         const val DND_SYNC_ENABLED = "dnd_sync_enabled"
         const val DND_PREVIOUS_FILTER = "dnd_previous_filter"
+        const val DND_PREVIOUS_POLICY_CATEGORIES = "dnd_previous_policy_categories"
+        const val DND_PREVIOUS_POLICY_CALL_SENDERS = "dnd_previous_policy_call_senders"
+        const val DND_PREVIOUS_POLICY_MSG_SENDERS = "dnd_previous_policy_msg_senders"
+        const val DND_PREVIOUS_POLICY_SUPPRESSED = "dnd_previous_policy_suppressed"
+        const val MANUAL_MESSENGER_MUTE = "manual_messenger_mute"
         const val LOCALE = "locale"
     }
 }

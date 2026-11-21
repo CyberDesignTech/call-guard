@@ -30,8 +30,8 @@ const Map<String, String> stringsUk = {
   'quickRules': 'Швидкі правила',
   'quickSubtitle': 'Налаштуйте, які вхідні дзвінки фільтрувати',
   'scheduleToggle': 'Активувати за розкладом',
-  'dndSyncTitle': 'Приглушувати месенджери (Не турбувати)',
-  'dndSyncDescription': 'Умикати системний режим «Не турбувати», коли активні режими «За кермом», ручна тиша або тиша за розкладом.',
+  'dndSyncTitle': 'Тиша в месенджерах (Не турбувати)',
+  'dndSyncDescription': 'Автоматично вмикати системний режим «Не турбувати» під час дії «За кермом» або «Тиші», щоб не приймати виклики з Telegram, WhatsApp, Viber та Signal.',
   'dndAccessWarning': 'Для синхронізації Call Gate потрібен доступ до політики «Не турбувати» в налаштуваннях Android.',
   'dndGrantAccess': 'Налаштувати доступ',
   'whiteTab': 'Білий список',
@@ -45,6 +45,8 @@ const Map<String, String> stringsUk = {
   'versionLabel': 'Версія',
   'aboutDescription': 'Розроблено незалежним об’єднанням розробників CyberDesignTech Dev із фокусом на локальну приватність, швидкість та безпеку без хмарних сервісів.',
   'aboutPrivacy': 'Ваші налаштування та списки зберігаються лише на цьому пристрої. Дані не надсилаються на сервер.',
+  'developerWebsite': 'Вебсайт розробника',
+  'aboutHelpFaq': 'Інструкція та часті запитання (FAQ)',
   'copyrightLine': '© 2026 CyberDesignTech Dev',
   'footerCollective': 'Незалежне об’єднання розробників',
   'supportThanks':
@@ -334,6 +336,8 @@ const Map<String, String> stringsUk = {
   'manualSilenceTitle': 'Режим тиші вручну',
   'manualSilenceSubtitle':
       'Відхиляти вхідні дзвінки поза білим списком просто зараз',
+  'manualMessengerMuteTitle': 'Тиша в месенджерах',
+  'manualMessengerMuteSubtitle': 'Вмикає системний режим «Не турбувати», щоб не приймати вхідні дзвінки з Telegram, WhatsApp, Viber та Signal.',
   'runSimulation': 'Перевірити номер',
   'checkingCallRules': 'Перевіряємо правила…',
   'verdictAllowed': 'Цей виклик дозволено',

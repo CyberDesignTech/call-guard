@@ -30,8 +30,8 @@ const Map<String, String> stringsPl = {
   'quickRules': 'Szybkie reguły',
   'quickSubtitle': 'Wybierz połączenia przychodzące do filtrowania',
   'scheduleToggle': 'Aktywuj według harmonogramu',
-  'dndSyncTitle': 'Wycisz komunikatory (Nie przeszkadzać)',
-  'dndSyncDescription': 'Włącz systemowy tryb Nie przeszkadzać, gdy aktywny jest tryb jazdy, cisza ręczna lub cisza według harmonogramu.',
+  'dndSyncTitle': 'Cisza w komunikatorach (Nie przeszkadzać)',
+  'dndSyncDescription': 'Automatycznie włącz systemowy tryb Nie przeszkadzać podczas trybu Jazda lub Cisza, aby nie odbierać połączeń z Telegrama, WhatsAppa, Vibera i Signala.',
   'dndAccessWarning': 'Aby synchronizować ten tryb, Call Gate potrzebuje dostępu do ustawień Nie przeszkadzać w Androidzie.',
   'dndGrantAccess': 'Skonfiguruj dostęp',
   'whiteTab': 'Biała lista',
@@ -45,6 +45,8 @@ const Map<String, String> stringsPl = {
   'versionLabel': 'Wersja',
   'aboutDescription': 'Stworzone przez CyberDesignTech Dev — niezależny zespół programistów skupiony na lokalnej prywatności, szybkości i bezpieczeństwie bez chmury.',
   'aboutPrivacy': 'Ustawienia i listy są przechowywane wyłącznie na tym urządzeniu. Dane nie trafiają na serwer.',
+  'developerWebsite': 'Strona internetowa dewelopera',
+  'aboutHelpFaq': 'Instrukcja i najczęstsze pytania (FAQ)',
   'copyrightLine': '© 2026 CyberDesignTech Dev',
   'footerCollective': 'Niezależny zespół programistów',
   'supportThanks':
@@ -332,6 +334,8 @@ const Map<String, String> stringsPl = {
   'manualSilenceTitle': 'Ręczny tryb ciszy',
   'manualSilenceSubtitle':
       'Odrzucaj teraz połączenia przychodzące spoza białej listy',
+  'manualMessengerMuteTitle': 'Cisza w komunikatorach',
+  'manualMessengerMuteSubtitle': 'Włącza systemowy tryb Nie przeszkadzać, aby nie przeszkadzały połączenia przychodzące z Telegrama, WhatsAppa, Vibera i Signala.',
   'runSimulation': 'Sprawdź numer',
   'checkingCallRules': 'Sprawdzanie reguł…',
   'verdictAllowed': 'To połączenie jest dozwolone',

@@ -24,6 +24,13 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.Executors
 
+/**
+ * Hosts the Flutter UI and exposes the narrow Android integration surface.
+ *
+ * Long-running database and provider work is dispatched off the main thread;
+ * activity-result state is kept here because permission and role requests are
+ * owned by the foreground activity.
+ */
 class MainActivity : FlutterActivity() {
     private var pendingRoleResult: MethodChannel.Result? = null
     private var pendingContactsResult: MethodChannel.Result? = null
@@ -122,7 +129,7 @@ class MainActivity : FlutterActivity() {
                 requestNotificationPermission(result)
             BridgeContract.Methods.OPEN_NOTIFICATION_SETTINGS -> openNotificationSettings(result)
             BridgeContract.Methods.IS_DND_POLICY_ACCESS_GRANTED ->
-                result.success(DndSyncController.isPolicyAccessGranted(applicationContext))
+                result.success(DndSyncController.hasPolicyAccess(applicationContext))
             BridgeContract.Methods.OPEN_DND_POLICY_ACCESS_SETTINGS ->
                 result.success(DndSyncController.openPolicyAccessSettings(applicationContext))
             BridgeContract.Methods.SYNC_DND_STATE -> syncDndState(result)
@@ -531,8 +538,13 @@ class MainActivity : FlutterActivity() {
             result.error("INVALID_ARGUMENT", "url is required", null)
             return
         }
+        val uri = runCatching { Uri.parse(url) }.getOrNull()
+        if (uri?.scheme?.lowercase() !in setOf("https", "market")) {
+            result.error("INVALID_ARGUMENT", "Only https and market URLs are allowed", null)
+            return
+        }
         try {
-            if (url.startsWith("market://")) {
+            if (uri?.scheme?.equals("market", ignoreCase = true) == true) {
                 val marketIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
@@ -558,7 +570,7 @@ class MainActivity : FlutterActivity() {
             startActivity(intent)
             result.success(true)
         } catch (error: ActivityNotFoundException) {
-            if (url.startsWith("market://")) {
+            if (uri?.scheme?.equals("market", ignoreCase = true) == true) {
                 val fallbackUrl = url.replace(
                     "market://details?id=",
                     "https://play.google.com/store/apps/details?id=",

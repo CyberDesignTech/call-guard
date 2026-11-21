@@ -7,6 +7,7 @@ import android.util.Log
 import java.util.Calendar
 import java.util.Locale
 
+/** Immutable result shared by native screening, simulation, and call logging. */
 data class CallRuleVerdict(
     val allowed: Boolean,
     val reason: String,
@@ -20,7 +21,13 @@ data class CallRuleVerdict(
     )
 }
 
-/** Reads the same SQLite file and setting keys used by Flutter's sqflite layer. */
+/**
+ * Reads the same SQLite file and setting keys used by Flutter's sqflite layer.
+ *
+ * Rule order is intentional: emergency services always pass, driving mode
+ * overrides allow rules, explicit lists precede country/operator rules, and
+ * the third rejected silent-mode call may break through only when enabled.
+ */
 class CallRuleEngine(
     context: Context,
     private val contactLookup: (Context, String) -> Boolean? = { lookupContext, number ->
@@ -33,6 +40,7 @@ class CallRuleEngine(
 ) {
     private val appContext = context.applicationContext
 
+    /** Evaluates one number, allowing the call if the local database is unavailable. */
     fun evaluate(phoneNumber: String?): CallRuleVerdict =
         evaluate(phoneNumber, settings = null)
 
@@ -59,6 +67,7 @@ class CallRuleEngine(
         }
     }
 
+    /** Persists a rejected-call event for the journal and emergency-repeat rule. */
     fun recordCallLog(phoneNumber: String, reason: String, contactName: String? = null) {
         try {
             CallGuardDatabase.withDatabase(appContext) { database ->
@@ -438,9 +447,6 @@ class CallRuleEngine(
 
     private fun Map<String, String>.bool(key: String, default: Boolean): Boolean =
         this[key]?.toBooleanStrictOrNull() ?: default
-
-    private fun Map<String, String>.int(key: String, default: Int): Int =
-        this[key]?.toIntOrNull() ?: default
 
     private fun verdict(allowed: Boolean, reason: String, phone: String) =
         CallRuleVerdict(allowed = allowed, reason = reason, phoneNumber = phone)

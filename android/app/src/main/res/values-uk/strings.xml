@@ -29,6 +29,11 @@
     <string name="status_driving_text">Усі вхідні виклики відхиляються</string>
     <string name="status_paused_title">CallGate · Захист вимкнено</string>
     <string name="status_paused_text">Натисніть, щоб відкрити та увімкнути захист</string>
+    <string name="status_silence_title">CallGate · Режим тиші</string>
+    <string name="status_silence_text">Захист активний • Режим тиші</string>
+    <string name="status_messenger_mute_title">CallGate · Тиша в месенджерах</string>
+    <string name="status_messenger_mute_text">Захист активний • Тиша в месенджерах</string>
+    <string name="status_silence_messenger_text">Захист активний • Режим тиші • Тиша в месенджерах</string>
     <string name="status_action_enable_protection">Увімкнути захист</string>
     <string name="status_action_disable_protection">Вимкнути захист</string>
     <string name="status_action_enable_driving">Увімкнути режим «За кермом»</string>

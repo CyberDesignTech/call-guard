@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 
 import '../models/recent_call_log_entry.dart';
 
+/// Android permission and call-screening-role state returned over the bridge.
 class CallScreeningPermissions {
   const CallScreeningPermissions({
     required this.roleAvailable,
@@ -24,6 +25,7 @@ class CallScreeningPermissions {
       );
 }
 
+/// Normalized verdict payload shared by native simulation and Dart UI code.
 class CallSimulationVerdict {
   const CallSimulationVerdict({
     required this.allowed,
@@ -62,6 +64,10 @@ class ContactPickerResult {
       );
 }
 
+/// Typed facade over the Flutter-to-Android MethodChannel.
+///
+/// Native Android owns telecom, DND, notification, contact, and alarm APIs;
+/// Dart owns presentation and persists user settings through [DatabaseHelper].
 class CallScreeningChannel {
   CallScreeningChannel({MethodChannel? channel})
     : _channel = channel ?? const MethodChannel('com.wepr.callguard/screening');
@@ -71,6 +77,7 @@ class CallScreeningChannel {
   Future<void> Function()? _statusModesChangedHandler;
   Future<void> Function()? _callHandledHandler;
 
+  /// Reads the current system role and permission state without prompting.
   Future<CallScreeningPermissions> checkPermissions() async =>
       CallScreeningPermissions.fromMap(
         await _channel.invokeMapMethod<String, Object?>('checkPermissions'),
@@ -130,6 +137,7 @@ class CallScreeningChannel {
   Future<bool> openDndPolicyAccessSettings() async =>
       await _channel.invokeMethod<bool>('openDndPolicyAccessSettings') ?? false;
 
+  /// Requests native reconciliation of CallGate modes with Android DND.
   Future<bool> syncDndState() async =>
       await _channel.invokeMethod<bool>('syncDndState') ?? false;
 

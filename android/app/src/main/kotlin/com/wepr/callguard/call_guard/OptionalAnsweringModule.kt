@@ -3,7 +3,12 @@ package com.wepr.callguard.call_guard
 import android.content.Context
 import android.util.Log
 
-/** Optional, removable call-back helper; it never answers calls or sends messages. */
+/**
+ * Optional, removable call-back helper; it never answers calls or sends messages.
+ *
+ * It can add a local notification or reminder only after the primary rule
+ * engine has rejected a call and the selected scenario explicitly applies.
+ */
 object OptionalAnsweringModule {
     /**
      * Optional scenario rule, limited to default-allowed calls so explicit allow rules win.
@@ -23,7 +28,7 @@ object OptionalAnsweringModule {
         return isUnknownNumber(context, phoneNumber)
     }
 
-    /** Returns true when this rejected call matches the selected callback scenario. */
+    /** Applies the selected callback scenario to an already rejected call. */
     fun handleRejectedCall(
         context: Context,
         phoneNumber: String,

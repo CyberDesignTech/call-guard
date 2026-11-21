@@ -10,6 +10,13 @@ import android.os.Build
 import android.os.PowerManager
 import java.util.concurrent.Executors
 
+/**
+ * Evaluates incoming calls without starting Flutter.
+ *
+ * The telecom response is delivered before optional notifications and SQLite
+ * logging so the platform's screening deadline is never coupled to side
+ * effects. A short WakeLock covers only that post-response persistence work.
+ */
 class CallGuardScreeningService : CallScreeningService() {
     override fun onScreenCall(callDetails: Call.Details) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||

@@ -4,6 +4,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /** Keeps rejection side effects independent so one optional failure cannot skip the log. */
 internal object CallScreeningPostResponseWork {
+    /**
+     * Runs optional rejection effects independently and releases the WakeLock
+     * exactly once after the Flutter/native completion notification.
+     */
     fun complete(
         verdict: CallRuleVerdict,
         onRejectedCall: () -> Unit,

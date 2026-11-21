@@ -15,6 +15,18 @@ class DndScheduleReceiver : BroadcastReceiver() {
         worker.execute {
             try {
                 DndSyncController.syncWithActiveModes(appContext)
+                val settings = CallGuardDatabase.readSettings(appContext)
+                CallNotificationHelper.updateStatusIndicator(
+                    context = appContext,
+                    enabled = BootCompletedReceiver.hasCallScreeningRole(appContext) &&
+                        settings[DbContract.SettingKeys.STATUS_TRAY_ICON_ENABLED]
+                            ?.toBooleanStrictOrNull() != false,
+                    protectionEnabled = settings[DbContract.SettingKeys.PROTECTION_ENABLED]
+                        ?.toBooleanStrictOrNull() ?: true,
+                    drivingMode = settings[DbContract.SettingKeys.DRIVING_MODE]
+                        ?.toBooleanStrictOrNull() ?: false,
+                    locale = settings[DbContract.SettingKeys.LOCALE] ?: "english",
+                )
             } catch (error: Exception) {
                 Log.w(TAG, "Could not synchronize DND at the schedule boundary", error)
             } finally {

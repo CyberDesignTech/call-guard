@@ -8,8 +8,15 @@ import android.os.Build
 import android.provider.ContactsContract
 import android.util.Log
 
-/** Shared ContactsContract.PhoneLookup checks for call screening and the answering module. */
+/**
+ * Shared ContactsContract.PhoneLookup checks for call screening and the answering module.
+ *
+ * Provider failures are deliberately conservative in opposite directions:
+ * screening keeps a call allowed, while the optional answering scenario does
+ * not treat an unverified number as unknown.
+ */
 object ContactLookup {
+    /** Returns whether the app may query the local contacts provider. */
     fun hasPermission(context: Context): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
             context.checkSelfPermission(Manifest.permission.READ_CONTACTS) ==
@@ -19,6 +26,7 @@ object ContactLookup {
      * Returns true when the number belongs to a contact, false when it does not,
      * or null when the contacts provider could not be queried.
      */
+    /** Returns true/false for a lookup result, or null when the provider fails. */
     fun isContact(context: Context, lookupNumber: String): Boolean? {
         val lookupUri = Uri.withAppendedPath(
             ContactsContract.PhoneLookup.CONTENT_FILTER_URI,

@@ -19,6 +19,7 @@ object CallGuardDatabase {
     @Volatile
     private var instance: SQLiteDatabase? = null
 
+    /** Opens the shared database and applies idempotent native compatibility work. */
     fun open(context: Context): SQLiteDatabase {
         instance?.let { return it }
         return synchronized(this) {
@@ -26,6 +27,7 @@ object CallGuardDatabase {
         }
     }
 
+    /** Runs a block against the process-wide database connection. */
     fun <T> withDatabase(context: Context, block: (SQLiteDatabase) -> T): T =
         block(open(context))
 
@@ -41,7 +43,7 @@ object CallGuardDatabase {
         }
     }
 
-    /** Reads every row of app_settings once, so one call can share a settings snapshot. */
+    /** Reads settings once so one screening pass can share a consistent snapshot. */
     fun readSettings(context: Context): Map<String, String> =
         withDatabase(context) { database ->
             val settings = HashMap<String, String>()
@@ -78,7 +80,27 @@ object CallGuardDatabase {
             ensureCallbackSettings(this)
             ensureFixedLineOperators(this)
             ensureSpainFranceCatalog(this)
+            ensureIndexes(this)
         }
+    }
+
+    private fun ensureIndexes(database: SQLiteDatabase) {
+        database.execSQL(
+            "CREATE INDEX IF NOT EXISTS idx_phone_rules_list_expires " +
+                "ON ${DbContract.PhoneRules.TABLE}(" +
+                "${DbContract.PhoneRules.LIST_TYPE}, ${DbContract.PhoneRules.EXPIRES_AT})",
+        )
+        database.execSQL("DROP INDEX IF EXISTS idx_operator_rules_country_id")
+        database.execSQL(
+            "CREATE INDEX IF NOT EXISTS idx_operator_rules_country_id " +
+                "ON ${DbContract.OperatorRules.TABLE}(" +
+                "${DbContract.OperatorRules.COUNTRY_ISO}, ${DbContract.OperatorRules.ID})",
+        )
+        database.execSQL(
+            "CREATE INDEX IF NOT EXISTS idx_call_logs_reason_ts " +
+                "ON ${DbContract.CallLogs.TABLE}(" +
+                "${DbContract.CallLogs.REASON}, ${DbContract.CallLogs.TIMESTAMP})",
+        )
     }
 
     /** Adds columns introduced after the first release; runs at most once per process. */
@@ -373,6 +395,11 @@ object CallGuardDatabase {
         DbContract.SettingKeys.ANSWERING_EMERGENCY_REPEAT to "false",
         DbContract.SettingKeys.DND_SYNC_ENABLED to "false",
         DbContract.SettingKeys.DND_PREVIOUS_FILTER to "-1",
+        DbContract.SettingKeys.DND_PREVIOUS_POLICY_CATEGORIES to "-1",
+        DbContract.SettingKeys.DND_PREVIOUS_POLICY_CALL_SENDERS to "-1",
+        DbContract.SettingKeys.DND_PREVIOUS_POLICY_MSG_SENDERS to "-1",
+        DbContract.SettingKeys.DND_PREVIOUS_POLICY_SUPPRESSED to "-1",
+        DbContract.SettingKeys.MANUAL_MESSENGER_MUTE to "false",
         DbContract.SettingKeys.BLOCK_SHORT_NUMBERS to "false",
         DbContract.SettingKeys.DRIVING_MODE to "false",
         DbContract.SettingKeys.STATUS_TRAY_ICON_ENABLED to "true",

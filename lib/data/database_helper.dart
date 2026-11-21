@@ -38,6 +38,10 @@ const _operatorSeeds = <(String, String, String)>[
   ('FR', 'operatorParisLandline', '1'),
 ];
 
+/// Owns the local SQLite database shared with the native Android call engine.
+///
+/// The schema and setting keys are intentionally compatible with
+/// `CallGuardDatabase.kt`, because screening may open the file without Flutter.
 class DatabaseHelper {
   static const settingBlockShortNumbers = 'block_short_numbers';
 
@@ -47,6 +51,11 @@ class DatabaseHelper {
     'answering_emergency_repeat': 'false',
     'dnd_sync_enabled': 'false',
     'dnd_previous_filter': '-1',
+    'dnd_previous_policy_categories': '-1',
+    'dnd_previous_policy_call_senders': '-1',
+    'dnd_previous_policy_msg_senders': '-1',
+    'dnd_previous_policy_suppressed': '-1',
+    'manual_messenger_mute': 'false',
     settingBlockShortNumbers: 'false',
     'driving_mode': 'false',
     'status_tray_icon_enabled': 'true',
@@ -84,10 +93,11 @@ class DatabaseHelper {
         await _ensureCountryAreaCodesColumn(db);
         await _migrateLegacyStatusTraySettings(db);
         await _migrateLegacyUnitedStates(db);
-        if (oldVersion < 3) await _createIndexes(db);
+        await _createIndexes(db);
         await _ensureCallbackSettings(db);
         await _ensureWorldCountries(db);
         await _ensureOperatorCatalog(db);
+        await _createIndexes(db);
       },
       onOpen: (db) async {
         await _ensureReminderRepeatColumns(db);
@@ -106,6 +116,7 @@ class DatabaseHelper {
     return database;
   }
 
+  /// Opens the database and applies all idempotent schema/catalog migrations.
   Future<void> initialize() async {
     await _database;
   }
@@ -220,6 +231,7 @@ class DatabaseHelper {
     await batch.commit(noResult: true);
   }
 
+  /// Creates indexes used by screening, journal history, and reminder queries.
   Future<void> _createIndexes(DatabaseExecutor db) async {
     final tables = (await db.rawQuery(
       "SELECT name FROM sqlite_master WHERE type = 'table'",
@@ -229,11 +241,16 @@ class DatabaseHelper {
         'CREATE INDEX IF NOT EXISTS idx_phone_rules_list_type '
         'ON phone_rules(list_type)',
       );
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_phone_rules_list_expires '
+        'ON phone_rules(list_type, expires_at)',
+      );
     }
     if (tables.contains('operator_rules')) {
+      await db.execute('DROP INDEX IF EXISTS idx_operator_rules_country_id');
       await db.execute(
         'CREATE INDEX IF NOT EXISTS idx_operator_rules_country_id '
-        'ON operator_rules(country_iso)',
+        'ON operator_rules(country_iso, id)',
       );
     }
     if (tables.contains('call_reminders')) {
@@ -246,6 +263,10 @@ class DatabaseHelper {
       await db.execute(
         'CREATE INDEX IF NOT EXISTS idx_call_logs_timestamp '
         'ON call_logs(timestamp)',
+      );
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_call_logs_reason_ts '
+        'ON call_logs(reason, timestamp)',
       );
     }
   }

@@ -1,5 +1,7 @@
+/// Visual mode of the persistent status notification.
 enum StatusTrayMode { hidden, active, driving, paused }
 
+/// Persisted user choices and activation state for the status notification.
 class StatusTrayPreferences {
   const StatusTrayPreferences({
     this.enabled = true,
@@ -26,6 +28,7 @@ class StatusTrayPreferences {
   );
 }
 
+/// Result of reconciling role, protection, driving, and notification state.
 class StatusTrayDecision {
   const StatusTrayDecision({
     required this.preferences,
@@ -40,9 +43,13 @@ class StatusTrayDecision {
 
 /// Keeps the notification hidden until screening is configured, then preserves
 /// its state across protection pauses unless the user explicitly disables it.
+///
+/// This lifecycle is deliberately separate from native DND ownership: the
+/// notification may describe a paused mode without changing system policy.
 class StatusTrayLifecycle {
   const StatusTrayLifecycle._();
 
+  /// Computes the next tray state without performing platform or database I/O.
   static StatusTrayDecision reconcile({
     required StatusTrayPreferences current,
     required bool roleGranted,
@@ -82,6 +89,7 @@ class StatusTrayLifecycle {
     );
   }
 
+  /// Applies an explicit user toggle and resets the permission prompt on enable.
   static StatusTrayPreferences userChanged(
     StatusTrayPreferences current,
     bool enabled,

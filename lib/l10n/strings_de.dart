@@ -30,8 +30,8 @@ const Map<String, String> stringsDe = {
   'quickSubtitle':
       'Wählen Sie, welche eingehenden Anrufe gefiltert werden sollen',
   'scheduleToggle': 'Nach Zeitplan aktivieren',
-  'dndSyncTitle': 'Messenger stummschalten (Bitte nicht stören)',
-  'dndSyncDescription': 'Android „Bitte nicht stören“ aktivieren, wenn Fahrmodus, manuelle Ruhe oder Ruhezeitplan aktiv ist.',
+  'dndSyncTitle': 'Messenger-Ruhe (Bitte nicht stören)',
+  'dndSyncDescription': 'Android „Bitte nicht stören“ während des Fahr- oder Ruhemodus automatisch aktivieren, damit Anrufe von Telegram, WhatsApp, Viber und Signal nicht stören.',
   'dndAccessWarning': 'Für die Synchronisierung benötigt Call Gate in den Android-Einstellungen Zugriff auf „Bitte nicht stören“.',
   'dndGrantAccess': 'Zugriff einrichten',
   'whiteTab': 'Erlaubnisliste',
@@ -45,6 +45,8 @@ const Map<String, String> stringsDe = {
   'versionLabel': 'Version',
   'aboutDescription': 'Entwickelt von CyberDesignTech Dev, einem unabhängigen Entwicklerkollektiv mit Fokus auf lokale Privatsphäre, Geschwindigkeit und Sicherheit ohne Cloud-Dienste.',
   'aboutPrivacy': 'Ihre Einstellungen und Listen werden nur auf diesem Gerät gespeichert. Es werden keine Daten an einen Server gesendet.',
+  'developerWebsite': 'Website des Entwicklers',
+  'aboutHelpFaq': 'Anleitung und häufig gestellte Fragen (FAQ)',
   'copyrightLine': '© 2026 CyberDesignTech Dev',
   'footerCollective': 'Unabhängiges Entwicklerkollektiv',
   'supportThanks':
@@ -332,6 +334,8 @@ const Map<String, String> stringsDe = {
   'manualSilenceTitle': 'Manueller Ruhemodus',
   'manualSilenceSubtitle':
       'Eingehende Anrufe außerhalb der Erlaubnisliste jetzt ablehnen',
+  'manualMessengerMuteTitle': 'Ruhe für Messenger',
+  'manualMessengerMuteSubtitle': 'Aktiviert „Bitte nicht stören“, damit eingehende Anrufe von Telegram, WhatsApp, Viber und Signal nicht stören.',
   'runSimulation': 'Nummer prüfen',
   'checkingCallRules': 'Regeln werden geprüft…',
   'verdictAllowed': 'Dieser Anruf ist erlaubt',

@@ -21,6 +21,11 @@ import '../widgets/common/rule_switch.dart';
 import '../widgets/common/section_heading.dart';
 import '../widgets/reminder_card.dart';
 
+/// Displays local reminders and the rejected-call journal.
+///
+/// The journal polling path compares count and newest timestamp before calling
+/// `setState`, avoiding rebuilds when the native screening service has not
+/// inserted a new record.
 class MorePage extends StatefulWidget {
   const MorePage({
     required this.database,
@@ -52,6 +57,8 @@ class MorePageState extends State<MorePage> with WidgetsBindingObserver {
   List<CallLogEntry> _logs = [];
   bool _loading = true;
   bool _notificationsGranted = false;
+  int? _lastLogCount;
+  int? _lastLogTimestamp;
   Timer? _refreshTimer;
   final _screeningChannel = CallScreeningChannel();
 
@@ -119,15 +126,30 @@ class MorePageState extends State<MorePage> with WidgetsBindingObserver {
     setState(() {
       _reminders = reminderRows.map(_reminderFromRow).toList();
       _logs = logRows.map(_logFromRow).toList();
+      _lastLogCount = logRows.length;
+      _lastLogTimestamp = logRows.isEmpty
+          ? null
+          : logRows.first['timestamp'] as int?;
       _loading = false;
     });
   }
 
+  /// Reloads the journal only when its observable ordering state changed.
   Future<void> _reloadLogs() async {
     final logRows = await widget.database.getCallLogs();
     if (!mounted) return;
+    final latestTimestamp = logRows.isEmpty
+        ? null
+        : logRows.first['timestamp'] as int?;
+    if (!_loading &&
+        _lastLogCount == logRows.length &&
+        _lastLogTimestamp == latestTimestamp) {
+      return;
+    }
     setState(() {
       _logs = logRows.map(_logFromRow).toList();
+      _lastLogCount = logRows.length;
+      _lastLogTimestamp = latestTimestamp;
       _loading = false;
     });
   }

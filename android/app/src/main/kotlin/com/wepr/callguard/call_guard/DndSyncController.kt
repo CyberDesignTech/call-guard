@@ -11,13 +11,20 @@ import android.provider.Settings
 import android.util.Log
 import java.util.Calendar
 
-/** Safely mirrors active CallGate modes to Android's interruption filter. */
+/**
+ * Safely mirrors active CallGate modes to Android's interruption filter.
+ *
+ * CallGate records the user's policy only when the current filter is ALL.
+ * It restores that policy only while the filter is still PRIORITY, avoiding
+ * overwriting a manual DND change made outside the app.
+ */
 object DndSyncController {
     const val NO_PREVIOUS_FILTER = -1
 
     private val syncLock = Any()
 
-    fun isPolicyAccessGranted(context: Context): Boolean {
+    /** Returns whether Android granted notification-policy access to CallGate. */
+    fun hasPolicyAccess(context: Context): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return false
         return runCatching {
             context.getSystemService(NotificationManager::class.java)
@@ -25,6 +32,9 @@ object DndSyncController {
         }.getOrDefault(false)
     }
 
+    fun isPolicyAccessGranted(context: Context): Boolean = hasPolicyAccess(context)
+
+    /** Opens the system screen where notification-policy access can be granted. */
     fun openPolicyAccessSettings(context: Context): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return false
         return runCatching {
@@ -36,7 +46,7 @@ object DndSyncController {
         }.getOrDefault(false)
     }
 
-    /** Reads persisted settings, syncs DND, and arms the next schedule boundary. */
+    /** Reads settings, reconciles DND ownership, and arms the next schedule boundary. */
     fun syncWithActiveModes(context: Context) {
         val appContext = context.applicationContext
         synchronized(syncLock) {
@@ -46,15 +56,18 @@ object DndSyncController {
 
                 val manager = appContext.getSystemService(NotificationManager::class.java)
                     ?: return
-                if (!isPolicyAccessGranted(appContext)) return
+                if (!hasPolicyAccess(appContext)) return
 
                 reconcile(
                     settings = settings,
                     hasPolicyAccess = true,
                     currentFilter = manager.currentInterruptionFilter,
-                    persistPreviousFilter = { value ->
-                        persistPreviousFilter(appContext, value)
+                    currentPolicy = DndPolicySnapshot.from(manager.notificationPolicy),
+                    persistPreviousState = { filter, policy ->
+                        persistPreviousState(appContext, filter, policy)
                     },
+                    clearPreviousState = { clearPreviousState(appContext) },
+                    setNotificationPolicy = manager::setNotificationPolicy,
                     setInterruptionFilter = manager::setInterruptionFilter,
                     now = Calendar.getInstance(),
                 )
@@ -64,12 +77,18 @@ object DndSyncController {
         }
     }
 
-    /** Pure transition logic kept injectable for deterministic local unit tests. */
+    /**
+     * Applies the DND ownership state machine without performing I/O itself.
+     * Keeping it pure makes restoration and manual-user-change cases testable.
+     */
     internal fun reconcile(
         settings: Map<String, String>,
         hasPolicyAccess: Boolean,
         currentFilter: Int,
-        persistPreviousFilter: (String) -> Unit,
+        currentPolicy: DndPolicySnapshot,
+        persistPreviousState: (Int, DndPolicySnapshot) -> Unit,
+        clearPreviousState: () -> Unit,
+        setNotificationPolicy: (NotificationManager.Policy) -> Unit,
         setInterruptionFilter: (Int) -> Unit,
         now: Calendar = Calendar.getInstance(),
     ) {
@@ -78,9 +97,12 @@ object DndSyncController {
         val previous = settings[DbContract.SettingKeys.DND_PREVIOUS_FILTER]
             ?.toIntOrNull()
             ?: NO_PREVIOUS_FILTER
-        val shouldActivate =
-            settings.booleanSetting(DbContract.SettingKeys.PROTECTION_ENABLED, true) &&
-                settings.booleanSetting(DbContract.SettingKeys.DND_SYNC_ENABLED, false) &&
+        val previousPolicy = savedPolicyFromSettings(settings)
+        val quietScheduleActive =
+            settings.booleanSetting(DbContract.SettingKeys.AUTOMATIC_SILENCE, false) &&
+                QuietSchedulePolicy.isWithin(settings, now)
+        val autoModeSyncActive =
+            settings.booleanSetting(DbContract.SettingKeys.DND_SYNC_ENABLED, false) &&
                 (
                     settings.booleanSetting(DbContract.SettingKeys.DRIVING_MODE, false) ||
                         settings.booleanSetting(
@@ -89,8 +111,15 @@ object DndSyncController {
                         ) ||
                         settings.booleanSetting(DbContract.SettingKeys.MANUAL_SILENCE, false) ||
                         settings.booleanSetting(DbContract.SettingKeys.SILENCE_MANUAL, false) ||
-                        settings.booleanSetting(DbContract.SettingKeys.AUTOMATIC_SILENCE, false) &&
-                        QuietSchedulePolicy.isWithin(settings, now)
+                        quietScheduleActive
+                    )
+        val shouldActivate =
+            settings.booleanSetting(DbContract.SettingKeys.PROTECTION_ENABLED, true) &&
+                (
+                    settings.booleanSetting(
+                        DbContract.SettingKeys.MANUAL_MESSENGER_MUTE,
+                        false,
+                    ) || autoModeSyncActive
                     )
 
         if (shouldActivate) {
@@ -99,11 +128,24 @@ object DndSyncController {
             if (previous == NO_PREVIOUS_FILTER &&
                 currentFilter == NotificationManager.INTERRUPTION_FILTER_ALL
             ) {
-                persistPreviousFilter(currentFilter.toString())
+                val policyToRestore = previousPolicy ?: currentPolicy
+                persistPreviousState(currentFilter, policyToRestore)
+                val mutedPolicy = NotificationManager.Policy(
+                    NotificationManager.Policy.PRIORITY_CATEGORY_CALLS or
+                        NotificationManager.Policy.PRIORITY_CATEGORY_REPEAT_CALLERS,
+                    NotificationManager.Policy.PRIORITY_SENDERS_ANY,
+                    // Message categories are excluded entirely; keep the unused
+                    // sender setting conservative in case policy bits change later.
+                    NotificationManager.Policy.PRIORITY_SENDERS_CONTACTS,
+                    currentPolicy.suppressedVisualEffects or
+                        NotificationManager.Policy.SUPPRESSED_EFFECT_PEEK,
+                )
                 try {
+                    setNotificationPolicy(mutedPolicy)
                     setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY)
                 } catch (error: SecurityException) {
-                    persistPreviousFilter(NO_PREVIOUS_FILTER.toString())
+                    runCatching { setNotificationPolicy(currentPolicy.toPlatformPolicy()) }
+                    clearPreviousState()
                     throw error
                 }
             }
@@ -115,30 +157,144 @@ object DndSyncController {
             // A different filter means the user changed DND manually; leave it alone.
             if (currentFilter == NotificationManager.INTERRUPTION_FILTER_PRIORITY) {
                 try {
+                    previousPolicy?.let { setNotificationPolicy(it.toPlatformPolicy()) }
                     setInterruptionFilter(previous)
                 } catch (error: SecurityException) {
-                    Log.w(TAG, "Could not restore the previous DND filter", error)
+                    Log.w(TAG, "Could not restore the previous DND policy/filter", error)
                     return
                 }
             }
-            persistPreviousFilter(NO_PREVIOUS_FILTER.toString())
+            clearPreviousState()
         }
     }
 
-    private fun persistPreviousFilter(context: Context, value: String) {
+    private fun savedPolicyFromSettings(settings: Map<String, String>): DndPolicySnapshot? {
+        val categories = settings[DbContract.SettingKeys.DND_PREVIOUS_POLICY_CATEGORIES]
+            ?.toIntOrNull()
+            ?: NO_PREVIOUS_FILTER
+        if (categories == NO_PREVIOUS_FILTER) return null
+        return DndPolicySnapshot(
+            priorityCategories = categories,
+            priorityCallSenders = settings[
+                DbContract.SettingKeys.DND_PREVIOUS_POLICY_CALL_SENDERS
+            ]?.toIntOrNull() ?: NotificationManager.Policy.PRIORITY_SENDERS_ANY,
+            priorityMessageSenders = settings[
+                DbContract.SettingKeys.DND_PREVIOUS_POLICY_MSG_SENDERS
+            ]?.toIntOrNull() ?: NotificationManager.Policy.PRIORITY_SENDERS_ANY,
+            suppressedVisualEffects = settings[
+                DbContract.SettingKeys.DND_PREVIOUS_POLICY_SUPPRESSED
+            ]?.toIntOrNull() ?: 0,
+        )
+    }
+
+    private fun persistPreviousState(
+        context: Context,
+        interruptionFilter: Int,
+        policy: DndPolicySnapshot,
+    ) {
         CallGuardDatabase.withDatabase(context) { database ->
-            val values = ContentValues().apply {
-                put(DbContract.AppSettings.KEY, DbContract.SettingKeys.DND_PREVIOUS_FILTER)
-                put(DbContract.AppSettings.VALUE, value)
+            database.beginTransaction()
+            try {
+                writeSetting(database, DbContract.SettingKeys.DND_PREVIOUS_FILTER, interruptionFilter)
+                writeSetting(
+                    database,
+                    DbContract.SettingKeys.DND_PREVIOUS_POLICY_CATEGORIES,
+                    policy.priorityCategories,
+                )
+                writeSetting(
+                    database,
+                    DbContract.SettingKeys.DND_PREVIOUS_POLICY_CALL_SENDERS,
+                    policy.priorityCallSenders,
+                )
+                writeSetting(
+                    database,
+                    DbContract.SettingKeys.DND_PREVIOUS_POLICY_MSG_SENDERS,
+                    policy.priorityMessageSenders,
+                )
+                writeSetting(
+                    database,
+                    DbContract.SettingKeys.DND_PREVIOUS_POLICY_SUPPRESSED,
+                    policy.suppressedVisualEffects,
+                )
+                database.setTransactionSuccessful()
+            } finally {
+                database.endTransaction()
             }
-            check(
-                database.insertWithOnConflict(
-                    DbContract.AppSettings.TABLE,
-                    null,
-                    values,
-                    android.database.sqlite.SQLiteDatabase.CONFLICT_REPLACE,
-                ) != -1L,
-            ) { "Could not persist the previous DND filter" }
+        }
+    }
+
+    private fun clearPreviousState(context: Context) {
+        CallGuardDatabase.withDatabase(context) { database ->
+            database.beginTransaction()
+            try {
+                writeSetting(database, DbContract.SettingKeys.DND_PREVIOUS_FILTER, NO_PREVIOUS_FILTER)
+                writeSetting(
+                    database,
+                    DbContract.SettingKeys.DND_PREVIOUS_POLICY_CATEGORIES,
+                    NO_PREVIOUS_FILTER,
+                )
+                writeSetting(
+                    database,
+                    DbContract.SettingKeys.DND_PREVIOUS_POLICY_CALL_SENDERS,
+                    NO_PREVIOUS_FILTER,
+                )
+                writeSetting(
+                    database,
+                    DbContract.SettingKeys.DND_PREVIOUS_POLICY_MSG_SENDERS,
+                    NO_PREVIOUS_FILTER,
+                )
+                writeSetting(
+                    database,
+                    DbContract.SettingKeys.DND_PREVIOUS_POLICY_SUPPRESSED,
+                    NO_PREVIOUS_FILTER,
+                )
+                database.setTransactionSuccessful()
+            } finally {
+                database.endTransaction()
+            }
+        }
+    }
+
+    private fun writeSetting(
+        database: android.database.sqlite.SQLiteDatabase,
+        key: String,
+        value: Int,
+    ) {
+        val values = ContentValues().apply {
+            put(DbContract.AppSettings.KEY, key)
+            put(DbContract.AppSettings.VALUE, value.toString())
+        }
+        check(
+            database.insertWithOnConflict(
+                DbContract.AppSettings.TABLE,
+                null,
+                values,
+                android.database.sqlite.SQLiteDatabase.CONFLICT_REPLACE,
+            ) != -1L,
+        ) { "Could not persist DND state key $key" }
+    }
+
+    private fun DndPolicySnapshot.toPlatformPolicy(): NotificationManager.Policy =
+        NotificationManager.Policy(
+            priorityCategories,
+            priorityCallSenders,
+            priorityMessageSenders,
+            suppressedVisualEffects,
+        )
+
+    internal data class DndPolicySnapshot(
+        val priorityCategories: Int,
+        val priorityCallSenders: Int,
+        val priorityMessageSenders: Int,
+        val suppressedVisualEffects: Int,
+    ) {
+        companion object {
+            fun from(policy: NotificationManager.Policy) = DndPolicySnapshot(
+                priorityCategories = policy.priorityCategories,
+                priorityCallSenders = policy.priorityCallSenders,
+                priorityMessageSenders = policy.priorityMessageSenders,
+                suppressedVisualEffects = policy.suppressedVisualEffects,
+            )
         }
     }
 
@@ -158,8 +314,12 @@ internal object DndScheduleScheduler {
         val shouldTrackSchedule =
             settings[DbContract.SettingKeys.PROTECTION_ENABLED]
                 ?.toBooleanStrictOrNull() != false &&
-                settings[DbContract.SettingKeys.DND_SYNC_ENABLED]
-                    ?.toBooleanStrictOrNull() == true &&
+                (
+                    settings[DbContract.SettingKeys.DND_SYNC_ENABLED]
+                        ?.toBooleanStrictOrNull() == true ||
+                        settings[DbContract.SettingKeys.STATUS_TRAY_ICON_ENABLED]
+                            ?.toBooleanStrictOrNull() != false
+                    ) &&
                 settings[DbContract.SettingKeys.AUTOMATIC_SILENCE]
                     ?.toBooleanStrictOrNull() == true
         if (!shouldTrackSchedule) {

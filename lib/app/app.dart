@@ -13,6 +13,10 @@ import '../theme/app_theme.dart';
 import '../widgets/common/shield_phone_logo.dart';
 import 'app_shell.dart';
 
+/// Root widget coordinating persisted settings, platform events, and theming.
+///
+/// Settings writes are serialized so rapid UI toggles cannot reorder values;
+/// native screening remains authoritative while Flutter reflects the result.
 class CallGuardApp extends StatefulWidget {
   CallGuardApp({super.key, DatabaseHelper? database})
     : database = database ?? DatabaseHelper.instance;
@@ -38,6 +42,7 @@ class CallGuardAppState extends State<CallGuardApp>
   bool _blockShortNumbers = false;
   bool _automaticSilence = false;
   bool _manualSilenceEnabled = false;
+  bool _manualMessengerMute = false;
   bool _allowOnlyWhitelist = true;
   TimeOfDay _silenceStart = const TimeOfDay(hour: 22, minute: 0);
   TimeOfDay _silenceEnd = const TimeOfDay(hour: 7, minute: 0);
@@ -90,6 +95,7 @@ class CallGuardAppState extends State<CallGuardApp>
     }
   }
 
+  /// Refreshes mode state after native events or app-resume without stale writes.
   Future<void> _refreshModesFromDatabase() async {
     if (!_ready) return;
     final generation = ++_modeRefreshGeneration;
@@ -116,6 +122,7 @@ class CallGuardAppState extends State<CallGuardApp>
     }
   }
 
+  /// Loads local settings before exposing the interactive shell.
   Future<void> _restoreSettings() async {
     try {
       await widget.database.initialize();
@@ -179,6 +186,7 @@ class CallGuardAppState extends State<CallGuardApp>
         );
         _automaticSilence = parseBool('automatic_silence', false);
         _manualSilenceEnabled = parseBool('manual_silence_enabled', false);
+        _manualMessengerMute = parseBool('manual_messenger_mute', false);
         _allowOnlyWhitelist = parseBool('allow_only_whitelist', true);
         _silenceStart = _timeOfDay(parseInt('silence_start_minute', 1320));
         _silenceEnd = _timeOfDay(parseInt('silence_end_minute', 420));
@@ -231,7 +239,12 @@ class CallGuardAppState extends State<CallGuardApp>
   }
 
   void _persistAndSyncDnd(String key, Object value) {
-    unawaited(_persistSetting(key, value).then((_) => _syncDndStateSafely()));
+    unawaited(
+      _persistSetting(key, value).then((_) async {
+        await _syncDndStateSafely();
+        _syncStatusIndicator();
+      }),
+    );
   }
 
   Future<void> _syncDndStateSafely() async {
@@ -444,6 +457,11 @@ class CallGuardAppState extends State<CallGuardApp>
               onManualSilenceChanged: (value) {
                 setState(() => _manualSilenceEnabled = value);
                 _persistAndSyncDnd('manual_silence_enabled', value);
+              },
+              manualMessengerMute: _manualMessengerMute,
+              onManualMessengerMuteChanged: (value) {
+                setState(() => _manualMessengerMute = value);
+                _persistAndSyncDnd('manual_messenger_mute', value);
               },
               onAutomaticSilenceChanged: (value) {
                 setState(() => _automaticSilence = value);

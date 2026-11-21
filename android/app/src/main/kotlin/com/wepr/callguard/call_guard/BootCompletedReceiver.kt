@@ -8,6 +8,10 @@ import android.os.Build
 import android.util.Log
 import java.util.concurrent.Executors
 
+/**
+ * Restores alarms, DND synchronization, and the status notification after
+ * boot, package replacement, clock changes, or timezone changes.
+ */
 class BootCompletedReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action !in RESTORE_ACTIONS) return

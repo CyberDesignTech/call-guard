@@ -7,11 +7,18 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 
+/**
+ * Schedules local reminder alarms and restores them after lifecycle events.
+ *
+ * Exact alarms are preferred for user-created reminders; an idle-safe fallback
+ * keeps reminders usable when Android withholds exact-alarm access.
+ */
 object CallReminderScheduler {
     const val ACTION_FIRE_REMINDER = "com.wepr.callguard.action.FIRE_REMINDER"
     const val ACTION_MARK_REMINDER_DONE = "com.wepr.callguard.action.MARK_REMINDER_DONE"
     const val EXTRA_REMINDER_ID = "reminder_id"
 
+    /** Arms or re-arms one reminder without changing its database record. */
     fun schedule(context: Context, reminderId: Int, remindAt: Long) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
         val pendingIntent = reminderPendingIntent(
@@ -41,6 +48,7 @@ object CallReminderScheduler {
         }
     }
 
+    /** Cancels the alarm associated with one reminder id. */
     fun cancel(context: Context, reminderId: Int) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
         val pendingIntent = reminderPendingIntent(
@@ -52,6 +60,7 @@ object CallReminderScheduler {
         pendingIntent.cancel()
     }
 
+    /** Restores pending alarms and advances overdue repeating reminders after boot. */
     fun restorePending(context: Context, afterBoot: Boolean = false) {
         val now = System.currentTimeMillis()
         val pendingSchedules = mutableListOf<PendingSchedule>()

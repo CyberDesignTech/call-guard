@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../l10n/app_strings.dart';
+import '../platform/call_screening_channel.dart';
 import '../theme/app_palette.dart';
 import 'common/icon_box.dart';
 import 'common/shield_phone_logo.dart';
@@ -26,8 +28,19 @@ class ProfileSettingsSheet extends StatefulWidget {
 }
 
 class ProfileSettingsSheetState extends State<ProfileSettingsSheet> {
+  final _screeningChannel = CallScreeningChannel();
   late AppLanguage _language = widget.language;
   late ThemeMode _themeMode = widget.themeMode;
+
+  Future<void> _openExternalUrl(String url) async {
+    try {
+      await _screeningChannel.openExternalUrl(url);
+    } on PlatformException {
+      // Keep the About dialog available if Android cannot open the URL.
+    } on MissingPluginException {
+      // External URLs are provided by the Android method channel.
+    }
+  }
 
   void _showAbout() {
     showDialog<void>(
@@ -35,57 +48,86 @@ class ProfileSettingsSheetState extends State<ProfileSettingsSheet> {
       builder: (dialogContext) => AlertDialog(
         icon: const ShieldPhoneLogo(size: 76),
         title: const Text('Call Gate'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '${widget.strings.call('versionLabel')}  v2.2.0',
-              style: TextStyle(
-                color: AppPalette.accent(AppPalette.blue),
-                fontWeight: FontWeight.w800,
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${widget.strings.call('versionLabel')}  v2.5.0',
+                style: TextStyle(
+                  color: AppPalette.accent(AppPalette.blue),
+                  fontWeight: FontWeight.w800,
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              widget.strings.call('aboutDescription'),
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppPalette.muted, fontSize: 13),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppPalette.bluePale,
-                borderRadius: BorderRadius.circular(16),
+              const SizedBox(height: 12),
+              Text(
+                widget.strings.call('aboutDescription'),
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppPalette.muted, fontSize: 13),
               ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.lock_outline_rounded,
-                    size: 19,
-                    color: AppPalette.accent(AppPalette.blue),
-                  ),
-                  const SizedBox(width: 9),
-                  Expanded(
-                    child: Text(
-                      widget.strings.call('aboutPrivacy'),
-                      style: TextStyle(color: AppPalette.ink, fontSize: 12),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppPalette.bluePale,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.lock_outline_rounded,
+                      size: 19,
+                      color: AppPalette.accent(AppPalette.blue),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Text(
+                        widget.strings.call('aboutPrivacy'),
+                        style: TextStyle(color: AppPalette.ink, fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              widget.strings.call('copyrightLine'),
-              textAlign: TextAlign.center,
-              style: Theme.of(dialogContext).textTheme.bodySmall?.copyWith(
-                color: Theme.of(dialogContext).colorScheme.onSurfaceVariant
-                    .withValues(alpha: 0.7),
+              const SizedBox(height: 6),
+              ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                  Icons.language_rounded,
+                  color: AppPalette.accent(AppPalette.blue),
+                ),
+                title: Text(widget.strings.call('developerWebsite')),
+                trailing: const Icon(Icons.open_in_new_rounded, size: 18),
+                onTap: () => _openExternalUrl(
+                  'https://www.cyberdesigntech.link/',
+                ),
               ),
-            ),
-          ],
+              ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                  Icons.help_outline_rounded,
+                  color: AppPalette.accent(AppPalette.blue),
+                ),
+                title: Text(widget.strings.call('aboutHelpFaq')),
+                trailing: const Icon(Icons.open_in_new_rounded, size: 18),
+                onTap: () => _openExternalUrl(
+                  'https://www.cyberdesigntech.link/#faq',
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                widget.strings.call('copyrightLine'),
+                textAlign: TextAlign.center,
+                style: Theme.of(dialogContext).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(dialogContext).colorScheme.onSurfaceVariant
+                      .withValues(alpha: 0.7),
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(

@@ -7,11 +7,16 @@ import '../platform/call_screening_channel.dart';
 ///
 /// Keep rule ordering and persisted setting keys in sync with
 /// `CallRuleEngine.kt`; call screening itself always runs natively.
+///
+/// Emergency service codes bypass every user rule, two-to-six digit codes are
+/// classified before country normalization, and emergency repeat requires two
+/// recent silent rejections before allowing the third call.
 class CallRuleSimulator {
   const CallRuleSimulator(this.database);
 
   final DatabaseHelper database;
 
+  /// Evaluates a simulated number using the current local settings snapshot.
   Future<CallSimulationVerdict> evaluate(
     String phoneNumber, {
     DateTime? now,

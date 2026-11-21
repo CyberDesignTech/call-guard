@@ -1,6 +1,11 @@
 package com.wepr.callguard.call_guard
 
-/** Single source of truth for the Flutter <-> Android MethodChannel bridge. */
+/**
+ * Single source of truth for the Flutter-to-Android MethodChannel contract.
+ *
+ * Keeping names and payload keys here prevents silent drift between Dart UI
+ * code and the native components that own system permissions and alarms.
+ */
 object BridgeContract {
     const val CHANNEL_NAME = "com.wepr.callguard/screening"
 
