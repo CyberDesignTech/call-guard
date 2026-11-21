@@ -70,7 +70,7 @@ const Map<String, String> stringsEn = {
   'quickNonContactsTitle': 'Not in contacts',
   'quickNonContactsSubtitle': 'Reject numbers outside your address book',
   'quickShortNumbersTitle': 'Short and service numbers',
-  'quickShortNumbersSubtitle': 'Block incoming short codes (3–6 digits), except contacts and emergency services',
+  'quickShortNumbersSubtitle': 'Block incoming short codes (2–6 digits), except contacts and emergency services',
   'quickInternationalTitle': 'International incoming calls',
   'quickInternationalSubtitle': 'Except incoming calls from allowed countries',
   'drivingModeTitle': 'Driving mode',

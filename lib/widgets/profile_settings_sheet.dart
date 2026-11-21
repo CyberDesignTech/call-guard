@@ -39,7 +39,7 @@ class ProfileSettingsSheetState extends State<ProfileSettingsSheet> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              '${widget.strings.call('versionLabel')}  v2.0.0',
+              '${widget.strings.call('versionLabel')}  v2.0.1',
               style: TextStyle(
                 color: AppPalette.accent(AppPalette.blue),
                 fontWeight: FontWeight.w800,

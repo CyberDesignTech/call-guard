@@ -86,7 +86,7 @@ class CallRuleEngine(
         }
 
         val hidden = PhoneNumbers.isHidden(rawPhone)
-        val shortNumber = PhoneNumbers.isShortNumber(rawPhone)
+        val shortNumber = !hidden && PhoneNumbers.isShortNumber(rawPhone)
         val canonicalPhone = when {
             hidden -> ""
             shortNumber -> PhoneNumbers.digits(rawPhone)

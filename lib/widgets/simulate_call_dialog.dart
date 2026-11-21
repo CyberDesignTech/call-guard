@@ -8,10 +8,15 @@ import '../platform/call_screening_channel.dart';
 import '../theme/app_palette.dart';
 
 class SimulateCallDialog extends StatefulWidget {
-  const SimulateCallDialog({required this.strings, required this.database});
+  const SimulateCallDialog({
+    required this.strings,
+    required this.database,
+    required this.settingsOverrides,
+  });
 
   final AppStrings strings;
   final DatabaseHelper database;
+  final Map<String, String> settingsOverrides;
 
   @override
   State<SimulateCallDialog> createState() => SimulateCallDialogState();
@@ -40,8 +45,11 @@ class SimulateCallDialogState extends State<SimulateCallDialog> {
     });
     try {
       bool? isInContacts;
-      final settings = await widget.database.getSettings();
-      if (settings['block_non_contacts'] == 'true') {
+      final shouldCheckContacts =
+          widget.settingsOverrides['block_non_contacts'] == 'true' ||
+          widget.settingsOverrides[DatabaseHelper.settingBlockShortNumbers] ==
+              'true';
+      if (shouldCheckContacts) {
         try {
           final permissions = await _channel.checkPermissions();
           if (permissions.readContacts) {
@@ -55,8 +63,11 @@ class SimulateCallDialogState extends State<SimulateCallDialog> {
           // Pure Dart simulation remains available off Android.
         }
       }
-      final verdict = await CallRuleSimulator(widget.database)
-          .evaluate(phoneNumber, isInContacts: isInContacts);
+      final verdict = await CallRuleSimulator(widget.database).evaluate(
+        phoneNumber,
+        isInContacts: isInContacts,
+        settingsOverrides: widget.settingsOverrides,
+      );
       if (!mounted) return;
       setState(() => _verdict = verdict);
     } on PlatformException {

@@ -72,7 +72,7 @@ const Map<String, String> stringsDe = {
   'quickNonContactsTitle': 'Nicht in Kontakten',
   'quickNonContactsSubtitle': 'Nummern außerhalb des Adressbuchs abweisen',
   'quickShortNumbersTitle': 'Kurze und Servicenummern',
-  'quickShortNumbersSubtitle': 'Eingehende Anrufe von Kurzwahlen (3–6 Ziffern) blockieren, außer Kontakten und Notdiensten',
+  'quickShortNumbersSubtitle': 'Eingehende Anrufe von Kurzwahlen (2–6 Ziffern) blockieren, außer Kontakten und Notdiensten',
   'quickInternationalTitle': 'Internationale eingehende Anrufe',
   'drivingModeTitle': 'Fahrmodus',
   'drivingModeSubtitle': 'Alle eingehenden Anrufe blockieren (auch von der Whitelist); alle abgewiesenen Anrufe werden im Protokoll gespeichert',

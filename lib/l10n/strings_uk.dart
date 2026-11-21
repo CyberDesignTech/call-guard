@@ -73,7 +73,7 @@ const Map<String, String> stringsUk = {
   'quickNonContactsTitle': 'Не з контактів',
   'quickNonContactsSubtitle': 'Відхиляти номери поза адресною книгою',
   'quickShortNumbersTitle': 'Короткі та службові номери',
-  'quickShortNumbersSubtitle': 'Блокувати вхідні виклики з коротких кодів (3–6 цифр), крім контактів та екстрених служб',
+  'quickShortNumbersSubtitle': 'Блокувати вхідні виклики з коротких кодів (2–6 цифр), крім контактів та екстрених служб',
   'quickInternationalTitle': 'Міжнародні вхідні дзвінки',
   'quickInternationalSubtitle': 'Окрім вхідних дзвінків із дозволених країн',
   'drivingModeTitle': 'Режим «За кермом»',

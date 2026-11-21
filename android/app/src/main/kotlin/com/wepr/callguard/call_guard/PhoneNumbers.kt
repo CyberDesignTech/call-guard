@@ -31,12 +31,10 @@ object PhoneNumbers {
         return cleaned.all { it in '0'..'9' } && cleaned in emergencyServiceNumbers
     }
 
-    /** Classifies a short code before E.164 formatting can treat it like a country prefix. */
+    /** Classifies a 2–6 digit code before E.164 formatting can treat it like a country prefix. */
     fun isShortNumber(phone: String): Boolean {
-        val cleaned = phone.trim().replace(shortNumberSeparators, "")
-        if (cleaned.startsWith("+") || cleaned.startsWith("00")) return false
-        if (cleaned.length !in 3..6 || !cleaned.all { it in '0'..'9' }) return false
-        return cleaned !in emergencyServiceNumbers
+        val phoneDigits = phone.filter { it in '0'..'9' }
+        return phoneDigits.length in 2..6 && phoneDigits !in emergencyServiceNumbers
     }
 
     fun digits(value: String): String =

@@ -170,12 +170,35 @@ class CallGuardShellState extends State<CallGuardShell> {
       );
   }
 
+  Map<String, String> get _testSettingsOverrides => {
+    'protection_enabled': widget.protectionEnabled.toString(),
+    'driving_mode': widget.drivingMode.toString(),
+    'block_hidden': widget.blockUnknown.toString(),
+    'block_non_contacts': widget.blockNonContacts.toString(),
+    'block_international': widget.blockInternational.toString(),
+    DatabaseHelper.settingBlockShortNumbers: widget.blockShortNumbers
+        .toString(),
+    'automatic_silence': widget.automaticSilence.toString(),
+    'manual_silence_enabled': widget.manualSilenceEnabled.toString(),
+    'manual_silence': widget.manualSilenceEnabled.toString(),
+    'silence_manual': widget.manualSilenceEnabled.toString(),
+    'allow_only_whitelist': widget.allowOnlyWhitelist.toString(),
+    'silence_start_minute':
+        (widget.silenceStart.hour * 60 + widget.silenceStart.minute).toString(),
+    'silence_end_minute':
+        (widget.silenceEnd.hour * 60 + widget.silenceEnd.minute).toString(),
+    'silence_weekdays': (widget.silenceWeekdays.toList()..sort()).join(','),
+    'answering_enabled': widget.answeringEnabled.toString(),
+    'answering_emergency_repeat': widget.answeringEmergencyRepeat.toString(),
+  };
+
   void _openTestDialog() {
     showDialog<void>(
       context: context,
       builder: (_) => SimulateCallDialog(
         strings: widget.strings,
         database: widget.database,
+        settingsOverrides: _testSettingsOverrides,
       ),
     );
   }

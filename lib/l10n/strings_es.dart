@@ -71,7 +71,7 @@ const Map<String, String> stringsEs = {
   'quickNonContactsTitle': 'Fuera de contactos',
   'quickNonContactsSubtitle': 'Rechazar números fuera de la agenda',
   'quickShortNumbersTitle': 'Números cortos y de servicio',
-  'quickShortNumbersSubtitle': 'Bloquear llamadas entrantes de códigos cortos (3–6 dígitos), excepto contactos y servicios de emergencia',
+  'quickShortNumbersSubtitle': 'Bloquear llamadas entrantes de códigos cortos (2–6 dígitos), excepto contactos y servicios de emergencia',
   'quickInternationalTitle': 'Llamadas entrantes internacionales',
   'drivingModeTitle': 'Modo conducción',
   'drivingModeSubtitle': 'Bloquear todas las llamadas entrantes (incluso de la lista blanca); todas las rechazadas se guardan en el registro',

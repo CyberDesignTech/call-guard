@@ -71,7 +71,7 @@ const Map<String, String> stringsPl = {
   'quickNonContactsTitle': 'Spoza kontaktów',
   'quickNonContactsSubtitle': 'Odrzucaj numery spoza książki adresowej',
   'quickShortNumbersTitle': 'Krótkie i usługowe numery',
-  'quickShortNumbersSubtitle': 'Blokuj połączenia z krótkich kodów (3–6 cyfr), z wyjątkiem kontaktów i służb ratunkowych',
+  'quickShortNumbersSubtitle': 'Blokuj połączenia z krótkich kodów (2–6 cyfr), z wyjątkiem kontaktów i służb ratunkowych',
   'quickInternationalTitle': 'Międzynarodowe połączenia przychodzące',
   'drivingModeTitle': 'Tryb jazdy',
   'drivingModeSubtitle': 'Blokuj wszystkie połączenia przychodzące (nawet z białej listy); wszystkie odrzucone są zapisywane w dzienniku',

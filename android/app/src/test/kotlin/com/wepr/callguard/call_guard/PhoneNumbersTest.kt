@@ -20,17 +20,18 @@ class PhoneNumbersTest {
     }
 
     @Test
-    fun detectsShortNumbersBeforeCountryCodeNormalization() {
+    fun detectsShortNumbersByDigitCountBeforeCountryCodeNormalization() {
+        assertFalse(PhoneNumbers.isShortNumber("7"))
+        assertTrue(PhoneNumbers.isShortNumber("11"))
         assertTrue(PhoneNumbers.isShortNumber("3700"))
         assertTrue(PhoneNumbers.isShortNumber("4-66"))
-        assertTrue(PhoneNumbers.isShortNumber("5 433"))
-        assertTrue(PhoneNumbers.isShortNumber("1 (551)"))
+        assertTrue(PhoneNumbers.isShortNumber("080050"))
+        assertTrue(PhoneNumbers.isShortNumber("+3700"))
+        assertTrue(PhoneNumbers.isShortNumber("00 3700"))
+        assertTrue(PhoneNumbers.isShortNumber("ABC3700"))
 
-        assertFalse(PhoneNumbers.isShortNumber("+3700"))
-        assertFalse(PhoneNumbers.isShortNumber("00 3700"))
         assertFalse(PhoneNumbers.isShortNumber("112"))
-        assertFalse(PhoneNumbers.isShortNumber("12"))
         assertFalse(PhoneNumbers.isShortNumber("1234567"))
-        assertFalse(PhoneNumbers.isShortNumber("ABC3700"))
+        assertFalse(PhoneNumbers.isShortNumber("1234567890"))
     }
 }

@@ -17,6 +17,7 @@ import 'package:call_guard/l10n/strings_fr.dart';
 import 'package:call_guard/l10n/strings_pl.dart';
 import 'package:call_guard/l10n/strings_uk.dart';
 import 'package:call_guard/platform/call_screening_channel.dart';
+import 'package:call_guard/theme/app_palette.dart';
 import 'package:call_guard/widgets/common/app_panel.dart';
 import 'package:call_guard/widgets/common/journal_card.dart';
 
@@ -651,7 +652,7 @@ void main() {
     expect(tester.widget<SwitchListTile>(switchTile).value, isFalse);
     expect(
       find.text(
-        'Блокувати вхідні виклики з коротких кодів (3–6 цифр), крім контактів та екстрених служб',
+        'Блокувати вхідні виклики з коротких кодів (2–6 цифр), крім контактів та екстрених служб',
       ),
       findsOneWidget,
     );
@@ -2008,6 +2009,109 @@ void main() {
     expect(find.text('Перевірити номер'), findsOneWidget);
   });
 
+  testWidgets('test call uses the live short-number switch and allowlist', (
+    tester,
+  ) async {
+    const channel = MethodChannel('com.wepr.callguard/screening');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'checkPermissions') {
+        return {
+          'roleAvailable': true,
+          'callScreeningRole': false,
+          'readContacts': true,
+          'notificationsGranted': true,
+        };
+      }
+      if (call.method == 'lookupContactName') return null;
+      return null;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    await pumpApp(tester);
+    await tester.drag(find.byType(ListView).first, const Offset(0, -1200));
+    await tester.pumpAndSettle();
+    final testButton = find.text('Тестовий виклик (перевірка правила)');
+
+    Future<void> openTestDialog() async {
+      await tester.ensureVisible(testButton);
+      await tester.tap(testButton);
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> evaluateNumber(String expectedVerdict) async {
+      final input = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(input, '3700');
+      await tester.tap(find.text('Перевірити номер'));
+      await tester.pump();
+      await waitForText(tester, expectedVerdict);
+    }
+
+    void expectVerdictColor(String label, Color color) {
+      final labelFinder = find.text(label);
+      expect(labelFinder, findsOneWidget);
+      expect(
+        tester.widget<Text>(labelFinder).style!.color,
+        AppPalette.accent(color),
+      );
+    }
+
+    // With the filter off, the simulator allows the short number.
+    await openTestDialog();
+    await evaluateNumber('Цей виклик дозволено');
+    expectVerdictColor('Цей виклик дозволено', AppPalette.green);
+    expect(
+      find.textContaining('Правило дозволяє вхідний дзвінок'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Закрити вікно'));
+    await tester.pumpAndSettle();
+
+    // The live app value must win even if the persisted value is stale.
+    final shortNumbersTitle = find.text('Короткі та службові номери');
+    await tester.ensureVisible(shortNumbersTitle);
+    final shortNumbersSwitch = find
+        .ancestor(of: shortNumbersTitle, matching: find.byType(SwitchListTile))
+        .first;
+    await tester.tap(shortNumbersSwitch);
+    await tester.pump();
+    await waitForDatabase(tester);
+    expect(tester.widget<SwitchListTile>(shortNumbersSwitch).value, isTrue);
+    await tester.runAsync(
+      () => _testDatabase.setSetting(
+        DatabaseHelper.settingBlockShortNumbers,
+        false,
+      ),
+    );
+
+    await openTestDialog();
+    await evaluateNumber('Цей виклик відхилено');
+    expectVerdictColor('Цей виклик відхилено', AppPalette.red);
+    expect(
+      find.textContaining('Короткий або службовий номер заблоковано'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Закрити вікно'));
+    await tester.pumpAndSettle();
+
+    // A white-listed short number is still allowed while blocking is on.
+    await tester.runAsync(
+      () => _testDatabase.insertPhoneRule(
+        phone: '3700',
+        label: 'Test allow',
+        listType: 'white',
+      ),
+    );
+    await openTestDialog();
+    await evaluateNumber('Цей виклик дозволено');
+    expectVerdictColor('Цей виклик дозволено', AppPalette.green);
+    expect(find.textContaining('Білий список'), findsOneWidget);
+  });
+
   testWidgets('granted screening role can be changed from system settings', (
     tester,
   ) async {
@@ -2214,7 +2318,7 @@ void main() {
     await tester.tap(aboutMenuItem);
     await tester.pumpAndSettle();
     expect(find.text('Call Gate'), findsOneWidget);
-    expect(find.textContaining('v2.0.0'), findsOneWidget);
+    expect(find.textContaining('v2.0.1'), findsOneWidget);
     expect(find.text('© 2026 CyberDesignTech Dev'), findsOneWidget);
     expect(
       find.textContaining('CyberDesignTech Dev із фокусом'),

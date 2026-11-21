@@ -127,35 +127,57 @@ void main() {
     () async {
       await database.setSetting('block_international', true);
       await database.setSetting(DatabaseHelper.settingBlockShortNumbers, false);
-      for (final number in ['3700', '466']) {
+      await database.updateCountryAction('LT', 'block');
+      for (final number in ['11', '3700', '080050', '+3700']) {
+        final verdict = await CallRuleSimulator(database).evaluate(number);
+        expect(verdict.allowed, isTrue);
+        expect(
+          verdict.reason,
+          'default_allow',
+          reason: '$number must skip country and international rules',
+        );
+      }
+      for (final number in ['1', '1234567', '1234567890']) {
         final verdict = await CallRuleSimulator(database).evaluate(number);
         expect(verdict.allowed, isTrue);
         expect(verdict.reason, 'default_allow');
       }
 
       await database.setSetting(DatabaseHelper.settingBlockShortNumbers, true);
-      final notContact = await CallRuleSimulator(database)
-          .evaluate('3700', isInContacts: false);
-      expect(notContact.allowed, isFalse);
-      expect(notContact.reason, 'short_number_block');
+      for (final number in ['11', '3700', '080050', '+3700']) {
+        final notContact = await CallRuleSimulator(database)
+            .evaluate(number, isInContacts: false);
+        expect(
+          notContact.allowed,
+          isFalse,
+          reason: '$number should be rejected',
+        );
+        expect(notContact.reason, 'short_number_block');
+      }
+      for (final number in ['1', '1234567', '1234567890']) {
+        final normalNumber = await CallRuleSimulator(database)
+            .evaluate(number, isInContacts: false);
+        expect(normalNumber.allowed, isTrue);
+        expect(normalNumber.reason, 'default_allow');
+      }
 
       final contact = await CallRuleSimulator(database)
-          .evaluate('3700', isInContacts: true);
+          .evaluate('080050', isInContacts: true);
       expect(contact.allowed, isTrue);
       expect(contact.reason, 'default_allow');
 
       final unknownContactStatus = await CallRuleSimulator(database)
-          .evaluate('3700');
+          .evaluate('080050');
       expect(unknownContactStatus.allowed, isTrue);
       expect(unknownContactStatus.reason, 'default_allow');
 
       await database.insertPhoneRule(
-        phone: '3700',
+        phone: '080050',
         label: 'Explicit allow',
         listType: 'white',
       );
       final allowlisted = await CallRuleSimulator(database)
-          .evaluate('3700', isInContacts: false);
+          .evaluate('080050', isInContacts: false);
       expect(allowlisted.allowed, isTrue);
       expect(allowlisted.reason, 'allowlist');
     },

@@ -16,9 +16,25 @@ class CallRuleSimulator {
     String phoneNumber, {
     DateTime? now,
     bool? isInContacts,
+    Map<String, String>? settingsOverrides,
   }) async {
     final rawPhone = phoneNumber.trim();
-    final canonical = _canonical(rawPhone);
+    if (_isEmergencyServiceNumber(rawPhone)) {
+      final canonical = _canonical(rawPhone);
+      return CallSimulationVerdict(
+        allowed: true,
+        reason: 'emergency_service',
+        phoneNumber: canonical.isEmpty ? rawPhone : '+$canonical',
+      );
+    }
+
+    final hidden = _isHidden(rawPhone);
+    final shortNumber = !hidden && _isShortNumber(rawPhone);
+    final canonical = hidden
+        ? ''
+        : shortNumber
+        ? _digits(rawPhone)
+        : _canonical(rawPhone);
     CallSimulationVerdict verdict(bool allowed, String reason) =>
         CallSimulationVerdict(
           allowed: allowed,
@@ -26,11 +42,7 @@ class CallRuleSimulator {
           phoneNumber: canonical.isEmpty ? rawPhone : '+$canonical',
         );
 
-    if (_isEmergencyServiceNumber(rawPhone)) {
-      return verdict(true, 'emergency_service');
-    }
-
-    final settings = await database.getSettings();
+    final settings = {...await database.getSettings(), ...?settingsOverrides};
     if (!_bool(settings, 'protection_enabled', true)) {
       return verdict(true, 'protection_disabled');
     }
@@ -41,7 +53,6 @@ class CallRuleSimulator {
       return verdict(false, 'driving_mode');
     }
 
-    final hidden = _isHidden(rawPhone);
     final whiteRules = await database.getPhoneRules('white');
     final isWhitelisted =
         !hidden &&
@@ -88,7 +99,7 @@ class CallRuleSimulator {
       return verdict(false, 'hidden_number');
     }
 
-    if (_isShortNumber(rawPhone)) {
+    if (shortNumber) {
       if (!_bool(settings, DatabaseHelper.settingBlockShortNumbers, false) ||
           isInContacts != false) {
         return verdict(true, 'default_allow');
@@ -336,10 +347,10 @@ class CallRuleSimulator {
   }
 
   bool _isShortNumber(String phone) {
-    final cleaned = _removeShortNumberSeparators(phone);
-    if (cleaned.startsWith('+') || cleaned.startsWith('00')) return false;
-    if (!RegExp(r'^\d{3,6}$').hasMatch(cleaned)) return false;
-    return !_emergencyServiceNumbers.contains(cleaned);
+    final digitsOnly = _digits(phone);
+    return digitsOnly.length >= 2 &&
+        digitsOnly.length <= 6 &&
+        !_emergencyServiceNumbers.contains(digitsOnly);
   }
 
   String _removeShortNumberSeparators(String phone) =>

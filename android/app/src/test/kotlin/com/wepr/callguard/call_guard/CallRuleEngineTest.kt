@@ -99,6 +99,18 @@ class CallRuleEngineTest {
                 },
             )
             fixture.insertOrThrow(
+                DbContract.CountryRules.TABLE,
+                null,
+                ContentValues().apply {
+                    put(DbContract.CountryRules.ISO_CODE, "LT")
+                    put(DbContract.CountryRules.DIAL_CODE, "+37")
+                    put("name_key", "countryLithuania")
+                    put("custom_name", null as String?)
+                    put(DbContract.CountryRules.ACTION, "block")
+                    put(DbContract.CountryRules.AREA_CODES, "")
+                },
+            )
+            fixture.insertOrThrow(
                 DbContract.PhoneRules.TABLE,
                 null,
                 ContentValues().apply {
@@ -156,17 +168,40 @@ class CallRuleEngineTest {
             DbContract.SettingKeys.BLOCK_SHORT_NUMBERS to "false",
         )
         val shortAllowlistOff = CallRuleEngine(context) { _, _ -> false }
-        assertEquals("default_allow", shortAllowlistOff.evaluate("3700", shortSettings).reason)
-        assertEquals("default_allow", shortAllowlistOff.evaluate("466", shortSettings).reason)
+        listOf("11", "3700", "080050", "+3700").forEach { number ->
+            val shortAllowed = shortAllowlistOff.evaluate(number, shortSettings)
+            assertTrue("$number should be allowed", shortAllowed.allowed)
+            assertEquals(
+                "$number should skip country and international rules",
+                "default_allow",
+                shortAllowed.reason,
+            )
+        }
+        listOf("7", "1234567", "1234567890").forEach { number ->
+            val normalAllowed = shortAllowlistOff.evaluate(number, shortSettings)
+            assertFalse(
+                "$number must not be classified as a short code",
+                normalAllowed.reason == "short_number_block",
+            )
+        }
 
         val shortBlockingSettings = shortSettings +
             (DbContract.SettingKeys.BLOCK_SHORT_NUMBERS to "true")
-        val blockedShort = shortAllowlistOff.evaluate("3700", shortBlockingSettings)
-        assertFalse(blockedShort.allowed)
-        assertEquals("short_number_block", blockedShort.reason)
+        listOf("11", "3700", "080050", "+3700").forEach { number ->
+            val blockedShort = shortAllowlistOff.evaluate(number, shortBlockingSettings)
+            assertFalse("$number should be rejected", blockedShort.allowed)
+            assertEquals("short_number_block", blockedShort.reason)
+        }
+        listOf("7", "1234567", "1234567890").forEach { number ->
+            val normalAllowed = shortAllowlistOff.evaluate(number, shortBlockingSettings)
+            assertFalse(
+                "$number must use normal-number rules",
+                normalAllowed.reason == "short_number_block",
+            )
+        }
 
         val contactShort = CallRuleEngine(context) { _, _ -> true }
-            .evaluate("3700", shortBlockingSettings)
+            .evaluate("080050", shortBlockingSettings)
         assertEquals("default_allow", contactShort.reason)
 
         CallGuardDatabase.withDatabase(context) { database ->
@@ -174,7 +209,7 @@ class CallRuleEngineTest {
                 DbContract.PhoneRules.TABLE,
                 null,
                 ContentValues().apply {
-                    put(DbContract.PhoneRules.PHONE, "3700")
+                    put(DbContract.PhoneRules.PHONE, "080050")
                     put(DbContract.PhoneRules.LABEL, "Short code contact allow")
                     put(DbContract.PhoneRules.LIST_TYPE, DbContract.PhoneRules.WHITE)
                     put(DbContract.PhoneRules.CREATED_AT, 1L)
@@ -182,7 +217,7 @@ class CallRuleEngineTest {
                 },
             )
         }
-        val allowlistedShort = shortAllowlistOff.evaluate("3700", shortBlockingSettings)
+        val allowlistedShort = shortAllowlistOff.evaluate("080050", shortBlockingSettings)
         assertEquals("allowlist", allowlistedShort.reason)
     }
 
