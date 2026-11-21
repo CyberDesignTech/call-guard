@@ -45,6 +45,8 @@ class DatabaseHelper {
     'answering_auto_remind': 'false',
     'answering_auto_remind_minutes': '30',
     'answering_emergency_repeat': 'false',
+    'dnd_sync_enabled': 'false',
+    'dnd_previous_filter': '-1',
     settingBlockShortNumbers: 'false',
     'driving_mode': 'false',
     'status_tray_icon_enabled': 'true',

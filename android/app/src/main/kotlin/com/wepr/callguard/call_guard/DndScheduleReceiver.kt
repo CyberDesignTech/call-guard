@@ -1,0 +1,32 @@
+package com.wepr.callguard.call_guard
+
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.util.Log
+import java.util.concurrent.Executors
+
+/** Applies DND state when a configured quiet-schedule boundary is reached. */
+class DndScheduleReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action != DndScheduleScheduler.ACTION_SYNC_SCHEDULE) return
+        val appContext = context.applicationContext
+        val pendingResult = goAsync()
+        worker.execute {
+            try {
+                DndSyncController.syncWithActiveModes(appContext)
+            } catch (error: Exception) {
+                Log.w(TAG, "Could not synchronize DND at the schedule boundary", error)
+            } finally {
+                pendingResult.finish()
+            }
+        }
+    }
+
+    private companion object {
+        const val TAG = "CallGateDndSchedule"
+        val worker = Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "CallGateDndSchedule").apply { isDaemon = true }
+        }
+    }
+}

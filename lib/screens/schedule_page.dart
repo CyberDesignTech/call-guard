@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../l10n/app_strings.dart';
+import '../platform/call_screening_channel.dart';
 import '../theme/app_palette.dart';
 import '../widgets/common/app_panel.dart';
 import '../widgets/common/page_intro.dart';
@@ -15,6 +17,8 @@ class SchedulePage extends StatefulWidget {
     required this.protectionEnabled,
     required this.automaticSilence,
     required this.onAutomaticSilenceChanged,
+    required this.dndSyncEnabled,
+    required this.onDndSyncEnabledChanged,
     required this.allowOnlyWhitelist,
     required this.onAllowOnlyWhitelistChanged,
     required this.startTime,
@@ -29,6 +33,8 @@ class SchedulePage extends StatefulWidget {
   final bool protectionEnabled;
   final bool automaticSilence;
   final ValueChanged<bool> onAutomaticSilenceChanged;
+  final bool dndSyncEnabled;
+  final ValueChanged<bool> onDndSyncEnabledChanged;
   final bool allowOnlyWhitelist;
   final ValueChanged<bool> onAllowOnlyWhitelistChanged;
   final TimeOfDay startTime;
@@ -42,8 +48,11 @@ class SchedulePage extends StatefulWidget {
   State<SchedulePage> createState() => SchedulePageState();
 }
 
-class SchedulePageState extends State<SchedulePage> {
+class SchedulePageState extends State<SchedulePage>
+    with WidgetsBindingObserver {
   final _protectionWarningKey = GlobalKey<ProtectionWarningState>();
+  final _screeningChannel = CallScreeningChannel();
+  bool _dndPolicyAccessGranted = false;
 
   bool get _scheduleSettingsEnabled =>
       widget.protectionEnabled && widget.automaticSilence;
@@ -57,6 +66,49 @@ class SchedulePageState extends State<SchedulePage> {
     widget.strings.call('daySat'),
     widget.strings.call('daySun'),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refreshDndPolicyAccess();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshDndPolicyAccess();
+  }
+
+  Future<void> _refreshDndPolicyAccess() async {
+    try {
+      final granted = await _screeningChannel.isDndPolicyAccessGranted();
+      if (!mounted) return;
+      setState(() => _dndPolicyAccessGranted = granted);
+      if (granted && widget.dndSyncEnabled) {
+        await _screeningChannel.syncDndState();
+      }
+    } on PlatformException {
+      // Do Not Disturb policy access is Android-specific.
+    } on MissingPluginException {
+      // Keep the schedule UI usable without the Android method channel.
+    }
+  }
+
+  Future<void> _openDndPolicyAccessSettings() async {
+    try {
+      await _screeningChannel.openDndPolicyAccessSettings();
+    } on PlatformException {
+      // Permission access is optional; refresh when the app resumes.
+    } on MissingPluginException {
+      // System policy settings exist only on Android.
+    }
+  }
 
   Future<void> _pickTime({required bool start}) async {
     final selected = await showTimePicker(
@@ -117,6 +169,41 @@ class SchedulePageState extends State<SchedulePage> {
                 : () => _protectionWarningKey.currentState?.highlight(),
             iconColor: const Color(0xFF7663D9),
             iconBackground: const Color(0xFFF0EDFF),
+          ),
+        ),
+        const SizedBox(height: 16),
+        AppPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              RuleSwitch(
+                icon: Icons.do_not_disturb_on_outlined,
+                title: widget.strings.call('dndSyncTitle'),
+                subtitle: widget.strings.call('dndSyncDescription'),
+                value: widget.dndSyncEnabled,
+                onChanged: widget.onDndSyncEnabledChanged,
+                iconColor: AppPalette.accent(AppPalette.blue),
+                iconBackground: AppPalette.bluePale,
+              ),
+              if (widget.dndSyncEnabled && !_dndPolicyAccessGranted) ...[
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(
+                    widget.strings.call('dndAccessWarning'),
+                    style: TextStyle(color: AppPalette.muted, fontSize: 12),
+                  ),
+                ),
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: TextButton.icon(
+                    onPressed: _openDndPolicyAccessSettings,
+                    icon: const Icon(Icons.settings_outlined, size: 17),
+                    label: Text(widget.strings.call('dndGrantAccess')),
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
         Opacity(

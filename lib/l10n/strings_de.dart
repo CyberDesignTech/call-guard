@@ -30,6 +30,10 @@ const Map<String, String> stringsDe = {
   'quickSubtitle':
       'Wählen Sie, welche eingehenden Anrufe gefiltert werden sollen',
   'scheduleToggle': 'Nach Zeitplan aktivieren',
+  'dndSyncTitle': 'Messenger stummschalten (Bitte nicht stören)',
+  'dndSyncDescription': 'Android „Bitte nicht stören“ aktivieren, wenn Fahrmodus, manuelle Ruhe oder Ruhezeitplan aktiv ist.',
+  'dndAccessWarning': 'Für die Synchronisierung benötigt Call Gate in den Android-Einstellungen Zugriff auf „Bitte nicht stören“.',
+  'dndGrantAccess': 'Zugriff einrichten',
   'whiteTab': 'Erlaubnisliste',
   'blackTab': 'Sperrliste',
   'countryOperatorsTab': 'Länder und Anbieter',

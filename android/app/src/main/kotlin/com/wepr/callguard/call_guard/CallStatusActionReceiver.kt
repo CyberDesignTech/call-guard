@@ -22,6 +22,11 @@ class CallStatusActionReceiver : BroadcastReceiver() {
                     val settings = toggleSettingAndReadBack(appContext, toggle)
                     Log.i(TAG, "Saved ${toggle.settingKey}=${settings[toggle.settingKey]}")
                     runCatching {
+                        DndSyncController.syncWithActiveModes(appContext)
+                    }.onFailure {
+                        Log.w(TAG, "Could not synchronize DND after a notification action", it)
+                    }
+                    runCatching {
                         CallNotificationHelper.updateStatusIndicator(
                             context = appContext,
                             enabled = BootCompletedReceiver.hasCallScreeningRole(appContext) &&

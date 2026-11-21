@@ -87,6 +87,8 @@ object DbContract {
         const val ANSWERING_AUTO_REMIND = "answering_auto_remind"
         const val ANSWERING_AUTO_REMIND_MINUTES = "answering_auto_remind_minutes"
         const val ANSWERING_EMERGENCY_REPEAT = "answering_emergency_repeat"
+        const val DND_SYNC_ENABLED = "dnd_sync_enabled"
+        const val DND_PREVIOUS_FILTER = "dnd_previous_filter"
         const val LOCALE = "locale"
     }
 }

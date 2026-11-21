@@ -124,6 +124,15 @@ class CallScreeningChannel {
     await _channel.invokeMethod<bool>('openNotificationSettings');
   }
 
+  Future<bool> isDndPolicyAccessGranted() async =>
+      await _channel.invokeMethod<bool>('isDndPolicyAccessGranted') ?? false;
+
+  Future<bool> openDndPolicyAccessSettings() async =>
+      await _channel.invokeMethod<bool>('openDndPolicyAccessSettings') ?? false;
+
+  Future<bool> syncDndState() async =>
+      await _channel.invokeMethod<bool>('syncDndState') ?? false;
+
   Future<void> updateStatusIndicator({
     required bool enabled,
     required bool protectionEnabled,

@@ -240,6 +240,60 @@ class CallRuleEngineTest {
             }
     }
 
+    @Test
+    fun emergencyRepeatRequiresTheScenariosMasterSwitch() {
+        val context = RuntimeEnvironment.getApplication()
+        val databaseFile = context.getDatabasePath(DbContract.DATABASE_NAME)
+        databaseFile.parentFile?.mkdirs()
+        CallGuardDatabase.closeForTesting()
+        databaseFile.delete()
+
+        val fixture = SQLiteDatabase.openOrCreateDatabase(databaseFile, null)
+        try {
+            createSchema(fixture)
+            repeat(2) { offset ->
+                fixture.insertOrThrow(
+                    DbContract.CallLogs.TABLE,
+                    null,
+                    ContentValues().apply {
+                        put(DbContract.CallLogs.PHONE, "+380 63 555 01 02")
+                        put(DbContract.CallLogs.REASON, "silent_schedule")
+                        put(DbContract.CallLogs.TIMESTAMP, System.currentTimeMillis() - offset * 1000L)
+                    },
+                )
+            }
+        } finally {
+            fixture.close()
+        }
+
+        val settings = mapOf(
+            DbContract.SettingKeys.PROTECTION_ENABLED to "true",
+            DbContract.SettingKeys.DRIVING_MODE to "false",
+            DbContract.SettingKeys.MANUAL_SILENCE_ENABLED to "true",
+            DbContract.SettingKeys.AUTOMATIC_SILENCE to "false",
+            DbContract.SettingKeys.BLOCK_HIDDEN to "false",
+            DbContract.SettingKeys.BLOCK_NON_CONTACTS to "false",
+            DbContract.SettingKeys.BLOCK_INTERNATIONAL to "false",
+            DbContract.SettingKeys.ANSWERING_EMERGENCY_REPEAT to "true",
+            DbContract.SettingKeys.ANSWERING_ENABLED to "false",
+        )
+        try {
+            val engine = CallRuleEngine(context)
+            val withoutMaster = engine.evaluate("+380 63 555 01 02", settings)
+            assertFalse(withoutMaster.allowed)
+            assertEquals("silent_schedule", withoutMaster.reason)
+
+            val withMaster = engine.evaluate(
+                "+380 63 555 01 02",
+                settings + (DbContract.SettingKeys.ANSWERING_ENABLED to "true"),
+            )
+            assertTrue(withMaster.allowed)
+            assertEquals("emergency_repeat", withMaster.reason)
+        } finally {
+            CallGuardDatabase.closeForTesting()
+        }
+    }
+
     private fun createSchema(database: SQLiteDatabase) {
         database.execSQL(
             "CREATE TABLE ${DbContract.PhoneRules.TABLE} (" +

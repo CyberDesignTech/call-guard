@@ -110,7 +110,7 @@ class CallRuleEngine(
         val calendar = Calendar.getInstance()
         val scheduleActive =
             settings.bool(DbContract.SettingKeys.AUTOMATIC_SILENCE, false) &&
-                isWithinQuietSchedule(settings, calendar)
+                QuietSchedulePolicy.isWithin(settings, calendar)
         val manualSilenceActive = settings.bool(DbContract.SettingKeys.MANUAL_SILENCE_ENABLED, false) ||
             settings.bool(DbContract.SettingKeys.MANUAL_SILENCE, false) ||
             settings.bool(DbContract.SettingKeys.SILENCE_MANUAL, false)
@@ -121,7 +121,7 @@ class CallRuleEngine(
             val emergencyRepeatEnabled = settings.bool(
                 DbContract.SettingKeys.ANSWERING_EMERGENCY_REPEAT,
                 false,
-            ) && settings.bool(DbContract.SettingKeys.ANSWERING_ENABLED, false)
+            ) && OptionalAnsweringModule.isEnabled(settings)
             if (emergencyRepeatEnabled && !hidden && canonicalPhone.isNotBlank() &&
                 !isExplicitlyBlocked(database, rawPhone, canonicalPhone, settings) &&
                 hasRecentRejectedSilenceCalls(database, canonicalPhone)
@@ -436,36 +436,6 @@ class CallRuleEngine(
         }?.dialDigits
     }
 
-    private fun isWithinQuietSchedule(settings: Map<String, String>, calendar: Calendar): Boolean {
-        val weekdays = settings[DbContract.SettingKeys.SILENCE_WEEKDAYS]
-            ?.split(',')
-            ?.mapNotNull(String::toIntOrNull)
-            ?.filter { it in 1..7 }
-            ?.toSet()
-            ?: (1..7).toSet()
-        if (weekdays.isEmpty()) return false
-
-        val start = settings.int(
-            DbContract.SettingKeys.SILENCE_START_MINUTE,
-            DEFAULT_START_MINUTE,
-        ).coerceIn(0, 1439)
-        val end = settings.int(
-            DbContract.SettingKeys.SILENCE_END_MINUTE,
-            DEFAULT_END_MINUTE,
-        ).coerceIn(0, 1439)
-        val minuteOfDay = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
-        val isoWeekday = ((calendar.get(Calendar.DAY_OF_WEEK) + 5) % 7) + 1
-
-        if (start == end) return isoWeekday in weekdays
-        if (start < end) return isoWeekday in weekdays && minuteOfDay in start until end
-        if (minuteOfDay >= start) return isoWeekday in weekdays
-        if (minuteOfDay < end) {
-            val previousWeekday = if (isoWeekday == 1) 7 else isoWeekday - 1
-            return previousWeekday in weekdays
-        }
-        return false
-    }
-
     private fun Map<String, String>.bool(key: String, default: Boolean): Boolean =
         this[key]?.toBooleanStrictOrNull() ?: default
 
@@ -486,8 +456,6 @@ class CallRuleEngine(
         const val TAG = "CallGuardRuleEngine"
         const val ACTION_ALLOW = "allow"
         const val ACTION_BLOCK = "block"
-        const val DEFAULT_START_MINUTE = 22 * 60
-        const val DEFAULT_END_MINUTE = 7 * 60
         const val EMERGENCY_REPEAT_WINDOW_MS = 5 * 60 * 1000L
         const val EMERGENCY_REPEAT_MIN_REJECTED_CALLS = 2
     }

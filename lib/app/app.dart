@@ -48,6 +48,7 @@ class CallGuardAppState extends State<CallGuardApp>
   bool _answeringAutoRemind = false;
   int _answeringAutoRemindMinutes = 30;
   bool _answeringEmergencyRepeat = false;
+  bool _dndSyncEnabled = false;
   int _openCallJournalRequest = 0;
   int _callHandledRequest = 0;
   int _modeRefreshGeneration = 0;
@@ -203,9 +204,11 @@ class CallGuardAppState extends State<CallGuardApp>
           'answering_emergency_repeat',
           false,
         );
+        _dndSyncEnabled = parseBool('dnd_sync_enabled', false);
         _ready = true;
       });
       await _reconcileStatusTray(allowPermissionRequest: true);
+      await _syncDndStateSafely();
     } catch (error, stackTrace) {
       debugPrint(
         'Call Gate settings could not be restored: $error\n$stackTrace',
@@ -225,6 +228,20 @@ class CallGuardAppState extends State<CallGuardApp>
         .then((_) => widget.database.setSetting(key, value));
     _pendingSettingsWrites = write;
     return write;
+  }
+
+  void _persistAndSyncDnd(String key, Object value) {
+    unawaited(_persistSetting(key, value).then((_) => _syncDndStateSafely()));
+  }
+
+  Future<void> _syncDndStateSafely() async {
+    try {
+      await _screeningChannel.syncDndState();
+    } on PlatformException {
+      // DND policy access and synchronization are optional Android features.
+    } on MissingPluginException {
+      // Keep the app usable when the Android channel is unavailable.
+    }
   }
 
   Future<CallScreeningPermissions?> _readPermissions() async {
@@ -351,18 +368,18 @@ class CallGuardAppState extends State<CallGuardApp>
 
   void _setSilenceStart(TimeOfDay value) {
     setState(() => _silenceStart = value);
-    _persistSetting('silence_start_minute', value.hour * 60 + value.minute);
+    _persistAndSyncDnd('silence_start_minute', value.hour * 60 + value.minute);
   }
 
   void _setSilenceEnd(TimeOfDay value) {
     setState(() => _silenceEnd = value);
-    _persistSetting('silence_end_minute', value.hour * 60 + value.minute);
+    _persistAndSyncDnd('silence_end_minute', value.hour * 60 + value.minute);
   }
 
   void _setSilenceWeekdays(Set<int> value) {
     setState(() => _silenceWeekdays = value);
     final days = value.toList()..sort();
-    _persistSetting('silence_weekdays', days.join(','));
+    _persistAndSyncDnd('silence_weekdays', days.join(','));
   }
 
   @override
@@ -391,13 +408,13 @@ class CallGuardAppState extends State<CallGuardApp>
               protectionEnabled: _protectionEnabled,
               onProtectionChanged: (value) {
                 setState(() => _protectionEnabled = value);
-                _persistSetting('protection_enabled', value);
+                _persistAndSyncDnd('protection_enabled', value);
                 unawaited(_reconcileStatusTray());
               },
               drivingMode: _drivingMode,
               onDrivingModeChanged: (value) {
                 setState(() => _drivingMode = value);
-                _persistSetting('driving_mode', value);
+                _persistAndSyncDnd('driving_mode', value);
                 unawaited(_reconcileStatusTray());
               },
               statusIndicatorEnabled: _trayPreferences.enabled,
@@ -426,11 +443,16 @@ class CallGuardAppState extends State<CallGuardApp>
               manualSilenceEnabled: _manualSilenceEnabled,
               onManualSilenceChanged: (value) {
                 setState(() => _manualSilenceEnabled = value);
-                _persistSetting('manual_silence_enabled', value);
+                _persistAndSyncDnd('manual_silence_enabled', value);
               },
               onAutomaticSilenceChanged: (value) {
                 setState(() => _automaticSilence = value);
-                _persistSetting('automatic_silence', value);
+                _persistAndSyncDnd('automatic_silence', value);
+              },
+              dndSyncEnabled: _dndSyncEnabled,
+              onDndSyncEnabledChanged: (value) {
+                setState(() => _dndSyncEnabled = value);
+                _persistAndSyncDnd('dnd_sync_enabled', value);
               },
               allowOnlyWhitelist: _allowOnlyWhitelist,
               onAllowOnlyWhitelistChanged: (value) {

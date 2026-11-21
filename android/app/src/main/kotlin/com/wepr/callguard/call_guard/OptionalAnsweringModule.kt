@@ -89,9 +89,11 @@ object OptionalAnsweringModule {
         isEnabled(settings) &&
             settings[DbContract.SettingKeys.ANSWERING_SCENARIO] == scenario
 
-    private fun isEnabled(settings: Map<String, String>): Boolean =
-        (settings[DbContract.SettingKeys.ANSWERING_ENABLED] ?: "false")
-            .equals("true", ignoreCase = true)
+    internal fun isEnabled(settings: Map<String, String>): Boolean =
+        settings[DbContract.SettingKeys.PROTECTION_ENABLED]
+            ?.toBooleanStrictOrNull() != false &&
+            settings[DbContract.SettingKeys.ANSWERING_ENABLED]
+                ?.equals("true", ignoreCase = true) == true
 
     private fun isUnknownNumber(context: Context, phoneNumber: String): Boolean {
         if (isHiddenNumber(phoneNumber)) return true

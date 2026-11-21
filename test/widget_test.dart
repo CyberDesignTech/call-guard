@@ -89,6 +89,8 @@ void main() {
       expect(settings['locale'], 'ukrainian');
       expect(settings['protection_enabled'], 'true');
       expect(settings[DatabaseHelper.settingBlockShortNumbers], 'false');
+      expect(settings['dnd_sync_enabled'], 'false');
+      expect(settings['dnd_previous_filter'], '-1');
       expect(countries, hasLength(195));
       expect(worldCountries, hasLength(195));
       expect(await _testDatabase.getOperators('UA'), hasLength(4));
@@ -1138,6 +1140,14 @@ void main() {
   testWidgets('scenario settings unlock only after enabling the module', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(390, 1300);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.runAsync(() async {
+      await _testDatabase.setSetting('answering_auto_remind', true);
+      await _testDatabase.setSetting('answering_emergency_repeat', true);
+    });
     await pumpApp(tester);
     await tester.tap(find.byTooltip('Сценарії та нагадування'));
     await finishSectionTransition(tester);
@@ -1168,6 +1178,39 @@ void main() {
       closeTo(0.45, 0.01),
     );
 
+    const scenarioContents = [
+      'Сценарій відхилення',
+      'У режимі тиші',
+      'Усі невідомі номери',
+      'Сповіщення про пропущений вхідний дзвінок',
+      'Автоматично нагадувати передзвонити',
+      'Нагадати через',
+      '15 хв',
+      '30 хв',
+      '1 год',
+      'Екстрений прорив (3-й дзвінок за 5 хв)',
+    ];
+    for (final label in scenarioContents) {
+      final content = find.text(label);
+      expect(content, findsOneWidget, reason: '$label should be visible');
+      final opacity = find
+          .ancestor(of: content, matching: find.byType(Opacity))
+          .first;
+      final pointer = find
+          .ancestor(of: content, matching: find.byType(AbsorbPointer))
+          .first;
+      expect(
+        tester.widget<Opacity>(opacity).opacity,
+        closeTo(0.45, 0.01),
+        reason: '$label should be dimmed with the master switch off',
+      );
+      expect(
+        tester.widget<AbsorbPointer>(pointer).absorbing,
+        isTrue,
+        reason: '$label should not be interactive with the master off',
+      );
+    }
+
     await tester.tap(find.text(toggleTitle));
     await tester.pump();
     scenarioBlock = find
@@ -1184,13 +1227,36 @@ void main() {
         )
         .first;
     expect(tester.widget<Opacity>(scenarioOpacity).opacity, 1);
+    for (final label in scenarioContents) {
+      final content = find.text(label);
+      final opacity = find
+          .ancestor(of: content, matching: find.byType(Opacity))
+          .first;
+      final pointer = find
+          .ancestor(of: content, matching: find.byType(AbsorbPointer))
+          .first;
+      expect(
+        tester.widget<Opacity>(opacity).opacity,
+        1,
+        reason: '$label should be bright with the master switch on',
+      );
+      expect(
+        tester.widget<AbsorbPointer>(pointer).absorbing,
+        isFalse,
+        reason: '$label should be interactive with the master on',
+      );
+    }
+    await tester.ensureVisible(find.text('Усі невідомі номери'));
+    await tester.tap(find.text('Усі невідомі номери'));
     await waitForDatabase(tester);
+    final enabledSettings = await tester.runAsync(_testDatabase.getSettings);
+    expect(enabledSettings?['answering_scenario'], 'unknown_numbers');
   });
 
   testWidgets('schedule warns and locks settings when main protection is off', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(390, 900);
+    tester.view.physicalSize = const Size(390, 1300);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -1237,6 +1303,57 @@ void main() {
     );
     final decoration = warningContainer.decoration! as BoxDecoration;
     expect(decoration.border!.top.width, 2);
+  });
+
+  testWidgets('DND sync switch offers Android policy access settings', (
+    tester,
+  ) async {
+    const channel = MethodChannel('com.wepr.callguard/screening');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    var openedDndSettings = false;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'isDndPolicyAccessGranted') return false;
+      if (call.method == 'openDndPolicyAccessSettings') {
+        openedDndSettings = true;
+        return true;
+      }
+      if (call.method == 'syncDndState') return true;
+      if (call.method == 'checkPermissions') {
+        return {
+          'roleAvailable': true,
+          'callScreeningRole': false,
+          'readContacts': false,
+          'notificationsGranted': true,
+        };
+      }
+      if (call.method == 'consumePendingCallJournal') return false;
+      if (call.method == 'restorePendingReminders') return true;
+      return null;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    await pumpApp(tester);
+    await tester.tap(find.byTooltip('Графік режиму тиші'));
+    await finishSectionTransition(tester);
+
+    final title = find.text('Приглушувати месенджери (Не турбувати)');
+    await tester.ensureVisible(title);
+    await tester.tap(title);
+    await tester.pump();
+    await waitForDatabase(tester);
+
+    expect(
+      find.text(
+        'Для синхронізації Call Gate потрібен доступ до політики «Не турбувати» в налаштуваннях Android.',
+      ),
+      findsOneWidget,
+    );
+    final accessButton = find.text('Налаштувати доступ');
+    await tester.ensureVisible(accessButton);
+    await tester.tap(accessButton);
+    await tester.pump();
+    expect(openedDndSettings, isTrue);
   });
 
   testWidgets('schedule settings stay locked until its schedule switch is on', (
@@ -2221,6 +2338,9 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.runAsync(
+      () => _testDatabase.setSetting('answering_enabled', true),
+    );
 
     const channel = MethodChannel('com.wepr.callguard/screening');
     final messenger =
@@ -2245,18 +2365,33 @@ void main() {
     await finishSectionTransition(tester);
 
     final autoRemindLabel = find.text('Автоматично нагадувати передзвонити');
-    await tester.ensureVisible(autoRemindLabel);
+    final answeringScrollable = find
+        .ancestor(of: autoRemindLabel, matching: find.byType(Scrollable))
+        .first;
+    await tester.scrollUntilVisible(
+      autoRemindLabel,
+      240,
+      scrollable: answeringScrollable,
+    );
     await tester.tap(autoRemindLabel);
     await tester.pump();
     expect(find.text('15 хв'), findsOneWidget);
     expect(find.text('30 хв'), findsOneWidget);
     expect(find.text('1 год'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('15 хв'),
+      240,
+      scrollable: answeringScrollable,
+    );
     await tester.tap(find.text('15 хв'));
     await tester.pump();
 
     final emergencyLabel = find.text('Екстрений прорив (3-й дзвінок за 5 хв)');
-    await tester.ensureVisible(emergencyLabel);
-    await tester.pump();
+    await tester.scrollUntilVisible(
+      emergencyLabel,
+      240,
+      scrollable: answeringScrollable,
+    );
     await tester.tap(emergencyLabel);
     await tester.pump();
 
@@ -2318,7 +2453,7 @@ void main() {
     await tester.tap(aboutMenuItem);
     await tester.pumpAndSettle();
     expect(find.text('Call Gate'), findsOneWidget);
-    expect(find.textContaining('v2.0.1'), findsOneWidget);
+    expect(find.textContaining('v2.2.0'), findsOneWidget);
     expect(find.text('© 2026 CyberDesignTech Dev'), findsOneWidget);
     expect(
       find.textContaining('CyberDesignTech Dev із фокусом'),

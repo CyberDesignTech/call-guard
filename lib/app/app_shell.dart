@@ -36,6 +36,8 @@ class CallGuardShell extends StatefulWidget {
     required this.manualSilenceEnabled,
     required this.onManualSilenceChanged,
     required this.onAutomaticSilenceChanged,
+    required this.dndSyncEnabled,
+    required this.onDndSyncEnabledChanged,
     required this.allowOnlyWhitelist,
     required this.onAllowOnlyWhitelistChanged,
     required this.silenceStart,
@@ -84,6 +86,8 @@ class CallGuardShell extends StatefulWidget {
   final bool manualSilenceEnabled;
   final ValueChanged<bool> onManualSilenceChanged;
   final ValueChanged<bool> onAutomaticSilenceChanged;
+  final bool dndSyncEnabled;
+  final ValueChanged<bool> onDndSyncEnabledChanged;
   final bool allowOnlyWhitelist;
   final ValueChanged<bool> onAllowOnlyWhitelistChanged;
   final TimeOfDay silenceStart;
@@ -322,6 +326,8 @@ class CallGuardShellState extends State<CallGuardShell> {
             protectionEnabled: widget.protectionEnabled,
             automaticSilence: widget.automaticSilence,
             onAutomaticSilenceChanged: widget.onAutomaticSilenceChanged,
+            dndSyncEnabled: widget.dndSyncEnabled,
+            onDndSyncEnabledChanged: widget.onDndSyncEnabledChanged,
             allowOnlyWhitelist: widget.allowOnlyWhitelist,
             onAllowOnlyWhitelistChanged: widget.onAllowOnlyWhitelistChanged,
             startTime: widget.silenceStart,

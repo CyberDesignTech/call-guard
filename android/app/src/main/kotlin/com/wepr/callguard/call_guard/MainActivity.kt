@@ -121,6 +121,11 @@ class MainActivity : FlutterActivity() {
             BridgeContract.Methods.REQUEST_NOTIFICATION_PERMISSION ->
                 requestNotificationPermission(result)
             BridgeContract.Methods.OPEN_NOTIFICATION_SETTINGS -> openNotificationSettings(result)
+            BridgeContract.Methods.IS_DND_POLICY_ACCESS_GRANTED ->
+                result.success(DndSyncController.isPolicyAccessGranted(applicationContext))
+            BridgeContract.Methods.OPEN_DND_POLICY_ACCESS_SETTINGS ->
+                result.success(DndSyncController.openPolicyAccessSettings(applicationContext))
+            BridgeContract.Methods.SYNC_DND_STATE -> syncDndState(result)
             BridgeContract.Methods.UPDATE_STATUS_INDICATOR -> updateStatusIndicator(call, result)
             BridgeContract.Methods.SCHEDULE_REMINDER -> scheduleReminder(call, result)
             BridgeContract.Methods.CANCEL_REMINDER -> cancelReminder(call, result)
@@ -417,6 +422,19 @@ class MainActivity : FlutterActivity() {
                 "Could not open notification settings",
                 null,
             )
+        }
+    }
+
+    private fun syncDndState(result: MethodChannel.Result) {
+        simulationExecutor.execute {
+            try {
+                DndSyncController.syncWithActiveModes(applicationContext)
+                runOnUiThread { result.success(true) }
+            } catch (error: Exception) {
+                runOnUiThread {
+                    result.error("DND_SYNC_FAILED", error.message, null)
+                }
+            }
         }
     }
 

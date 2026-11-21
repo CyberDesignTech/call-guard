@@ -20,6 +20,11 @@ class BootCompletedReceiver : BroadcastReceiver() {
                 Log.e(TAG, "Could not restore call reminders after ${intent.action}", error)
             } finally {
                 runCatching {
+                    DndSyncController.syncWithActiveModes(appContext)
+                }.onFailure {
+                    Log.w(TAG, "Could not restore DND synchronization", it)
+                }
+                runCatching {
                     val settings = CallGuardDatabase.readSettings(appContext)
                     val trayEnabled = hasCallScreeningRole(appContext) &&
                         settings[DbContract.SettingKeys.STATUS_TRAY_ICON_ENABLED]

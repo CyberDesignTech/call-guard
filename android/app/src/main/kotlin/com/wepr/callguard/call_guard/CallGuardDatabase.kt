@@ -371,6 +371,8 @@ object CallGuardDatabase {
         DbContract.SettingKeys.ANSWERING_AUTO_REMIND to "false",
         DbContract.SettingKeys.ANSWERING_AUTO_REMIND_MINUTES to "30",
         DbContract.SettingKeys.ANSWERING_EMERGENCY_REPEAT to "false",
+        DbContract.SettingKeys.DND_SYNC_ENABLED to "false",
+        DbContract.SettingKeys.DND_PREVIOUS_FILTER to "-1",
         DbContract.SettingKeys.BLOCK_SHORT_NUMBERS to "false",
         DbContract.SettingKeys.DRIVING_MODE to "false",
         DbContract.SettingKeys.STATUS_TRAY_ICON_ENABLED to "true",

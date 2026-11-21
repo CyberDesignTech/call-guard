@@ -176,24 +176,6 @@ class _AnsweringModePageState extends State<AnsweringModePage>
           message: widget.strings.call('answeringProtectionDisabledWarning'),
         ),
       ],
-      if (widget.localNotification && !_notificationsGranted) ...[
-        const SizedBox(height: 12),
-        _permissionWarning(
-          message: widget.strings.call(
-            'answeringNotificationsPermissionWarning',
-          ),
-          actionLabel: widget.strings.call('grantNotificationPermission'),
-          onPressed: _requestNotificationPermission,
-        ),
-      ],
-      if (widget.scenario == 'unknown_numbers' && !_contactsGranted) ...[
-        const SizedBox(height: 12),
-        _permissionWarning(
-          message: widget.strings.call('answeringContactsPermissionWarning'),
-          actionLabel: widget.strings.call('grantContacts'),
-          onPressed: _requestContactsPermission,
-        ),
-      ],
       const SizedBox(height: 18),
       AppPanel(
         child: RuleSwitch(
@@ -215,6 +197,27 @@ class _AnsweringModePageState extends State<AnsweringModePage>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (widget.localNotification && !_notificationsGranted) ...[
+                _permissionWarning(
+                  message: widget.strings.call(
+                    'answeringNotificationsPermissionWarning',
+                  ),
+                  actionLabel: widget.strings.call(
+                    'grantNotificationPermission',
+                  ),
+                  onPressed: _requestNotificationPermission,
+                ),
+              ],
+              if (widget.scenario == 'unknown_numbers' &&
+                  !_contactsGranted) ...[
+                _permissionWarning(
+                  message: widget.strings.call(
+                    'answeringContactsPermissionWarning',
+                  ),
+                  actionLabel: widget.strings.call('grantContacts'),
+                  onPressed: _requestContactsPermission,
+                ),
+              ],
               SectionHeading(
                 title: widget.strings.call('answeringScenarioTitle'),
                 subtitle: widget.strings.call('answeringScenarioHint'),
@@ -255,87 +258,99 @@ class _AnsweringModePageState extends State<AnsweringModePage>
                   ),
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
-      const SizedBox(height: 16),
-      AppPanel(
-        child: RuleSwitch(
-          icon: Icons.notifications_active_outlined,
-          title: widget.strings.call('answeringNotificationLabel'),
-          subtitle: widget.strings.call('answeringNotificationHint'),
-          value: widget.localNotification,
-          onChanged: widget.onLocalNotificationChanged,
-          iconColor: AppPalette.amber,
-          iconBackground: AppPalette.amberPale,
-        ),
-      ),
-      const SizedBox(height: 16),
-      AppPanel(
-        child: Column(
-          children: [
-            RuleSwitch(
-              icon: Icons.alarm_outlined,
-              title: widget.strings.call('answeringAutoRemindLabel'),
-              subtitle: widget.strings.call('answeringAutoRemindDescription'),
-              value: widget.autoRemind,
-              onChanged: widget.onAutoRemindChanged,
-            ),
-            if (widget.autoRemind) ...[
-              const SizedBox(height: 12),
-              Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Text(
-                    widget.strings.call('answeringAutoRemindIntervalLabel'),
-                    style: TextStyle(
-                      color: AppPalette.muted,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+              const SizedBox(height: 16),
+              AppPanel(
+                child: RuleSwitch(
+                  icon: Icons.notifications_active_outlined,
+                  title: widget.strings.call('answeringNotificationLabel'),
+                  subtitle: widget.strings.call('answeringNotificationHint'),
+                  value: widget.localNotification,
+                  onChanged: widget.onLocalNotificationChanged,
+                  iconColor: AppPalette.amber,
+                  iconBackground: AppPalette.amberPale,
                 ),
               ),
-              const SizedBox(height: 7),
-              SegmentedButton<int>(
-                showSelectedIcon: false,
-                segments: [
-                  ButtonSegment<int>(
-                    value: 15,
-                    label: Text(widget.strings.call('answeringInterval15')),
+              const SizedBox(height: 16),
+              AppPanel(
+                child: Column(
+                  children: [
+                    RuleSwitch(
+                      icon: Icons.alarm_outlined,
+                      title: widget.strings.call('answeringAutoRemindLabel'),
+                      subtitle: widget.strings.call(
+                        'answeringAutoRemindDescription',
+                      ),
+                      value: widget.autoRemind,
+                      onChanged: widget.onAutoRemindChanged,
+                    ),
+                    if (widget.autoRemind) ...[
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(
+                            widget.strings.call(
+                              'answeringAutoRemindIntervalLabel',
+                            ),
+                            style: TextStyle(
+                              color: AppPalette.muted,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 7),
+                      SegmentedButton<int>(
+                        showSelectedIcon: false,
+                        segments: [
+                          ButtonSegment<int>(
+                            value: 15,
+                            label: Text(
+                              widget.strings.call('answeringInterval15'),
+                            ),
+                          ),
+                          ButtonSegment<int>(
+                            value: 30,
+                            label: Text(
+                              widget.strings.call('answeringInterval30'),
+                            ),
+                          ),
+                          ButtonSegment<int>(
+                            value: 60,
+                            label: Text(
+                              widget.strings.call('answeringInterval60'),
+                            ),
+                          ),
+                        ],
+                        selected: {widget.autoRemindMinutes},
+                        onSelectionChanged: (selection) {
+                          if (selection.isNotEmpty) {
+                            widget.onAutoRemindMinutesChanged(selection.first);
+                          }
+                        },
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              AppPanel(
+                child: RuleSwitch(
+                  icon: Icons.phone_callback_rounded,
+                  title: widget.strings.call('answeringEmergencyRepeatLabel'),
+                  subtitle: widget.strings.call(
+                    'answeringEmergencyRepeatDescription',
                   ),
-                  ButtonSegment<int>(
-                    value: 30,
-                    label: Text(widget.strings.call('answeringInterval30')),
-                  ),
-                  ButtonSegment<int>(
-                    value: 60,
-                    label: Text(widget.strings.call('answeringInterval60')),
-                  ),
-                ],
-                selected: {widget.autoRemindMinutes},
-                onSelectionChanged: (selection) {
-                  if (selection.isNotEmpty) {
-                    widget.onAutoRemindMinutesChanged(selection.first);
-                  }
-                },
+                  value: widget.emergencyRepeat,
+                  onChanged: widget.onEmergencyRepeatChanged,
+                  iconColor: AppPalette.red,
+                  iconBackground: AppPalette.redPale,
+                ),
               ),
             ],
-          ],
-        ),
-      ),
-      const SizedBox(height: 16),
-      AppPanel(
-        child: RuleSwitch(
-          icon: Icons.phone_callback_rounded,
-          title: widget.strings.call('answeringEmergencyRepeatLabel'),
-          subtitle: widget.strings.call('answeringEmergencyRepeatDescription'),
-          value: widget.emergencyRepeat,
-          onChanged: widget.onEmergencyRepeatChanged,
-          iconColor: AppPalette.red,
-          iconBackground: AppPalette.redPale,
+          ),
         ),
       ),
     ],
