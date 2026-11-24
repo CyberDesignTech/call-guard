@@ -1,0 +1,82 @@
+name: Automatic GitHub Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - pubspec.yaml
+      - .github/workflows/auto-release.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository and tags
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read and validate app version
+        id: version
+        shell: bash
+        run: |
+          full_version="$(python3 - <<'PY'
+          from pathlib import Path
+
+          line = next((line for line in Path("pubspec.yaml").read_text().splitlines()
+                       if line.startswith("version:")), "")
+          value = line.split(":", 1)[1].split("#", 1)[0].strip() if line else ""
+          print(value.strip("\"'"))
+          PY
+          )"
+
+          if [[ ! "$full_version" =~ ^([0-9]+\.[0-9]+\.[0-9]+)\+([0-9]+)$ ]]; then
+            echo "Expected pubspec.yaml version in X.Y.Z+BUILD format; got: $full_version" >&2
+            exit 1
+          fi
+
+          release_version="${BASH_REMATCH[1]}"
+          build_number="${BASH_REMATCH[2]}"
+          tag="v${release_version}"
+
+          echo "full_version=$full_version" >> "$GITHUB_OUTPUT"
+          echo "release_version=$release_version" >> "$GITHUB_OUTPUT"
+          echo "build_number=$build_number" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Check whether release tag already exists
+        id: tag_check
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        shell: bash
+        run: |
+          if git rev-parse --quiet --verify "refs/tags/${RELEASE_TAG}" >/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Tag ${RELEASE_TAG} already exists; skipping release creation."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub Release
+        if: steps.tag_check.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: CallGate v${{ steps.version.outputs.release_version }}
+          body: |
+            CallGate release v${{ steps.version.outputs.release_version }}.
+
+            Full app version: ${{ steps.version.outputs.full_version }}
+            Build number: ${{ steps.version.outputs.build_number }}
+          draft: false
+          prerelease: false
