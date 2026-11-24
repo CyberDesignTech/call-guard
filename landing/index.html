@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10111a">
+  <meta name="description" content="Call Gate — офлайн-фільтр вхідних дзвінків для Android. Блокуйте спам і налаштовуйте власні правила тиші.">
+  <title>Call Gate — фільтр дзвінків для Android</title>
+  <link rel="icon" href="assets/images/call-gate.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script src="assets/js/i18n.js" defer></script>
+  <script src="assets/js/guide-i18n.js" defer></script>
+  <script src="assets/js/main.js" defer></script>
+  <script type="module" src="assets/js/animations.js"></script>
+</head>
+<body>
+  <svg class="icon-library" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s7-3.5 7-10V5l-7-3-7 3v7c0 6.5 7 10 7 10Z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M5 16v4h14v-4"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="m9 5 11 7-11 7V5Z"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18m0-18a15 15 0 0 0 0 18"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><path d="M7 3H4a1 1 0 0 0-1 1c0 9.4 7.6 17 17 17a1 1 0 0 0 1-1v-3l-5-2-2 2a14 14 0 0 1-7-7l2-2-2-5Z"/></symbol>
+    <symbol id="i-phone-off" viewBox="0 0 24 24"><path d="M3.4 11.3C5.6 8.6 8.5 7.4 12 7.4s6.4 1.2 8.6 3.9c.4.5.4 1.3 0 1.8L19 15.3c-.4.5-1.1.7-1.7.4l-3-1.4V11h-4.6v3.3l-3 1.4c-.6.3-1.3.1-1.7-.4l-1.6-2.2c-.4-.5-.4-1.3 0-1.8Z"/><path d="m3 3 18 18"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.4 14a8.7 8.7 0 0 1-10.5-10.4A9 9 0 1 0 20.4 14Z"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2"/></symbol>
+    <symbol id="i-wifi-off" viewBox="0 0 24 24"><path d="m3 3 18 18M2 8.8a16 16 0 0 1 3-2M9 5.3a16 16 0 0 1 13 3.5M6 13a10 10 0 0 1 3-1.7m6 0a10 10 0 0 1 3 1.7m-9 4a5 5 0 0 1 6 0m-3 3h.01"/></symbol>
+    <symbol id="i-bell-off" viewBox="0 0 24 24"><path d="M3 3l18 18m-11-1a2 2 0 0 0 4 0M8 8a5 5 0 0 0-.9 2.9c0 3.6-2.1 4.5-2.1 6.1h12m2-2.5c-1-1.4-1.7-2.1-1.7-3.6A5 5 0 0 0 12 6"/></symbol>
+    <symbol id="i-android" viewBox="0 0 24 24"><path d="M3 18a9 9 0 0 1 18 0H3ZM7 5l2 4m8-4-2 4M8 14h.01m8-.01h.01"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h5m4 0h7M4 12h9m4 0h3M4 18h2m4 0h10"/><circle cx="11" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="8" cy="18" r="2"/></symbol>
+    <symbol id="i-car" viewBox="0 0 24 24"><path d="m4 11 2-5h12l2 5M4 18v2m16-2v2M3 12a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v5H3v-5Zm4 2h.01M17 14h.01"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-repeat" viewBox="0 0 24 24"><path d="m15 3 4 4-4 4m4-4H8a4 4 0 0 0-4 4m5 10-4-4 4-4m-4 4h11a4 4 0 0 0 4-4"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 10.5 6.8-4m-6.8 7 6.8 4"/></symbol>
+    <symbol id="i-signal" viewBox="0 0 24 24"><path d="M4 18v-3m5 3v-6m5 6V9m5 9V5"/></symbol>
+    <symbol id="i-battery" viewBox="0 0 24 24"><rect x="2" y="7" width="17" height="10" rx="2"/><path d="M22 10v4M5 12h11"/></symbol>
+  </svg>
+
+  <a class="skip-link" href="#main" data-t="skip">До основного вмісту</a>
+  <header class="site-header" id="top">
+    <div class="container nav-shell">
+      <a class="brand" href="#top" aria-label="CallGate"><img src="assets/images/call-gate.svg" alt="" width="36" height="36">CallGate</a>
+      <nav class="site-nav" id="site-nav" aria-label="Основна навігація" data-a="navigation">
+        <a href="#features" data-t="navFeatures">Можливості</a>
+        <a href="#demo" data-t="navDemo">Симулятор</a>
+        <a href="#privacy" data-t="navPrivacy">Приватність</a>
+        <a href="#guide" data-t="navGuide">Довідник</a>
+        <a href="#faq" data-t="navFaq">Запитання</a>
+      </nav>
+      <div class="nav-actions">
+        <label class="locale"><svg class="icon"><use href="#i-globe"/></svg><select id="language" aria-label="Мова сайту" data-a="language">
+          <option value="uk" lang="uk">UA</option><option value="en" lang="en">EN</option><option value="pl" lang="pl">PL</option><option value="de" lang="de">DE</option><option value="es" lang="es">ES</option><option value="fr" lang="fr">FR</option>
+        </select><svg class="icon locale-chevron"><use href="#i-chevron"/></svg></label>
+        <a class="button button-primary button-small nav-download" href="#download" data-t="navDownload">Завантажити</a>
+        <button class="button menu-toggle" type="button" aria-label="Меню" data-a="menu" aria-expanded="false" aria-controls="site-nav"><svg class="icon"><use href="#i-menu"/></svg></button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="container hero-inner">
+        <div class="hero-copy">
+          <div class="hero-badge"><svg class="icon"><use href="#i-shield"/></svg><span data-t="heroBadge">Офлайн-захист для Android</span></div>
+          <h1 id="hero-title"><span data-t="heroTitleOne">Менше спаму.</span><span class="accent" data-t="heroTitleTwo">Більше тиші.</span></h1>
+          <p data-t="heroDescription">Call Gate блокує небажані дзвінки за вашими правилами. Налаштуйте списки й розклад тиші, а контакти залишаться на телефоні.</p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="release/CallGate-2.6.1.apk" download><svg class="icon"><use href="#i-download"/></svg><span data-t="downloadApp">Завантажити Call Gate</span></a>
+            <a class="button button-secondary" href="#demo"><svg class="icon"><use href="#i-play"/></svg><span data-t="tryDemo">Спробувати демо</span></a>
+          </div>
+          <div class="release-meta"><span data-t="version">Версія 2.6.1</span><span>Android 10+</span><span data-t="size">19,4 МБ</span></div>
+        </div>
+        <div class="hero-visual" role="img" aria-label="Ілюстрація Call Gate з увімкненим захистом, розкладом тиші та прикладами заблокованих дзвінків" data-a="illustration">
+          <img class="orbit" src="assets/images/orbit.webp" alt="" width="1200" height="900" fetchpriority="high">
+          <div class="phone" aria-hidden="true">
+            <div class="phone-screen">
+              <div class="phone-status"><strong>9:41</strong><div><svg class="icon"><use href="#i-signal"/></svg><svg class="icon"><use href="#i-battery"/></svg></div></div>
+              <div class="phone-brand"><img src="assets/images/call-gate.svg" alt="" width="25" height="25">Call Gate</div>
+              <div class="phone-card phone-protection"><div class="phone-tile-icon"><svg class="icon"><use href="#i-shield"/></svg></div><div><strong data-t="screenProtection">Захист</strong><small data-t="screenOn">Увімкнено</small></div><span class="phone-switch"></span></div>
+              <div class="phone-card phone-quiet"><div class="phone-tile-icon"><svg class="icon"><use href="#i-moon"/></svg></div><div><strong data-t="screenQuiet">Розклад тиші</strong><small>22:00–07:00</small></div></div>
+              <p class="phone-label" data-t="screenJournal">Журнал дзвінків</p>
+              <div class="phone-entry"><svg class="icon blocked"><use href="#i-phone-off"/></svg><div><strong>+44 20 7946 0958</strong><small data-t="screenPrefix">Заблокований префікс</small></div><span>22:16</span></div>
+              <div class="phone-entry"><svg class="icon blocked"><use href="#i-phone-off"/></svg><div><strong data-t="screenHidden">Прихований номер</strong><small data-t="screenBlocked">Заблоковано</small></div><span>21:54</span></div>
+              <div class="phone-entry"><svg class="icon allowed"><use href="#i-phone"/></svg><div><strong data-t="screenMom">Мама</strong><small data-t="screenAllowlist">Білий список</small></div><span>20:02</span></div>
+              <div class="phone-tabs"><svg class="icon"><use href="#i-shield"/></svg><svg class="icon"><use href="#i-list"/></svg><svg class="icon"><use href="#i-clock"/></svg><svg class="icon"><use href="#i-sliders"/></svg></div>
+            </div>
+          </div>
+          <div class="floating-card float-block" aria-hidden="true"><span class="floating-icon"><svg class="icon"><use href="#i-phone-off"/></svg></span><div><strong data-t="floatBlocked">Дзвінок відхилено</strong><small data-t="floatPrefix">Міжнародний префікс</small></div></div>
+          <div class="floating-card float-quiet" aria-hidden="true"><span class="floating-icon"><svg class="icon"><use href="#i-moon"/></svg></span><div><strong data-t="floatQuiet">Режим тиші</strong><small>22:00–07:00</small></div></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="trust-strip">
+      <ul class="container trust-grid" role="list">
+        <li><svg class="icon"><use href="#i-wifi-off"/></svg><span data-t="trustOffline">Працює офлайн</span></li>
+        <li><svg class="icon"><use href="#i-lock"/></svg><span data-t="trustPrivate">Дані на телефоні</span></li>
+        <li><svg class="icon"><use href="#i-bell-off"/></svg><span data-t="trustNoAds">Без реклами й підписок</span></li>
+        <li><svg class="icon"><use href="#i-android"/></svg><span>Android 10+</span></li>
+      </ul>
+    </div>
+
+    <section class="section container" id="features" aria-labelledby="features-title">
+      <div class="section-heading"><p class="eyebrow" data-t="navFeatures">Можливості</p><h2 id="features-title" data-t="featuresTitle">Ви вирішуєте, хто додзвониться</h2><p class="section-lead" data-t="featuresLead">Дозволяйте важливі виклики й налаштовуйте фільтри під свій день.</p></div>
+      <div class="feature-grid">
+        <article class="feature-card"><div class="feature-icon green"><svg class="icon"><use href="#i-sliders"/></svg></div><h3 data-t="rulesTitle">Гнучкі правила</h3><p data-t="rulesBody">Додавайте номери в білий і чорний списки назавжди або на певний час. Блокуйте приховані номери й виклики не з контактів.</p></article>
+        <article class="feature-card"><div class="feature-icon purple"><svg class="icon"><use href="#i-moon"/></svg></div><h3 data-t="quietTitle">Тиша за розкладом</h3><p data-t="quietBody">Задайте години та дні, увімкніть тишу вручну або залиште доступними лише номери з білого списку.</p></article>
+        <article class="feature-card"><div class="feature-icon blue"><svg class="icon"><use href="#i-globe"/></svg></div><h3 data-t="prefixTitle">Країни, оператори й короткі номери</h3><p data-t="prefixBody">Налаштуйте міжнародні виклики та префікси країн і операторів. Блокуйте короткі номери з 2–6 цифр із винятками для контактів і білого списку.</p></article>
+        <article class="feature-card"><div class="feature-icon purple"><svg class="icon"><use href="#i-repeat"/></svg></div><h3 data-t="repeatTitle">Терміновий повторний дзвінок</h3><p data-t="repeatBody">У тиші можна дозволити третій дзвінок за 5 хвилин із того самого відкритого номера. Номери, які явно заблоковано, залишаються заблокованими.</p></article>
+        <article class="feature-card"><div class="feature-icon blue"><svg class="icon"><use href="#i-car"/></svg></div><h3 data-t="drivingTitle">Режим «За кермом»</h3><p data-t="drivingBody">Відхиляйте вхідні виклики, навіть із білого списку. Керуйте водінням і захистом зі шторки сповіщень.</p></article>
+        <article class="feature-card"><div class="feature-icon green"><svg class="icon"><use href="#i-clock"/></svg></div><h3 data-t="callbackTitle">Журнал і нагадування</h3><p data-t="callbackBody">Переглядайте журнал блокувань, налаштовуйте тихе відхилення й отримуйте нагадування передзвонити, коли зручно.</p></article>
+        <article class="feature-card messenger-feature">
+          <div class="messenger-copy">
+            <div class="feature-icon purple"><svg class="icon" aria-hidden="true"><use href="#i-bell-off"/></svg></div>
+            <h3 data-t="messengerTitle">Тиша в месенджерах</h3>
+            <p data-t="messengerBody">Ви можете в CallGate обрати системний режим «Не турбувати» під час режимів «За кермом» або «Тиша», приглушуючи дзвінки та сповіщення месенджерів.</p>
+          </div>
+          <div class="messenger-badges">
+            <span class="messenger-badge telegram"><svg class="messenger-logo telegram" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M5 11.6 18.5 6.4l-2.3 11-4.1-3.1-2.2 2 .3-3.6 6.1-4-7.5 3.2z"/></svg>Telegram</span>
+            <span class="messenger-badge whatsapp"><svg class="messenger-logo whatsapp" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M7.3 17.4l.7-2.3a5.8 5.8 0 1 1 2.1 2l-2.8.3z"/><path d="M10 9.1c.3 2 2.1 3.8 4 4.1l1-.9 1.4.8c.1 1-1 1.9-2 1.7-2.8-.5-5.3-3-5.8-5.7-.2-1 .6-2 1.6-1.9l.8 1.2z"/></svg>WhatsApp</span>
+            <span class="messenger-badge viber"><svg class="messenger-logo viber" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M7 8.5c0-2 1.8-3 5-3s5 1 5 3v4c0 2-1.8 3-5 3h-1.5L8 18v-2.8c-.7-.5-1-1.4-1-2.7z"/><path d="M10 8.5c.3 2 2 3.8 4 4.2l.8-.8 1 .6c0 .8-.7 1.5-1.5 1.4-2.4-.5-4.4-2.5-4.9-4.8-.1-.8.6-1.5 1.3-1.5l.6 1z"/></svg>Viber</span>
+            <span class="messenger-badge signal"><svg class="messenger-logo signal" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M7.4 16.8l.5-2a6 6 0 1 1 2 1.9z"/></svg>Signal</span>
+            <span class="messenger-badge messenger-more" data-t="messengerMore">та інші</span>
+          </div>
+        </article>
+      </div>
+      <div class="extras"><div><svg class="icon"><use href="#i-phone"/></svg><span data-t="extraEmergency">Екстрені коди 101–104, 112, 911 і 999 завжди дозволені правилами.</span></div><div><svg class="icon"><use href="#i-globe"/></svg><span data-t="extraLanguages">6 мов інтерфейсу та світла, темна й системна теми.</span></div></div>
+    </section>
+
+    <section class="section demo-section" id="demo" aria-labelledby="demo-title">
+      <div class="container">
+        <div class="section-heading"><p class="eyebrow" data-t="navDemo">Симулятор</p><h2 id="demo-title" data-t="demoTitle">Перевірте вхідний дзвінок</h2><p class="section-lead" data-t="demoLead">Спробуйте готовий сценарій або введіть номер. Демо використовує приклад правил і працює в браузері.</p></div>
+        <div class="demo-board">
+          <form class="demo-controls" id="call-form" novalidate>
+            <fieldset>
+              <legend data-t="demoScenario">Оберіть сценарій</legend>
+              <div class="scenario-grid">
+                <label class="scenario"><input type="radio" name="scenario" value="allowlist" checked><span><svg class="icon"><use href="#i-shield"/></svg><span data-t="caseAllowlist">Білий список</span></span></label>
+                <label class="scenario"><input type="radio" name="scenario" value="night"><span><svg class="icon"><use href="#i-moon"/></svg><span data-t="caseNight">Невідомий уночі</span></span></label>
+                <label class="scenario"><input type="radio" name="scenario" value="repeat"><span><svg class="icon"><use href="#i-repeat"/></svg><span data-t="caseRepeat">Третій дзвінок</span></span></label>
+                <label class="scenario"><input type="radio" name="scenario" value="foreign"><span><svg class="icon"><use href="#i-globe"/></svg><span data-t="caseForeign">Заборонений префікс</span></span></label>
+              </div>
+            </fieldset>
+            <label class="input-label" for="phone-number" data-t="demoNumber">Номер для перевірки</label>
+            <div class="input-row"><input id="phone-number" type="tel" inputmode="tel" autocomplete="off" maxlength="32" value="+1 202 555 0142" placeholder="+380…" aria-describedby="demo-rules"><button type="submit" class="button button-primary" data-t="checkNumber">Перевірити</button></div>
+            <p class="demo-note" id="demo-rules" data-t="demoRules">Для свого номера діють тестові правила: перший номер у білому списку, префікс +44 заблоковано.</p>
+          </form>
+          <div class="demo-result" id="call-result" data-status="idle" role="status" aria-live="polite" aria-atomic="true">
+            <div class="result-icon"><svg class="icon"><use href="#i-phone"/></svg></div>
+            <h3 id="result-title" data-t="resultIdleTitle">Готово до перевірки</h3>
+            <p id="result-body" data-t="resultIdleBody">Тут з’явиться рішення фільтра та його причина.</p>
+          </div>
+        </div>
+        <noscript><p class="no-script">Для вебсимулятора потрібен JavaScript.</p></noscript>
+      </div>
+    </section>
+
+    <section class="section container" id="privacy" aria-labelledby="privacy-title">
+      <div class="privacy-panel">
+        <div class="privacy-copy"><p class="eyebrow" data-t="navPrivacy">Приватність</p><h2 id="privacy-title" data-t="privacyTitle">Ваші дані залишаються з вами</h2><p data-t="privacyBody">Call Gate фільтрує виклики на пристрої через системну службу Android. Правила, контакти й журнал не передаються на сервер.</p>
+          <ul role="list" class="privacy-list"><li><svg class="icon"><use href="#i-check"/></svg><span data-t="privacyPointOne">Без акаунта й хмарної синхронізації</span></li><li><svg class="icon"><use href="#i-check"/></svg><span data-t="privacyPointTwo">Фільтрація без доступу до інтернету</span></li><li><svg class="icon"><use href="#i-check"/></svg><span data-t="privacyPointThree">Локальне зберігання списків і журналу</span></li></ul>
+        </div>
+        <img src="assets/images/privacy-lock.webp" alt="" width="1200" height="900" loading="lazy" class="privacy-image">
+      </div>
+    </section>
+
+    <section class="section guide-section" id="guide" aria-labelledby="guide-title">
+      <div class="container">
+        <div class="section-heading"><p class="eyebrow" data-t="guideKicker">Довідник</p><h2 id="guide-title" data-t="guideTitle">Завантаження, встановлення та можливості</h2><p class="section-lead" data-t="guideLead">Швидко увімкніть Call Gate, а потім відкрийте потрібне вікно довідника.</p></div>
+        <aside class="guide-permissions-callout" aria-labelledby="guide-permissions-title">
+          <div class="guide-permissions-heading"><svg class="icon"><use href="#i-shield"/></svg><div><h3 id="guide-permissions-title" data-t="guidePermissionsTitle">Три дозволи для повного захисту</h3><p data-t="guidePermissionsLead">CallGate працює локально, але Android має дозволити йому виконувати ці системні дії.</p></div></div>
+          <div class="guide-permissions-grid">
+            <article class="guide-permission"><div class="guide-permission-top"><span class="guide-permission-icon"><svg class="icon"><use href="#i-phone"/></svg></span><span class="guide-permission-badge required" data-t="guidePermissionRequired">Обов’язково</span></div><h4 data-t="guidePermissionCallsTitle">Визначення номера та спаму</h4><p data-t="guidePermissionCallsBody"><strong>Навіщо:</strong> головний системний дозвіл Android дозволяє перевіряти вхідні виклики до першого гудка та відсіювати небажані дзвінки. Без нього фільтрація не працюватиме.</p></article>
+            <article class="guide-permission"><div class="guide-permission-top"><span class="guide-permission-icon"><svg class="icon"><use href="#i-list"/></svg></span><span class="guide-permission-badge recommended" data-t="guidePermissionRecommended">Рекомендовано</span></div><h4 data-t="guidePermissionContactsTitle">Доступ до контактів</h4><p data-t="guidePermissionContactsBody"><strong>Навіщо:</strong> використовується лише на вашому пристрої, щоб розпізнавати збережені номери й не блокувати рідних або колег під час фільтрації невідомих викликів чи режиму «За кермом». Контакти нікуди не передаються.</p></article>
+            <article class="guide-permission"><div class="guide-permission-top"><span class="guide-permission-icon"><svg class="icon"><use href="#i-bell-off"/></svg></span><span class="guide-permission-badge recommended" data-t="guidePermissionRecommended">Рекомендовано</span></div><h4 data-t="guidePermissionNotificationsTitle">Дозвіл на сповіщення</h4><p data-t="guidePermissionNotificationsBody"><strong>Навіщо:</strong> показує індикатор активного режиму захисту у верхній панелі телефона та дозволяє вчасно нагадувати про пропущені виклики.</p></article>
+          </div>
+          <p class="guide-permissions-note"><svg class="icon"><use href="#i-shield"/></svg><span data-t="guidePermissionQuietNote">Додатковий доступ до системного режиму «Не турбувати» потрібен лише для функції «Тиша в месенджерах».</span></p>
+        </aside>
+        <ol class="guide-steps" role="list">
+          <li class="guide-step"><img src="screenshots/01-home.png" alt="" loading="lazy"><div class="guide-step-copy"><span class="guide-step-number">01</span><h3 data-t="guideStepOneTitle">Завантаження та встановлення</h3><p data-t="guideStepOneBody">Завантажте CallGate-2.6.1.apk на Android 10+ і дозвольте встановлення з цього джерела.</p></div></li>
+          <li class="guide-step"><img src="screenshots/02-lists-rules.png" alt="" loading="lazy"><div class="guide-step-copy"><span class="guide-step-number">02</span><h3 data-t="guideStepTwoTitle">Головний дозвіл захисту</h3><p data-t="guideStepTwoBody">Призначте Call Gate застосунком за замовчуванням для АОН і спаму, щоб активувати CallScreeningService.</p></div></li>
+          <li class="guide-step"><img src="screenshots/03-silence-quiet-hours.png" alt="" loading="lazy"><div class="guide-step-copy"><span class="guide-step-number">03</span><h3 data-t="guideStepThreeTitle">Фонова робота без обмежень батареї</h3><p data-t="guideStepThreeBody">У налаштуваннях батареї вимкніть оптимізацію для Call Gate, щоб фільтрація спрацьовувала миттєво.</p></div></li>
+          <li class="guide-step"><img src="screenshots/04-scenarios-reminders.png" alt="" loading="lazy"><div class="guide-step-copy"><span class="guide-step-number">04</span><h3 data-t="guideStepFourTitle">Тиша в месенджерах</h3><p data-t="guideStepFourBody">Надайте доступ до «Не турбувати», щоб синхронізувати тишу для Telegram, WhatsApp, Viber і Signal.</p></div></li>
+        </ol>
+        <div class="guide-reference">
+          <div class="section-heading guide-reference-heading"><p class="eyebrow" data-t="guideReferenceKicker">Довідник функцій</p><h3 data-t="guideReferenceTitle">Що робить кожне вікно застосунку</h3><p class="section-lead" data-t="guideReferenceLead">Відкрийте групу, щоб побачити призначення функцій і спосіб їх застосування.</p></div>
+          <div class="guide-details">
+            <details><summary><span data-t="guideHomeTitle">Головна</span><svg class="icon"><use href="#i-chevron"/></svg></summary><div class="guide-detail-body">
+              <p data-t="guideHomeProtection">Головний перемикач захисту — вмикає або призупиняє фільтрацію всіх вхідних дзвінків. Увімкніть його після надання системної ролі.</p>
+              <p data-t="guideHomeDriving">«За кермом» — відхиляє вхідні дзвінки, навіть із білого списку. Увімкніть режим перед поїздкою.</p>
+              <p data-t="guideHomeSilence">«Режим тиші» — застосовує активний сценарій тиші до дзвінків. Увімкніть його вручну або скористайтеся розкладом.</p>
+              <p data-t="guideHomeMessenger">«Тиша в месенджерах» — синхронізує CallGate із системним режимом «Не турбувати» для Telegram, WhatsApp, Viber і Signal. Надайте доступ до політики сповіщень.</p>
+              <p data-t="guideHomeSimulator">«Тестовий виклик» — симулює номер за поточними правилами без реального дзвінка. Введіть номер і перевірте причину рішення.</p>
+            </div></details>
+            <details><summary><span data-t="guideListsTitle">Списки та правила</span><svg class="icon"><use href="#i-chevron"/></svg></summary><div class="guide-detail-body">
+              <p data-t="guideListsAllow">Білий список — завжди дозволяє важливі номери; тимчасове правило діє до вказаної дати, після чого видаляється автоматично.</p>
+              <p data-t="guideListsBlock">Чорний список — явно блокує номери та має пріоритет над загальними дозволами.</p>
+              <p data-t="guideListsUnknown">Блокування невідомих і прихованих номерів відхиляє виклики без доступного номера або без контакту, якщо перемикач увімкнено.</p>
+              <p data-t="guideListsShort">Короткі сервісні номери з 2–6 цифр оцінюються окремо; екстрені коди та дозволені контакти залишаються винятками.</p>
+              <p data-t="guideListsInternational">Міжнародне правило блокує виклики з іноземними кодами, якщо вони не дозволені списком.</p>
+              <p data-t="guideListsCountries">Правила країн та операторів фільтрують виклики за кодом країни й префіксом оператора. Виберіть дію біля потрібної країни або оператора.</p>
+            </div></details>
+            <details><summary><span data-t="guideScheduleTitle">Розклад тиші</span><svg class="icon"><use href="#i-chevron"/></svg></summary><div class="guide-detail-body">
+              <p data-t="guideScheduleHours">Розклад автоматичної тиші вмикає режим у вибрані дні та години, наприклад з 22:00 до 07:00. Увімкніть розклад і позначте дні повторення.</p>
+              <p data-t="guideScheduleQuietHours">Автосинхронізація з месенджерами застосовує системний режим «Не турбувати» на час тиші. Дозвольте політику сповіщень, щоб Telegram, WhatsApp, Viber і Signal не дзвонили.</p>
+            </div></details>
+            <details><summary><span data-t="guideScenariosTitle">Сценарії та нагадування</span><svg class="icon"><use href="#i-chevron"/></svg></summary><div class="guide-detail-body">
+              <p data-t="guideScenariosRepeat">Екстрений прорив дозволяє третій дзвінок за 5 хвилин із того самого видимого номера після двох відхилень у тиші. Явно заблоковані номери не прориваються.</p>
+              <p data-t="guideScenariosReminder">Нагадування передзвонити створює локальну подію після відхиленого виклику. Увімкніть сповіщення та виберіть сценарій нагадування.</p>
+              <p data-t="guideScenariosProtection">Сценарії працюють лише разом із головним перемикачем захисту секції. Спочатку увімкніть захист на «Головній».</p>
+            </div></details>
+            <details><summary><span data-t="guideJournalTitle">Журнал викликів та налаштування</span><svg class="icon"><use href="#i-chevron"/></svg></summary><div class="guide-detail-body">
+              <p data-t="guideJournalReasons">Журнал показує причину кожного рішення — блокування або дозволу — та час виклику. Відкрийте «Журнал» у вікні «Більше».</p>
+              <p data-t="guideJournalLocal">Правила, контакти й журнал зберігаються 100% локально в SQLite на телефоні. Немає акаунта, хмарної синхронізації чи телеметрії.</p>
+            </div></details>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section container faq-section" id="faq" aria-labelledby="faq-title">
+      <div class="section-heading"><h2 id="faq-title" data-t="faqTitle">Часті запитання</h2></div>
+      <div class="faq-list">
+        <details><summary><span data-t="faqOneQ">Чи працює CallGate офлайн?</span><svg class="icon"><use href="#i-chevron"/></svg></summary><p data-t="faqOneA">Так. Фільтрація, правила, контакти й журнал працюють без інтернету. З’єднання потрібне лише для завантаження APK або оновлень.</p></details>
+        <details><summary><span data-t="faqTwoQ">Навіщо потрібен доступ до контактів і журналу?</span><svg class="icon"><use href="#i-chevron"/></svg></summary><p data-t="faqTwoA">Контакти потрібні, щоб розрізняти знайомі та невідомі номери. Журнал викликів допомагає імпортувати номер у правило; дані не залишають пристрій.</p></details>
+        <details><summary><span data-t="faqThreeQ">Чому після завершення тиші в месенджері лишається пропущений виклик?</span><svg class="icon"><use href="#i-chevron"/></svg></summary><p data-t="faqThreeA">Системний режим «Не турбувати» може приховати або приглушити сповіщення, але не скасовує подію виклику в самому месенджері. Після завершення тиші застосунок може показати пропущений виклик.</p></details>
+        <details><summary><span data-t="faqFourQ">Що робити, якщо месенджер ігнорує режим «Не турбувати»?</span><svg class="icon"><use href="#i-chevron"/></svg></summary><p data-t="faqFourA">Перевірте доступ CallGate до системного режиму «Не турбувати», дозвольте сповіщення месенджера та вимкніть для нього власні винятки. Поведінка також залежить від оболонки виробника.</p></details>
+        <details><summary><span data-t="faqFiveQ">Чи завжди проходять екстрені номери?</span><svg class="icon"><use href="#i-chevron"/></svg></summary><p data-t="faqFiveA">Так. Коди 101–104, 112, 911 і 999 мають безумовний пріоритет і проходять фільтр незалежно від інших правил.</p></details>
+        <details><summary><span data-t="faqSixQ">Як працює екстрений прорив третього дзвінка?</span><svg class="icon"><use href="#i-chevron"/></svg></summary><p data-t="faqSixA">Після двох відхилень у режимі тиші третій виклик за 5 хвилин із того самого видимого номера може пройти. Номер із чорного списку не проривається.</p></details>
+        <details><summary><span data-t="faqSevenQ">Які налаштування батареї потрібні на Samsung або Xiaomi?</span><svg class="icon"><use href="#i-chevron"/></svg></summary><p data-t="faqSevenA">Вимкніть оптимізацію батареї для CallGate і дозвольте фонову активність. На Samsung це може бути «Без обмежень», а на Xiaomi також вимкніть автозапуск і блокування фонового режиму.</p></details>
+        <details><summary><span data-t="faqEightQ">Чи безкоштовний CallGate і де його код?</span><svg class="icon"><use href="#i-chevron"/></svg></summary><p data-t="faqEightA">Так, застосунок безкоштовний, без реклами та телеметрії. Вихідний код відкритий на GitHub під ліцензією MIT.</p></details>
+      </div>
+    </section>
+
+    <section class="container download-section" id="download" aria-labelledby="download-title">
+      <div class="download-panel">
+        <img src="assets/images/call-gate.svg" alt="" width="56" height="56" loading="lazy">
+        <h2 id="download-title" data-t="downloadTitle">Готові до тихішого дня?</h2>
+        <p data-t="downloadBody">Встановіть Call Gate і налаштуйте блокування під себе.</p>
+        <div class="download-actions">
+          <a class="button button-primary" href="release/CallGate-2.6.1.apk" download><svg class="icon"><use href="#i-download"/></svg><span data-t="downloadApp">Завантажити Call Gate</span></a>
+          <a class="button button-secondary" id="download-github">GitHub</a>
+          <a class="button button-secondary" id="download-google-play">Google Play</a>
+        </div>
+        <div class="release-meta"><span data-t="version">Версія 2.6.1</span><span>Android 10+</span><span data-t="size">19,4 МБ</span></div>
+      </div>
+    </section>
+    <section class="container support-section" aria-labelledby="support-title">
+      <div class="support-panel">
+        <div class="support-copy">
+          <h2 id="support-title" data-t="supportTitle">Підтримати розвиток CallGate</h2>
+          <p data-t="supportBody">Якщо застосунок допомагає вам берегти спокій і час, ви можете пригостити розробника кавою.</p>
+        </div>
+        <div class="support-actions">
+          <a class="button support-kofi" href="https://ko-fi.com/O4F42APP5S" target="_blank" rel="noopener">
+            <svg class="support-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h13v7a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V7Z" fill="white"/><path d="M17 9h1.5a2.5 2.5 0 0 1 0 5H17" fill="none" stroke="white" stroke-width="2"/><path d="M10.5 11.5c-1.6-1.7-3.3.8 0 2.8 3.3-2 1.6-4.5 0-2.8Z" fill="#ef6578"/></svg>
+            <span data-t="supportKofi">Підтримати на Ko-fi</span>
+          </a>
+          <a class="button button-secondary support-monobank" href="https://send.monobank.ua/jar/AhQrx7NK3q" target="_blank" rel="noopener">
+            <svg class="support-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h8M8 5h8l1 2.5c1.2.7 2 2 2 3.5v6a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4v-6c0-1.5.8-2.8 2-3.5L8 5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 12c-1.8-1.8-3.8 1 0 3.5 3.8-2.5 1.8-5.3 0-3.5Z" fill="currentColor"/></svg>
+            <span data-t="supportMonobank">Банка Monobank</span>
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer"><div class="container footer-inner"><a class="brand" href="#top" aria-label="Call Gate"><img src="assets/images/call-gate.svg" alt="" width="32" height="32">Call Gate</a><span class="footer-note" data-t="footerNote">Офлайн-фільтр дзвінків для Android</span><nav class="footer-links" aria-label="Footer"><a class="footer-privacy" href="privacy.html" data-t="privacyPolicy">Політика приватності</a><span class="footer-copyright">© 2026 CyberDesignTech · CallGate</span></nav><button class="button button-secondary button-small share" type="button" id="share" hidden><svg class="icon"><use href="#i-share"/></svg><span data-t="share">Поділитися</span></button></div><p id="notice" class="notice" role="status" hidden></p></footer>
+</body>
+</html>
