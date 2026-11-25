@@ -32,28 +32,30 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
-/build/
+build/
 /android/app/build/
 /android/.gradle/
 /coverage/
 
 # Local Android SDK paths and generated APK/AAB artifacts
 /android/local.properties
+/android/key.properties
 **/key.properties
-**/*.jks
-**/*.keystore
+*.jks
+*.keystore
 **/*.p12
 **/*.pem
-**/.env
-**/.env.*
+.env*
+**/.env*
 *.env
 .callguard_deploy*
 *.apk
 *.aab
-release/
-!release/
+# APKs are ignored by default; keep the published release APK trackable.
 !release/CallGate-*.apk
-!landing/release/CallGate-*.apk
+
+# Web landing page is deployed separately.
+landing/
 
 # Symbolication related
 app.*.symbols
@@ -70,5 +72,5 @@ app.*.map.json
 .widget_preview/
 
 # Generated promotional video drafts and their local toolchains
-/brag-output/
+brag-output/
 /brag-output-*/
